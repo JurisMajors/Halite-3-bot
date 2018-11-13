@@ -45,10 +45,11 @@ while True:
     game.update_frame()    
     me = game.me
     game_map = game.game_map
+    return_percentage = 0.9 if game.turn_number < 50 else 0.7
 
     command_queue = []
     h = [] # stores halite amount * -1 with its position in a minheap
-    top_left = Position(-15 , -15) + me.shipyard.position # top left of scan area
+    top_left = Position(-15, -15) + me.shipyard.position # top left of scan area
     for y in range(size):
         for x in range(size):
             p = Position((top_left.x + x) % game_map.width, (top_left.y + y) % game_map.height) # position of patch
@@ -90,11 +91,11 @@ while True:
         if ship_state[ship.id] == "exploring" and (ship.position == ship_dest[ship.id] or game_map[ship.position].halite_amount > 300) :
             # collect if reached destination or on medium sized patch
             ship_state[ship.id] = "collecting"          
-        elif ship_state[ship.id] == "exploring" and ship.halite_amount >= constants.MAX_HALITE*0.7:
+        elif ship_state[ship.id] == "exploring" and ship.halite_amount >= constants.MAX_HALITE*return_percentage:
             # return if ship is 70+% full
             ship_state[ship.id] = "returning" 
             ship_dest[ship.id] = me.shipyard.position
-        elif ship_state[ship.id] == "collecting" and (game_map[ship.position].halite_amount < 10 or ship.halite_amount >= constants.MAX_HALITE*0.7): # return to shipyard if enough halite
+        elif ship_state[ship.id] == "collecting" and (game_map[ship.position].halite_amount < 10 or ship.halite_amount >= constants.MAX_HALITE*return_percentage): # return to shipyard if enough halite
             # return if patch has little halite or ship is 70% full
             ship_state[ship.id] = "returning"
             ship_dest[ship.id] = me.shipyard.position 
