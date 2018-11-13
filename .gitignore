@@ -9,6 +9,5 @@ __pycache__/
 *.class
 *.ipr
 *.iws
-halite.exe
 run_game.sh
 replays
