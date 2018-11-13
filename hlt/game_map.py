@@ -17,6 +17,10 @@ class MapCell:
         self.ship = None
         self.structure = None
 
+        # Parameters for Dijkstra
+        self.weight_to_shipyard = 0
+        self.direction_to_shipyard = None
+
     @property
     def is_empty(self):
         """
@@ -242,6 +246,12 @@ class GameMap:
         return final_direction 
 
 
+    def create_graph(self):
+        """
+        Assigns the correct value to weight_to_shipyard, and direction_to_shipyard for each cell in this map
+        by using Dijkstra using the shipyard as source.
+        """
+        pass
 
 
     @staticmethod
