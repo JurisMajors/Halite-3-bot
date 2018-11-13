@@ -6,6 +6,7 @@ from .entity import Entity, Shipyard, Ship, Dropoff
 from .player import Player
 from .positionals import Direction, Position
 from .common import read_input
+from heapq import heappush, heappop
 import logging
 
 
@@ -173,7 +174,7 @@ class GameMap:
         all_moves = Direction.get_all_cardinals()
         # pick random move that is safe
         move = random.choice(all_moves)
-        while self[ship.position.directional_offset(move)].is_occupied: 
+        while self[ship.position.directional_offset(move)].is_occupied:
             all_moves.remove(move)
             if len(all_moves) == 0: # if stuck in all directions then stay still
                 return Direction.Still
@@ -181,7 +182,7 @@ class GameMap:
         self[ship.position.directional_offset(move)].mark_unsafe(ship)
         return move
 
-    def select_best_direction(self, prev_position, ship, destination): 
+    def select_best_direction(self, prev_position, ship, destination):
         # selects best direction that is not occupied but with smallest distance to destination
         possible_moves = [] # (direction, distance to destination if taken that direction)
         for direction in Direction.get_all_cardinals(): # for 4 directions
@@ -202,7 +203,7 @@ class GameMap:
         if self.calculate_distance(ship.position, destination) == 1: # move in the needed direction or stay still if a ship is in the destination at this moment
             surrounded = True # assumption
             for direction in Direction.get_all_cardinals():
-                if not self[destination.directional_offset(direction)].is_occupied: 
+                if not self[destination.directional_offset(direction)].is_occupied:
                     # if any position around destination is not occupied it is not surrounded
                     surrounded = False
             if surrounded: # move in circle to not surround
@@ -243,16 +244,51 @@ class GameMap:
             position = position.directional_offset(direction) # new position
             self[position].mark_unsafe(ship)
 
-        return final_direction 
+        return final_direction
 
 
     def create_graph(self):
+
         """
         Assigns the correct value to weight_to_shipyard, and direction_to_shipyard for each cell in this map
         by using Dijkstra using the shipyard as source.
         """
         pass
 
+    def dijkstra(self, source_cell):
+        """
+        Does Dijkstra from Cell source_cell
+        :param source_cell: the source cell.
+        """
+        # Priority Queue with map cells
+        PQ = []
+        # set distance to infinity on all nodes
+        for cell in self._cells:
+            cell.weight_to_shipyard = 1_000_000
+        source_cell.weight_to_shipyard = 0
+        heappush(PQ, (cell.weight_to_shipyard, cell))
+        while PQ:
+            dist_cell = heappop(PQ)
+            dist = dist_cell[0]
+            cell = dist_cell[1]
+            if cell.weight_to_shipyard < dist: continue
+            for neighbour in self.get_neighbours(cell):
+                new_dist = dist + neighbour.halite_amount
+                if new_dist < neighbour.weight_to_shipyard:
+                    neighbour.weight_to_shipyard = new_dist
+                    neighbour.parent = cell
+                    heappush(PQ, (new_dist, neighbour))
+
+    def get_neighbours(self, source_cell):
+        """
+        Returns a list of all neighbouring cells
+        """
+        dy = [-1, 0, 1, 0]
+        dx = [0, -1, 0, 1]
+        neighbours = []
+        for i in range(len(dy)):
+            neighbours.append(self[source_cell.position + Position(dy[i], dx[i])])
+        return neighbours
 
     @staticmethod
     def _generate():
