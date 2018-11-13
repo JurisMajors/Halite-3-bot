@@ -45,7 +45,7 @@ while True:
     game.update_frame()    
     me = game.me
     game_map = game.game_map
-    return_percentage = 0.9 if game.turn_number < 50 else 0.7
+    return_percentage = 0.7 if game.turn_number < 50 else 0.7
 
     command_queue = []
     h = [] # stores halite amount * -1 with its position in a minheap
