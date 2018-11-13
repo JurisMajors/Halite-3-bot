@@ -20,7 +20,7 @@ class MapCell:
 
         # Parameters for Dijkstra
         self.weight_to_shipyard = 0
-        self.direction_to_shipyard = None
+        self.parent = None
 
     @property
     def is_empty(self):
@@ -63,6 +63,9 @@ class MapCell:
 
     def __ne__(self, other):
         return not self.__eq__(other)
+
+    def __lt__(self, other):
+        return self.position.x < other.position.x
 
     def __str__(self):
         return 'MapCell({}, halite={})'.format(self.position, self.halite_amount)
@@ -231,7 +234,7 @@ class GameMap:
         # now artifically move and mark future spots unsafe too
         distance = self.calculate_distance(ship.position, destination)
         #select how many moves we mark in future
-        nr_future_moves = 2
+        nr_future_moves = 1
         position = new_position
         prev_position = ship.position
         # simulate moves
@@ -263,17 +266,20 @@ class GameMap:
         # Priority Queue with map cells
         PQ = []
         # set distance to infinity on all nodes
-        for cell in self._cells:
-            cell.weight_to_shipyard = 1_000_000
+        for i in range(self.height):
+            for j in range(self.width):
+                self._cells[i][j].weight_to_shipyard = 1_000_000
+        # for cell in self._cells:
+        #     cell.weight_to_shipyard = 1_000_000
         source_cell.weight_to_shipyard = 0
-        heappush(PQ, (cell.weight_to_shipyard, cell))
+        heappush(PQ, (source_cell.weight_to_shipyard, source_cell))
         while PQ:
             dist_cell = heappop(PQ)
             dist = dist_cell[0]
             cell = dist_cell[1]
             if cell.weight_to_shipyard < dist: continue
             for neighbour in self.get_neighbours(cell):
-                new_dist = dist + neighbour.halite_amount
+                new_dist = dist + neighbour.halite_amount + 50
                 if new_dist < neighbour.weight_to_shipyard:
                     neighbour.weight_to_shipyard = new_dist
                     neighbour.parent = cell

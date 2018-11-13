@@ -45,7 +45,11 @@ while True:
     game.update_frame()    
     me = game.me
     game_map = game.game_map
+    game_map.dijkstra(me.shipyard)
     return_percentage = 0.7 if game.turn_number < 50 else 0.7
+
+    # Maps IDs of the ships to whether they made a move or not
+    has_moved = {}
 
     command_queue = []
     h = [] # stores halite amount * -1 with its position in a minheap
@@ -57,7 +61,8 @@ while True:
             halite_positions[factor] = p
             heappush(h, factor) # add negative halite amounts so that would act as maxheap
     ships = [] # ship priority queue
-    for s in me.get_ships(): 
+    for s in me.get_ships():
+        has_moved[s.id] = False
         if s.id in ship_state:
             # importance, the lower the number, bigger importance
             if ship_state[s.id] == "returning":
@@ -70,9 +75,13 @@ while True:
             importance = 0 # newly spawned ships max importance
         heappush(ships, (importance, s))
 
+    # True if a ship moves into the shipyard this turn
+    move_into_shipyard = False
 
     while not len(ships) == 0:
         ship = heappop(ships)[1]
+        if has_moved[ship.id]:
+            continue
         if ship.id not in previous_position:
             previous_position[ship.id] = me.shipyard.position
         find_new_dest = False
@@ -130,15 +139,47 @@ while True:
             move = game_map.smart_navigate(previous_position[ship.id], ship, ship_dest[ship.id])
             command_queue.append(ship.move(move))
             
-        elif ship_state[ship.id] == "returning": # if returning
-            move = game_map.smart_navigate(previous_position[ship.id], ship, ship_dest[ship.id])
+        elif ship_state[ship.id] == "returning":  # if returning
+            # Old move:
+            # move = game_map.smart_navigate(previous_position[ship.id], ship, ship_dest[ship.id])
+
+            # Get the cell and direction we want to go to from dijkstra
+            cell = game_map[ship.position].parent
+            target_pos = cell.position
+            target_dir = game_map._get_target_direction(ship.position, target_pos)
+            move = target_dir[0] if target_dir[0] is not None else target_dir[1]
+
+            # Occupied
+            if game_map[cell.position].is_occupied:
+                other_ship = game_map[cell.position].ship
+                # Occupied by own ship that can move, perform swap
+                if other_ship in me.get_ships() \
+                        and other_ship.halite_amount >= game_map[cell.position].halite_amount / 10\
+                        and not has_moved[other_ship.id]:
+                    # Move other ship to this position
+                    command_queue.append(other_ship.move(Direction.invert(move)))
+                    game_map[ship.position].mark_unsafe(other_ship)
+                    has_moved[other_ship.id] = True
+                # Occupied by enemy ship (or own ship that cannot move), try to go around? Stand still?
+                else:
+                    logging.info("ship {} cannot swap".format(ship.id))
+                    move = Direction.Still
+                    target_pos = ship.position
+
+            if target_pos == me.shipyard.position:
+                move_into_shipyard = True
+
+            game_map[target_pos].mark_unsafe(ship)
             command_queue.append(ship.move(move))
             
         elif ship_state[ship.id] == "collecting": 
-            move = Direction.Still # collect
+            move = Direction.Still  # collect
             command_queue.append(ship.move(move))
 
         previous_position[ship.id] = ship.position
+
+        # This ship has made a move
+        has_moved[ship.id] = True
         
     # check if shipyard is surrounded by ships
     shipyard_surrounded = True
@@ -148,7 +189,8 @@ while True:
             shipyard_surrounded = False
             break
 
-    if game.turn_number <= 150 and me.halite_amount >= constants.SHIP_COST and not (game_map[me.shipyard].is_occupied or shipyard_surrounded):
+    if game.turn_number <= 150 and me.halite_amount >= constants.SHIP_COST \
+            and not (game_map[me.shipyard].is_occupied or shipyard_surrounded or move_into_shipyard):
         command_queue.append(me.shipyard.spawn())
 
     # Send your moves back to the game environment, ending this turn.
