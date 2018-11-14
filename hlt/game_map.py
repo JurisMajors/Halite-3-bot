@@ -220,10 +220,11 @@ class GameMap:
                 if not self[destination.directional_offset(direction)].is_occupied:
                     # if any position around destination is not occupied it is not surrounded
                     surrounded = False
+                    break
+            
             if surrounded:  # move in circle to not surround
                 target_direction = self.get_target_direction(destination, ship.position)  # direction destination->ship
-                relative_direction = target_direction[0] if target_direction[0] is not None else target_direction[
-                    1]  # get the direction
+                relative_direction = target_direction[0] if target_direction[0] is not None else target_direction[1]  # get the direction
                 movement = (relative_direction[1], relative_direction[0])  # rotate by 90 degrees
                 new_position = ship.position.directional_offset(movement)  # get possible future position
                 if self[new_position].is_occupied:  # if its occupied
@@ -231,13 +232,13 @@ class GameMap:
                 self[new_position].mark_unsafe(ship)  # mark the new position unsafe
                 return movement
             else:
-                for direction in self.get_unsafe_moves(ship.position, destination):
-                    target_pos = ship.position.directional_offset(direction)
-                    if (not self[target_pos].is_occupied or self[target_pos].ship == ship):
-                        # if not occupied or if it was occupied by the ship before, and its the correct destination, move there
-                        self[target_pos].mark_unsafe(ship)
-                        return direction
-                return Direction.Still
+                direction = self.get_target_direction(ship.position, destination)
+                target_direction = direction[0] if direction[0] is not None else direction[1]  # get the direction
+                new_position = ship.position.directional_offset(target_direction)
+                if self[new_position].is_occupied:
+                    return Direction.Still
+                self[new_position].mark_unsafe(ship)
+                return target_direction
         # else select best move 
         # and from that mark them
         final_direction = self.select_best_direction(previous, ship, destination)
