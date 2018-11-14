@@ -74,6 +74,10 @@ def shipPriorityQ(me, game_map):
         heappush(ships, (importance, s))
     return ships, has_moved
 
+def returnShip(ship_id, ship_dest, ship_state):
+    ship_dest[ship_id] = me.shipyard.position
+    ship_state[ship_id] = "returning"
+    return ship_state, ship_dest
 
 
 while True:
@@ -112,25 +116,21 @@ while True:
         
 
         # transition
-        #if ship_state[ship.id] == "returning" and game.turn_number >= CRASH_TURN and ship.position == me.shipyard.position:
-        #    ship_state[ship.id] = "harakiri"
         if ship_state[ship.id] == "returning" and game.turn_number >= CRASH_TURN and game_map.calculate_distance(ship.position, me.shipyard.position) < 2:
+            # if returning after crash turn, suicide
             ship_state[ship.id] = "harakiri"
-        #elif ship_state[ship.id] == "returning" and game.turn_number >= CRASH_TURN
         elif (ship_state[ship.id] == "collecting" or ship_state[ship.id] == "exploring") and game.turn_number == CRASH_TURN:
-            ship_state[ship.id] = "returning"
-            ship_dest[ship.id] = me.shipyard.position
+            # return if at crash turn
+            ship_state, ship_dest = returnShip(ship.id, ship_dest, ship_state)
         elif ship_state[ship.id] == "exploring" and (ship.position == ship_dest[ship.id] or game_map[ship.position].halite_amount > MEDIUM_HALITE) :
             # collect if reached destination or on medium sized patch
             ship_state[ship.id] = "collecting"
         elif ship_state[ship.id] == "exploring" and ship.halite_amount >= constants.MAX_HALITE*return_percentage:
             # return if ship is 70+% full
-            ship_state[ship.id] = "returning"
-            ship_dest[ship.id] = me.shipyard.position
+            ship_state, ship_dest = returnShip(ship.id, ship_dest, ship_state)
         elif ship_state[ship.id] == "collecting" and (game_map[ship.position].halite_amount < HALITE_STOP or ship.halite_amount >= constants.MAX_HALITE*return_percentage): # return to shipyard if enough halite
             # return if patch has little halite or ship is 70% full
-            ship_state[ship.id] = "returning"
-            ship_dest[ship.id] = me.shipyard.position
+            ship_state, ship_dest = returnShip(ship.id, ship_dest, ship_state)
         elif ship_state[ship.id] == "returning" and ship.position == ship_dest[ship.id]:
             # explore again when back in shipyard
             ship_state[ship.id] = "exploring"
@@ -162,9 +162,6 @@ while True:
             command_queue.append(ship.move(move))
             
         elif ship_state[ship.id] == "returning":  # if returning
-            # Old move:
-            # move = game_map.smart_navigate(previous_position[ship.id], ship, ship_dest[ship.id])
-
             # Get the cell and direction we want to go to from dijkstra
             cell = game_map[ship.position].parent
             target_pos = cell.position
@@ -198,18 +195,16 @@ while True:
             move = Direction.Still  # collect
             command_queue.append(ship.move(move))
 
-        elif ship_state[ship.id] == "harakiri":
-            if ship.position == me.shipyard.position:
-                move = Direction.Still
-            else:
-                cell = me.shipyard
-                target_pos = cell.position
+        elif ship_state[ship.id] == "harakiri": 
+            if ship.position == me.shipyard.position: # if at shipyard
+                move = Direction.Still # let other ships crash in to you
+            else: # otherwise move to the shipyard
+                target_pos = me.shipyard.position
                 target_dir = game_map._get_target_direction(ship.position, target_pos)
                 move = target_dir[0] if target_dir[0] is not None else target_dir[1]
             command_queue.append(ship.move(move))
 
         previous_position[ship.id] = ship.position
-
         # This ship has made a move
         has_moved[ship.id] = True
         
