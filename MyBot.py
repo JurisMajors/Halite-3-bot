@@ -192,7 +192,7 @@ while True:
             # Get the cell and direction we want to go to from dijkstra
             cell = game_map[ship.position].parent
             target_pos = cell.position
-            target_dir = game_map._get_target_direction(ship.position, target_pos)
+            target_dir = game_map.get_target_direction(ship.position, target_pos)
             move = target_dir[0] if target_dir[0] is not None else target_dir[1]
             # Occupied
             if game_map[target_pos].is_occupied:
@@ -229,7 +229,7 @@ while True:
                 move = Direction.Still  # let other ships crash in to you
             else:  # otherwise move to the shipyard
                 target_pos = me.shipyard.position
-                target_dir = game_map._get_target_direction(ship.position, target_pos)
+                target_dir = game_map.get_target_direction(ship.position, target_pos)
                 move = target_dir[0] if target_dir[0] is not None else target_dir[1]
             command_queue.append(ship.move(move))
 

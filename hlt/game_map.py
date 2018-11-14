@@ -12,6 +12,7 @@ import logging
 
 class MapCell:
     """A cell on the game map."""
+
     def __init__(self, position, halite_amount):
         self.position = position
         self.halite_amount = halite_amount
@@ -78,6 +79,7 @@ class GameMap:
     Can be indexed by a position, or by a contained entity.
     Coordinates start at 0. Coordinates are normalized for you
     """
+
     def __init__(self, cells, width, height):
         self.width = width
         self.height = height
@@ -108,7 +110,7 @@ class GameMap:
         target = self.normalize(target)
         resulting_position = abs(source - target)
         return min(resulting_position.x, self.width - resulting_position.x) + \
-            min(resulting_position.y, self.height - resulting_position.y)
+               min(resulting_position.y, self.height - resulting_position.y)
 
     def normalize(self, position):
         """
@@ -121,8 +123,7 @@ class GameMap:
         """
         return Position(position.x % self.width, position.y % self.height)
 
-    @staticmethod
-    def _get_target_direction(source, target):
+    def get_target_direction(self, source, target):
         """
         Returns where in the cardinality spectrum the target is from source. e.g.: North, East; South, West; etc.
         NOTE: Ignores toroid
@@ -130,8 +131,16 @@ class GameMap:
         :param target: The target position
         :return: A tuple containing the target Direction. A tuple item (or both) could be None if within same coords
         """
-        return (Direction.South if target.y > source.y else Direction.North if target.y < source.y else None,
-                Direction.East if target.x > source.x else Direction.West if target.x < source.x else None)
+        # Horizontal without using the edges
+        horizontal = Direction.South if target.y > source.y else Direction.North if target.y < source.y else None
+        # Use edge if its faster than normal
+        if abs(target.y - source.y) > (self.height - abs(target.y - source.y)) and horizontal is not None:
+            horizontal = Direction.invert(horizontal)
+        vertical = Direction.East if target.x > source.x else Direction.West if target.x < source.x else None
+        if abs(target.x - source.x) > (self.width - abs(target.x - source.x)) and vertical is not None:
+            vertical = Direction.invert(vertical)
+        return (horizontal,
+                vertical)
 
     def get_unsafe_moves(self, source, destination):
         """
@@ -146,7 +155,7 @@ class GameMap:
         destination = self.normalize(destination)
         possible_moves = []
         distance = abs(destination - source)
-        y_cardinality, x_cardinality = self._get_target_direction(source, destination)
+        y_cardinality, x_cardinality = self.get_target_direction(source, destination)
 
         if distance.x != 0:
             possible_moves.append(x_cardinality if distance.x < (self.width / 2)
@@ -179,7 +188,7 @@ class GameMap:
         move = random.choice(all_moves)
         while self[ship.position.directional_offset(move)].is_occupied:
             all_moves.remove(move)
-            if len(all_moves) == 0: # if stuck in all directions then stay still
+            if len(all_moves) == 0:  # if stuck in all directions then stay still
                 return Direction.Still
             move = random.choice(all_moves)
         self[ship.position.directional_offset(move)].mark_unsafe(ship)
@@ -187,36 +196,39 @@ class GameMap:
 
     def select_best_direction(self, prev_position, ship, destination):
         # selects best direction that is not occupied but with smallest distance to destination
-        possible_moves = [] # (direction, distance to destination if taken that direction)
-        for direction in Direction.get_all_cardinals(): # for 4 directions
+        possible_moves = []  # (direction, distance to destination if taken that direction)
+        for direction in Direction.get_all_cardinals():  # for 4 directions
             next_position = ship.position.directional_offset(direction)
-            if not (self[next_position].is_occupied  or self[prev_position] == self[next_position]): # check if the position is valid
-            # that is.. if its not occupied and not previous position (so the ship doesnt wiggle back and forth)
+            if not (self[next_position].is_occupied or self[prev_position] == self[
+                next_position]):  # check if the position is valid
+                # that is.. if its not occupied and not previous position (so the ship doesnt wiggle back and forth)
                 possible_moves.append((direction, self.calculate_distance(next_position, destination)))
 
         if len(possible_moves) == 0:
             return Direction.Still
         # select direction with best distance
-        final_direction = min(possible_moves, key = lambda t: t[1])[0]
+        final_direction = min(possible_moves, key=lambda t: t[1])[0]
         return final_direction
 
     def smart_navigate(self, previous, ship, destination):
         if ship.position == destination:
             return Direction.Still
-        if self.calculate_distance(ship.position, destination) == 1: # move in the needed direction or stay still if a ship is in the destination at this moment
-            surrounded = True # assumption
+        if self.calculate_distance(ship.position,
+                                   destination) == 1:  # move in the needed direction or stay still if a ship is in the destination at this moment
+            surrounded = True  # assumption
             for direction in Direction.get_all_cardinals():
                 if not self[destination.directional_offset(direction)].is_occupied:
                     # if any position around destination is not occupied it is not surrounded
                     surrounded = False
-            if surrounded: # move in circle to not surround
-                target_direction = self._get_target_direction(destination, ship.position) # direction destination->ship
-                relative_direction = target_direction[0] if target_direction[0] is not None else target_direction[1] # get the direction
-                movement = (relative_direction[1], relative_direction[0]) # rotate by 90 degrees
-                new_position = ship.position.directional_offset(movement) # get possible future position
-                if self[new_position].is_occupied: # if its occupied
-                    movement = relative_direction # go outwards
-                self[new_position].mark_unsafe(ship) # mark the new position unsafe
+            if surrounded:  # move in circle to not surround
+                target_direction = self.get_target_direction(destination, ship.position)  # direction destination->ship
+                relative_direction = target_direction[0] if target_direction[0] is not None else target_direction[
+                    1]  # get the direction
+                movement = (relative_direction[1], relative_direction[0])  # rotate by 90 degrees
+                new_position = ship.position.directional_offset(movement)  # get possible future position
+                if self[new_position].is_occupied:  # if its occupied
+                    movement = relative_direction  # go outwards
+                self[new_position].mark_unsafe(ship)  # mark the new position unsafe
                 return movement
             else:
                 for direction in self.get_unsafe_moves(ship.position, destination):
@@ -233,22 +245,21 @@ class GameMap:
         self[new_position].mark_unsafe(ship)
         # now artifically move and mark future spots unsafe too
         distance = self.calculate_distance(ship.position, destination)
-        #select how many moves we mark in future
+        # select how many moves we mark in future
         nr_future_moves = 1
         position = new_position
         prev_position = ship.position
         # simulate moves
         for _ in range(nr_future_moves):
-            direction = self.select_best_direction(prev_position,ship, destination)
-            if direction == Direction.Still: # if standing still stop cuz it will continue standing still
+            direction = self.select_best_direction(prev_position, ship, destination)
+            if direction == Direction.Still:  # if standing still stop cuz it will continue standing still
                 self[position].mark_unsafe(ship)
                 break
             prev_position = position
-            position = position.directional_offset(direction) # new position
+            position = position.directional_offset(direction)  # new position
             self[position].mark_unsafe(ship)
 
         return final_direction
-
 
     def create_graph(self):
 
