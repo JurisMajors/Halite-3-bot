@@ -35,11 +35,12 @@ previous_position = {} # ship.id-> previous pos
 #search area for halite relative to shipyard
 SCAN_AREA = 30
 PERCENTAGE_SWITCH = 50 # when switch collectable percentage of max halite
-SMALL_PERCENTAGE = 0.7
-BIG_PERCENTAGE = 0.7
+SMALL_PERCENTAGE = 0.8
+BIG_PERCENTAGE = 0.9
 MEDIUM_HALITE = 300 # definition of medium patch size for stopping and collecting patch if on the way
 HALITE_STOP = 10 # halite left at patch to stop collecting at that patch
-SPAWN_TURN = 150 # until which turn to spawn ships
+SPAWN_TURN = 220 # until which turn to spawn ships
+CRASH_TURN = 0.95 * constants.MAX_TURNS;
 
 def f(h_amount, h_distance): # function for determining patch priority
     return h_amount/(2*h_distance + 1)
@@ -111,18 +112,25 @@ while True:
         
 
         # transition
-        if ship_state[ship.id] == "exploring" and (ship.position == ship_dest[ship.id] or game_map[ship.position].halite_amount > MEDIUM_HALITE) :
+        #if ship_state[ship.id] == "returning" and game.turn_number >= CRASH_TURN and ship.position == me.shipyard.position:
+        #    ship_state[ship.id] = "harakiri"
+        if ship_state[ship.id] == "returning" and game.turn_number >= CRASH_TURN and game_map.calculate_distance(ship.position, me.shipyard.position) < 2:
+            ship_state[ship.id] = "harakiri"
+        #elif ship_state[ship.id] == "returning" and game.turn_number >= CRASH_TURN
+        elif (ship_state[ship.id] == "collecting" or ship_state[ship.id] == "exploring") and game.turn_number == CRASH_TURN:
+            ship_state[ship.id] = "returning"
+            ship_dest[ship.id] = me.shipyard.position
+        elif ship_state[ship.id] == "exploring" and (ship.position == ship_dest[ship.id] or game_map[ship.position].halite_amount > MEDIUM_HALITE) :
             # collect if reached destination or on medium sized patch
-            ship_state[ship.id] = "collecting"          
+            ship_state[ship.id] = "collecting"
         elif ship_state[ship.id] == "exploring" and ship.halite_amount >= constants.MAX_HALITE*return_percentage:
             # return if ship is 70+% full
-            ship_state[ship.id] = "returning" 
+            ship_state[ship.id] = "returning"
             ship_dest[ship.id] = me.shipyard.position
         elif ship_state[ship.id] == "collecting" and (game_map[ship.position].halite_amount < HALITE_STOP or ship.halite_amount >= constants.MAX_HALITE*return_percentage): # return to shipyard if enough halite
             # return if patch has little halite or ship is 70% full
             ship_state[ship.id] = "returning"
-            ship_dest[ship.id] = me.shipyard.position 
-            
+            ship_dest[ship.id] = me.shipyard.position
         elif ship_state[ship.id] == "returning" and ship.position == ship_dest[ship.id]:
             # explore again when back in shipyard
             ship_state[ship.id] = "exploring"
@@ -188,6 +196,16 @@ while True:
             
         elif ship_state[ship.id] == "collecting": 
             move = Direction.Still  # collect
+            command_queue.append(ship.move(move))
+
+        elif ship_state[ship.id] == "harakiri":
+            if ship.position == me.shipyard.position:
+                move = Direction.Still
+            else:
+                cell = me.shipyard
+                target_pos = cell.position
+                target_dir = game_map._get_target_direction(ship.position, target_pos)
+                move = target_dir[0] if target_dir[0] is not None else target_dir[1]
             command_queue.append(ship.move(move))
 
         previous_position[ship.id] = ship.position
