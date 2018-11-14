@@ -94,7 +94,7 @@ def selectCrashTurn():
         d = game_map.calculate_distance(me.shipyard.position, ship.position)
         if d > distance:
             distance = d
-    crash_turn = constants.MAX_TURNS - distance - 1
+    crash_turn = constants.MAX_TURNS - distance - 2
     return crash_turn if crash_turn > CRASH_SELECTION_TURN else CRASH_SELECTION_TURN
 
 
@@ -210,10 +210,6 @@ while True:
                     logging.info("ship {} cannot swap".format(ship.id))
                     move = Direction.Still
                     target_pos = ship.position
-            logging.info("ship: {}, parent: {}".format(str(ship.position), str(target_pos)))
-            ship_weight = game_map[ship.position].weight_to_shipyard
-            target_weight = game_map[target_pos].weight_to_shipyard
-            logging.info("s weight: {}, p weight: {}".format(ship_weight, target_weight))
             if target_pos == me.shipyard.position:
                 move_into_shipyard = True
 
