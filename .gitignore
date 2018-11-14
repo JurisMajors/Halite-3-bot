@@ -12,3 +12,4 @@ __pycache__/
 run_game.sh
 replays
 bad.py
+.idea/*
