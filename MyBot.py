@@ -33,31 +33,31 @@ ship_dest = {} # destination -> ship.id
 halite_positions = {} # halite -> position
 previous_position = {} # ship.id-> previous pos
 #search area for halite relative to shipyard
-size = 30
+SCAN_AREA = 30
+PERCENTAGE_SWITCH = 50 # when switch collectable percentage of max halite
+SMALL_PERCENTAGE = 0.7
+BIG_PERCENTAGE = 0.7
+MEDIUM_HALITE = 300 # definition of medium patch size for stopping and collecting patch if on the way
+HALITE_STOP = 10 # halite left at patch to stop collecting at that patch
+SPAWN_TURN = 150 # until which turn to spawn ships
 
 def f(h_amount, h_distance): # function for determining patch priority
     return h_amount/(2*h_distance + 1)
 
-while True:
-    game.update_frame()    
-    me = game.me
-    game_map = game.game_map
-    game_map.dijkstra(me.shipyard)
-    return_percentage = 0.7 if game.turn_number < 50 else 0.7
-
-    # Maps IDs of the ships to whether they made a move or not
-    has_moved = {}
-
-    command_queue = []
+def halitePriorityQ(shipyard_pos, game_map):
     h = [] # stores halite amount * -1 with its position in a minheap
-    top_left = Position(-15, -15) + me.shipyard.position # top left of scan area
-    for y in range(size):
-        for x in range(size):
+    top_left = Position(int(-1*SCAN_AREA/2), int(-1*SCAN_AREA/2)) + shipyard_pos # top left of scan area
+    for y in range(SCAN_AREA):
+        for x in range(SCAN_AREA):
             p = Position((top_left.x + x) % game_map.width, (top_left.y + y) % game_map.height) # position of patch
-            factor = f(game_map[p].halite_amount * -1, game_map.calculate_distance(p, me.shipyard.position)) # f(negative halite amount,  distance from shipyard to patch)
+            factor = f(game_map[p].halite_amount * -1, game_map.calculate_distance(p, shipyard_pos)) # f(negative halite amount,  distance from shipyard to patch)
             halite_positions[factor] = p
             heappush(h, factor) # add negative halite amounts so that would act as maxheap
+    return h
+
+def shipPriorityQ(me, game_map):
     ships = [] # ship priority queue
+    has_moved = {}
     for s in me.get_ships():
         has_moved[s.id] = False
         if s.id in ship_state:
@@ -71,6 +71,23 @@ while True:
         else:
             importance = 0 # newly spawned ships max importance
         heappush(ships, (importance, s))
+    return ships, has_moved
+
+
+
+while True:
+    game.update_frame()    
+    me = game.me
+    game_map = game.game_map
+    game_map.dijkstra(me.shipyard)
+    return_percentage = BIG_PERCENTAGE if game.turn_number < PERCENTAGE_SWITCH else SMALL_PERCENTAGE
+
+    command_queue = []
+    # priority Q of patch function values of function f(halite, distance)
+    h = halitePriorityQ(me.shipyard.position, game_map)
+    # has_moved ID->True/False, moved or not
+    # ships priority queue of (importance, ship) 
+    ships, has_moved = shipPriorityQ(me, game_map)
 
     # True if a ship moves into the shipyard this turn
     move_into_shipyard = False
@@ -94,14 +111,14 @@ while True:
         
 
         # transition
-        if ship_state[ship.id] == "exploring" and (ship.position == ship_dest[ship.id] or game_map[ship.position].halite_amount > 300) :
+        if ship_state[ship.id] == "exploring" and (ship.position == ship_dest[ship.id] or game_map[ship.position].halite_amount > MEDIUM_HALITE) :
             # collect if reached destination or on medium sized patch
             ship_state[ship.id] = "collecting"          
         elif ship_state[ship.id] == "exploring" and ship.halite_amount >= constants.MAX_HALITE*return_percentage:
             # return if ship is 70+% full
             ship_state[ship.id] = "returning" 
             ship_dest[ship.id] = me.shipyard.position
-        elif ship_state[ship.id] == "collecting" and (game_map[ship.position].halite_amount < 10 or ship.halite_amount >= constants.MAX_HALITE*return_percentage): # return to shipyard if enough halite
+        elif ship_state[ship.id] == "collecting" and (game_map[ship.position].halite_amount < HALITE_STOP or ship.halite_amount >= constants.MAX_HALITE*return_percentage): # return to shipyard if enough halite
             # return if patch has little halite or ship is 70% full
             ship_state[ship.id] = "returning"
             ship_dest[ship.id] = me.shipyard.position 
@@ -151,7 +168,7 @@ while True:
                 other_ship = game_map[cell.position].ship
                 # Occupied by own ship that can move, perform swap
                 if other_ship in me.get_ships() \
-                        and other_ship.halite_amount >= game_map[cell.position].halite_amount / 10\
+                        and other_ship.halite_amount >= game_map[cell.position].halite_amount * 0.1\
                         and not has_moved[other_ship.id]:
                     # Move other ship to this position
                     command_queue.append(other_ship.move(Direction.invert(move)))
@@ -186,7 +203,7 @@ while True:
             shipyard_surrounded = False
             break
 
-    if game.turn_number <= 150 and me.halite_amount >= constants.SHIP_COST \
+    if game.turn_number <= SPAWN_TURN and me.halite_amount >= constants.SHIP_COST \
             and not (game_map[me.shipyard].is_occupied or shipyard_surrounded or move_into_shipyard):
         command_queue.append(me.shipyard.spawn())
 
