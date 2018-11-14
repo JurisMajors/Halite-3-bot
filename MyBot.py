@@ -35,12 +35,14 @@ previous_position = {} # ship.id-> previous pos
 #search area for halite relative to shipyard
 SCAN_AREA = 30
 PERCENTAGE_SWITCH = 50 # when switch collectable percentage of max halite
-SMALL_PERCENTAGE = 0.8
-BIG_PERCENTAGE = 0.9
+SMALL_PERCENTAGE = 0.7
+BIG_PERCENTAGE = 0.95
 MEDIUM_HALITE = 300 # definition of medium patch size for stopping and collecting patch if on the way
 HALITE_STOP = 10 # halite left at patch to stop collecting at that patch
 SPAWN_TURN = 220 # until which turn to spawn ships
-CRASH_TURN = 0.95 * constants.MAX_TURNS;
+CRASH_TURN = constants.MAX_TURNS
+CRASH_SELECTION_TURN = int(0.8*constants.MAX_TURNS)
+
 
 def f(h_amount, h_distance): # function for determining patch priority
     return h_amount/(2*h_distance + 1)
@@ -79,6 +81,14 @@ def returnShip(ship_id, ship_dest, ship_state):
     ship_state[ship_id] = "returning"
     return ship_state, ship_dest
 
+def selectCrashTurn():
+    distance = 0
+    for ship in me.get_ships():
+        d = game_map.calculate_distance(me.shipyard.position, ship.position)
+        if d > distance:
+            distance = d
+    crash_turn = constants.MAX_TURNS - distance - 1
+    return crash_turn if crash_turn > CRASH_SELECTION_TURN else CRASH_SELECTION_TURN 
 
 while True:
     game.update_frame()    
@@ -97,6 +107,9 @@ while True:
     # True if a ship moves into the shipyard this turn
     move_into_shipyard = False
 
+    if game.turn_number == CRASH_SELECTION_TURN:
+        CRASH_TURN = selectCrashTurn()
+        logging.info("CRASH AT TURN{}".format(CRASH_TURN))
     while not len(ships) == 0:
         ship = heappop(ships)[1]
         if has_moved[ship.id]:
@@ -119,7 +132,7 @@ while True:
         if ship_state[ship.id] == "returning" and game.turn_number >= CRASH_TURN and game_map.calculate_distance(ship.position, me.shipyard.position) < 2:
             # if returning after crash turn, suicide
             ship_state[ship.id] = "harakiri"
-        elif (ship_state[ship.id] == "collecting" or ship_state[ship.id] == "exploring") and game.turn_number == CRASH_TURN:
+        elif (ship_state[ship.id] == "collecting" or ship_state[ship.id] == "exploring") and game.turn_number >= CRASH_TURN:
             # return if at crash turn
             ship_state, ship_dest = returnShip(ship.id, ship_dest, ship_state)
         elif ship_state[ship.id] == "exploring" and (ship.position == ship_dest[ship.id] or game_map[ship.position].halite_amount > MEDIUM_HALITE) :
@@ -167,13 +180,12 @@ while True:
             target_pos = cell.position
             target_dir = game_map._get_target_direction(ship.position, target_pos)
             move = target_dir[0] if target_dir[0] is not None else target_dir[1]
-
             # Occupied
-            if game_map[cell.position].is_occupied:
-                other_ship = game_map[cell.position].ship
+            if game_map[target_pos].is_occupied:
+                other_ship = game_map[target_pos].ship
                 # Occupied by own ship that can move, perform swap
                 if other_ship in me.get_ships() \
-                        and other_ship.halite_amount >= game_map[cell.position].halite_amount * 0.1\
+                        and other_ship.halite_amount >= game_map[target_pos].halite_amount * 0.1\
                         and not has_moved[other_ship.id]:
                     # Move other ship to this position
                     command_queue.append(other_ship.move(Direction.invert(move)))
@@ -184,7 +196,10 @@ while True:
                     logging.info("ship {} cannot swap".format(ship.id))
                     move = Direction.Still
                     target_pos = ship.position
-
+            logging.info("ship: {}, parent: {}".format(str(ship.position), str(target_pos)))
+            ship_weight = game_map[ship.position].weight_to_shipyard
+            target_weight = game_map[target_pos].weight_to_shipyard
+            logging.info("s weight: {}, p weight: {}".format(ship_weight, target_weight))
             if target_pos == me.shipyard.position:
                 move_into_shipyard = True
 

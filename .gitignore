@@ -11,3 +11,4 @@ __pycache__/
 *.iws
 run_game.sh
 replays
+bad.py
