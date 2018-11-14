@@ -205,11 +205,31 @@ while True:
                     command_queue.append(other_ship.move(Direction.invert(move)))
                     game_map[ship.position].mark_unsafe(other_ship)
                     has_moved[other_ship.id] = True
-                # Occupied by enemy ship (or own ship that cannot move), try to go around? Stand still?
+                # Occupied by enemy ship, try to go around
+                elif other_ship not in me.get_ships():
+                    logging.info("ship {} going around enemy ship".format(ship.id))
+                    # If ship was trying to go north or south, go east or west (to move around)
+                    if move == Direction.South or move == Direction.North:
+                        # Go to the patch with the least halite.
+                        if game_map[ship.position + Position(1, 0)].halite_amount < \
+                                game_map[ship.position + Position(-1, 0)].halite_amount:
+                            move = Direction.East
+                        else:
+                            move = Direction.West
+                    # Same as previous but directions reversed.
+                    else:
+                        if game_map[ship.position + Position(0, 1)].halite_amount < \
+                                game_map[ship.position + Position(0, -1)].halite_amount:
+                            move = Direction.South
+                        else:
+                            move = Direction.North
+
+                    # move = Direction.Still
+                    target_pos = ship.position.directional_offset(move)
                 else:
-                    logging.info("ship {} cannot swap".format(ship.id))
                     move = Direction.Still
                     target_pos = ship.position
+
             logging.info("ship: {}, parent: {}".format(str(ship.position), str(target_pos)))
             ship_weight = game_map[ship.position].weight_to_shipyard
             target_weight = game_map[target_pos].weight_to_shipyard
