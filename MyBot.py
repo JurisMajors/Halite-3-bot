@@ -70,7 +70,7 @@ def shipPriorityQ(me, game_map):
             # importance, the lower the number, bigger importance
             if ship_state[s.id] == "returning":
                 importance = game_map.calculate_distance(s.position, me.shipyard.position) / (
-                            game_map.width * 2)  # 0,1 range
+                        game_map.width * 2)  # 0,1 range
             elif ship_state[s.id] == "exploring":
                 importance = game_map.calculate_distance(s.position, me.shipyard.position)  # normal distance
             else:  # collecting
@@ -180,7 +180,11 @@ while True:
                 del ship_state[ship_id]
 
         # make move
-        if ship_state[ship.id] == "exploring":  # if exploring move to its destinition in ship_dest dictionary
+        if ship.halite_amount < game_map[ship.position].halite_amount / 10:  # Cannot move, stay stil
+            move = Direction.Still
+            command_queue.append(ship.move(move))
+
+        elif ship_state[ship.id] == "exploring":  # if exploring move to its destinition in ship_dest dictionary
             move = game_map.smart_navigate(previous_position[ship.id], ship, ship_dest[ship.id])
             command_queue.append(ship.move(move))
 
