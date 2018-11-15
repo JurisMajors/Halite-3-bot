@@ -47,6 +47,7 @@ C = 1
 CRASH_TURN = constants.MAX_TURNS
 CRASH_SELECTION_TURN = int(0.8 * constants.MAX_TURNS)
 
+
 # h_amount <= 0 to run minheap as maxheap
 def f(h_amount, h_distance):  # function for determining patch priority
     return h_amount / (A * h_distance * h_distance + B * h_distance + C)
@@ -91,22 +92,26 @@ def returnShip(ship_id, ship_dest, ship_state):
     ship_state[ship_id] = "returning"
     return ship_state, ship_dest
 
+
 # selects turn when to crash
 def selectCrashTurn():
     distance = 0
     for ship in me.get_ships():
         d = game_map.calculate_distance(me.shipyard.position, ship.position)
-        if d > distance: # get maximum distance away of shipyard
+        if d > distance:  # get maximum distance away of shipyard
             distance = d
     crash_turn = constants.MAX_TURNS - distance - 4
     # set the crash turn to be turn s.t. all ships make it
     return crash_turn if crash_turn > CRASH_SELECTION_TURN else CRASH_SELECTION_TURN
 
+
 def findNewDestination(h, ship_id):
     biggest_halite = heappop(h)  # get biggest halite
-    while halite_positions[biggest_halite] in ship_dest.values():  # get biggest halite while its a position no other ship goes to
+    while halite_positions[
+        biggest_halite] in ship_dest.values():  # get biggest halite while its a position no other ship goes to
         biggest_halite = heappop(h)
     ship_dest[ship_id] = halite_positions[biggest_halite]  # set the destination
+
 
 def clearDictionaries():
     # clear dictionaries of crushed ships
@@ -115,6 +120,66 @@ def clearDictionaries():
             del ship_dest[ship_id]
             del ship_state[ship_id]
 
+
+def get_dijkstra_move(current_position):
+    """
+    Gets a move from the map created by Dijkstra
+    :return: The target position of the move and the direction of the move.
+    """
+    cell = game_map[current_position].parent
+    new_pos = cell.position
+    dirs = game_map.get_target_direction(ship.position, new_pos)
+    new_dir = dirs[0] if dirs[0] is not None else dirs[1]
+    return new_pos, new_dir
+
+
+def make_returning_move(game_map, ship, me, has_moved, command_queue):
+    """
+    Makes a returning move based on Dijkstras and other ship positions.
+    :return: has_moved, command_queue
+    """
+    # Get the cell and direction we want to go to from dijkstra
+    target_pos, move = get_dijkstra_move(ship.position)
+
+    # Target is occupied
+    if game_map[target_pos].is_occupied:
+        other_ship = game_map[target_pos].ship
+        # Occupied by own ship that can move, perform swap
+        if other_ship in me.get_ships() \
+                and other_ship.halite_amount >= game_map[target_pos].halite_amount * 0.1 \
+                and not has_moved[other_ship.id]:
+            # Move other ship to this position
+            command_queue.append(other_ship.move(Direction.invert(move)))
+            game_map[ship.position].mark_unsafe(other_ship)
+            has_moved[other_ship.id] = True
+
+        # Occupied by enemy ship, try to go around
+        elif other_ship not in me.get_ships():
+            logging.info("ship {} going around enemy ship".format(ship.id))
+            # If ship was trying to go north or south, go east or west (to move around)
+            if move == Direction.South or Direction.North:
+                # Go to the patch with the least halite.
+                if game_map[ship.position.directional_offset(Direction.East)].halite_amount < \
+                        game_map[ship.position.directional_offset(Direction.West)].halite_amount:
+                    move = Direction.East
+                else:
+                    move = Direction.West
+            # Same as previous but directions reversed.
+            else:
+                if game_map[ship.position.directional_offset(Direction.South)].halite_amount < \
+                        game_map[ship.position.directional_offset(Direction.North)].halite_amount:
+                    move = Direction.South
+                else:
+                    move = Direction.North
+
+            # move = Direction.Still
+            target_pos = ship.position.directional_offset(move)
+        # Occupied by own unmovable ship
+        else:
+            move = Direction.Still
+            target_pos = ship.position
+
+    return move, target_pos, has_moved, command_queue
 
 
 while True:
@@ -138,11 +203,11 @@ while True:
     if game.turn_number == CRASH_SELECTION_TURN:
         CRASH_TURN = selectCrashTurn()
 
-    while ships: # go through all ships
+    while ships:  # go through all ships
         ship = heappop(ships)[1]
         if has_moved[ship.id]:
             continue
-        if ship.id not in previous_position: # if new ship the 
+        if ship.id not in previous_position:  # if new ship the
             previous_position[ship.id] = me.shipyard.position
         find_new_dest = False
         possible_moves = []
@@ -180,7 +245,7 @@ while True:
         logging.info("ship:{} , state:{} ".format(ship.id, ship_state[ship.id]))
         logging.info("destination: {}, {} ".format(ship_dest[ship.id].x, ship_dest[ship.id].y))
 
-        clearDictionaries() # of crashed ships
+        clearDictionaries()  # of crashed ships
 
         # make move
         if ship.halite_amount < game_map[ship.position].halite_amount / 10:  # Cannot move, stay stil
@@ -192,50 +257,13 @@ while True:
             command_queue.append(ship.move(move))
 
         elif ship_state[ship.id] == "returning":  # if returning
-            # Get the cell and direction we want to go to from dijkstra
-            cell = game_map[ship.position].parent
-            target_pos = cell.position
-            target_dir = game_map.get_target_direction(ship.position, target_pos)
-            move = target_dir[0] if target_dir[0] is not None else target_dir[1]
-            # Occupied
-            if game_map[target_pos].is_occupied:
-                other_ship = game_map[target_pos].ship
-                # Occupied by own ship that can move, perform swap
-                if other_ship in me.get_ships() \
-                        and other_ship.halite_amount >= game_map[target_pos].halite_amount * 0.1 \
-                        and not has_moved[other_ship.id]:
-                    # Move other ship to this position
-                    command_queue.append(other_ship.move(Direction.invert(move)))
-                    game_map[ship.position].mark_unsafe(other_ship)
-                    has_moved[other_ship.id] = True
-                # Occupied by enemy ship, try to go around
-                elif other_ship not in me.get_ships():
-                    logging.info("ship {} going around enemy ship".format(ship.id))
-                    # If ship was trying to go north or south, go east or west (to move around)
-                    if move == Direction.South or Direction.North:
-                        # Go to the patch with the least halite.
-                        if game_map[ship.position.directional_offset(Direction.East)].halite_amount < \
-                                game_map[ship.position.directional_offset(Direction.West)].halite_amount:
-                            move = Direction.East
-                        else:
-                            move = Direction.West
-                    # Same as previous but directions reversed.
-                    else:
-                        if game_map[ship.position.directional_offset(Direction.South)].halite_amount < \
-                                game_map[ship.position.directional_offset(Direction.North)].halite_amount:
-                            move = Direction.South
-                        else:
-                            move = Direction.North
-
-                    # move = Direction.Still
-                    target_pos = ship.position.directional_offset(move)
-                else:
-                    move = Direction.Still
-                    target_pos = ship.position
-
+            move, target_pos, has_moved, command_queue = make_returning_move(game_map, ship, me, has_moved,
+                                                                             command_queue)
+            # Track if we are moving a ship into the shipyard
             if target_pos == me.shipyard.position:
                 move_into_shipyard = True
 
+            # Keep track of unsafe position and make move
             game_map[target_pos].mark_unsafe(ship)
             command_queue.append(ship.move(move))
 
