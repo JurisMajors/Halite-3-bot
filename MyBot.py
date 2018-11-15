@@ -17,6 +17,7 @@ import random
 # Logging allows you to save messages for yourself. This is required because the regular STDOUT
 #   (print statements) are reserved for the engine-bot communication.
 import logging
+import time
 
 """ <<<Game Begin>>> """
 
@@ -40,12 +41,15 @@ BIG_PERCENTAGE = 0.95
 MEDIUM_HALITE = 300  # definition of medium patch size for stopping and collecting patch if on the way
 HALITE_STOP = 10  # halite left at patch to stop collecting at that patch
 SPAWN_TURN = 220  # until which turn to spawn ships
+A = 0
+B = 2
+C = 1
 CRASH_TURN = constants.MAX_TURNS
 CRASH_SELECTION_TURN = int(0.8 * constants.MAX_TURNS)
 
-
+# h_amount <= 0 to run minheap as maxheap
 def f(h_amount, h_distance):  # function for determining patch priority
-    return h_amount / (2 * h_distance + 1)
+    return h_amount / (A * h_distance * h_distance + B * h_distance + C)
 
 
 def halitePriorityQ(shipyard_pos, game_map):
@@ -87,21 +91,37 @@ def returnShip(ship_id, ship_dest, ship_state):
     ship_state[ship_id] = "returning"
     return ship_state, ship_dest
 
-
+# selects turn when to crash
 def selectCrashTurn():
     distance = 0
     for ship in me.get_ships():
         d = game_map.calculate_distance(me.shipyard.position, ship.position)
-        if d > distance:
+        if d > distance: # get maximum distance away of shipyard
             distance = d
-    crash_turn = constants.MAX_TURNS - distance - 1
+    crash_turn = constants.MAX_TURNS - distance - 4
+    # set the crash turn to be turn s.t. all ships make it
     return crash_turn if crash_turn > CRASH_SELECTION_TURN else CRASH_SELECTION_TURN
+
+def findNewDestination(h, ship_id):
+    biggest_halite = heappop(h)  # get biggest halite
+    while halite_positions[biggest_halite] in ship_dest.values():  # get biggest halite while its a position no other ship goes to
+        biggest_halite = heappop(h)
+    ship_dest[ship_id] = halite_positions[biggest_halite]  # set the destination
+
+def clearDictionaries():
+    # clear dictionaries of crushed ships
+    for ship_id in list(ship_dest.keys()):
+        if not me.has_ship(ship_id):
+            del ship_dest[ship_id]
+            del ship_state[ship_id]
+
 
 
 while True:
     game.update_frame()
     me = game.me
     game_map = game.game_map
+    # Djikstra the graph
     game_map.dijkstra(me.shipyard)
     return_percentage = BIG_PERCENTAGE if game.turn_number < PERCENTAGE_SWITCH else SMALL_PERCENTAGE
 
@@ -117,23 +137,19 @@ while True:
 
     if game.turn_number == CRASH_SELECTION_TURN:
         CRASH_TURN = selectCrashTurn()
-        logging.info("CRASH AT TURN{}".format(CRASH_TURN))
-    while not len(ships) == 0:
+
+    while ships: # go through all ships
         ship = heappop(ships)[1]
         if has_moved[ship.id]:
             continue
-        if ship.id not in previous_position:
+        if ship.id not in previous_position: # if new ship the 
             previous_position[ship.id] = me.shipyard.position
         find_new_dest = False
         possible_moves = []
 
         # setup state
         if ship.id not in ship_dest:  # if ship hasnt received a destination yet
-            biggest_halite = heappop(h)  # get biggest halite
-            while halite_positions[
-                biggest_halite] in ship_dest.values():  # get biggest halite while its a position no other ship goes to
-                biggest_halite = heappop(h)
-            ship_dest[ship.id] = halite_positions[biggest_halite]  # set the destination
+            findNewDestination(h, ship.id)
             ship_state[ship.id] = "exploring"  # explore
 
         # transition
@@ -159,25 +175,12 @@ while True:
         elif ship_state[ship.id] == "returning" and ship.position == ship_dest[ship.id]:
             # explore again when back in shipyard
             ship_state[ship.id] = "exploring"
-            find_new_dest = True
-
-        # find new destination for exploring shop
-        if find_new_dest:
-            biggest_halite = heappop(h)  # get biggest halite
-            while halite_positions[
-                biggest_halite] in ship_dest.values():  # get biggest halite while its a position no other ship goes to
-                biggest_halite = heappop(h)
-            find_new_dest = True
-            ship_dest[ship.id] = halite_positions[biggest_halite]  # set the destination
+            findNewDestination(h, ship.id)
 
         logging.info("ship:{} , state:{} ".format(ship.id, ship_state[ship.id]))
         logging.info("destination: {}, {} ".format(ship_dest[ship.id].x, ship_dest[ship.id].y))
 
-        # clear dictionaries of crushed ships
-        for ship_id in list(ship_dest.keys()):
-            if not me.has_ship(ship_id):
-                del ship_dest[ship_id]
-                del ship_state[ship_id]
+        clearDictionaries() # of crashed ships
 
         # make move
         if ship.halite_amount < game_map[ship.position].halite_amount / 10:  # Cannot move, stay stil
@@ -209,17 +212,17 @@ while True:
                 elif other_ship not in me.get_ships():
                     logging.info("ship {} going around enemy ship".format(ship.id))
                     # If ship was trying to go north or south, go east or west (to move around)
-                    if move == Direction.South or move == Direction.North:
+                    if move == Direction.South or Direction.North:
                         # Go to the patch with the least halite.
-                        if game_map[ship.position + Position(1, 0)].halite_amount < \
-                                game_map[ship.position + Position(-1, 0)].halite_amount:
+                        if game_map[ship.position.directional_offset(Direction.East)].halite_amount < \
+                                game_map[ship.position.directional_offset(Direction.West)].halite_amount:
                             move = Direction.East
                         else:
                             move = Direction.West
                     # Same as previous but directions reversed.
                     else:
-                        if game_map[ship.position + Position(0, 1)].halite_amount < \
-                                game_map[ship.position + Position(0, -1)].halite_amount:
+                        if game_map[ship.position.directional_offset(Direction.South)].halite_amount < \
+                                game_map[ship.position.directional_offset(Direction.North)].halite_amount:
                             move = Direction.South
                         else:
                             move = Direction.North
@@ -230,10 +233,6 @@ while True:
                     move = Direction.Still
                     target_pos = ship.position
 
-            logging.info("ship: {}, parent: {}".format(str(ship.position), str(target_pos)))
-            ship_weight = game_map[ship.position].weight_to_shipyard
-            target_weight = game_map[target_pos].weight_to_shipyard
-            logging.info("s weight: {}, p weight: {}".format(ship_weight, target_weight))
             if target_pos == me.shipyard.position:
                 move_into_shipyard = True
 
@@ -268,6 +267,5 @@ while True:
     if game.turn_number <= SPAWN_TURN and me.halite_amount >= constants.SHIP_COST \
             and not (game_map[me.shipyard].is_occupied or shipyard_surrounded or move_into_shipyard):
         command_queue.append(me.shipyard.spawn())
-
     # Send your moves back to the game environment, ending this turn.
     game.end_turn(command_queue)
