@@ -188,7 +188,8 @@ while True:
             command_queue.append(ship.move(move))
 
         elif ship_state[ship.id] == "exploring":  # if exploring move to its destinition in ship_dest dictionary
-            move = game_map.smart_navigate(previous_position[ship.id], ship, ship_dest[ship.id])
+            move = game_map.explore(ship, ship_dest[ship.id])
+            game_map[ship.position.directional_offset(move)].mark_unsafe(ship)
             command_queue.append(ship.move(move))
 
         elif ship_state[ship.id] == "returning":  # if returning

@@ -8,6 +8,7 @@ from .positionals import Direction, Position
 from .common import read_input
 from heapq import heappush, heappop
 import logging
+from collections import deque
 
 
 class MapCell:
@@ -22,6 +23,11 @@ class MapCell:
         # Parameters for Dijkstra
         self.weight_to_shipyard = 0
         self.parent = None
+
+        #Parameters for AStar
+        self.visited = None
+        self.a_star_parent = None
+        self.cost = None
 
     @property
     def is_empty(self):
@@ -307,6 +313,77 @@ class GameMap:
         for i in range(len(dy)):
             neighbours.append(self[source_cell.position + Position(dy[i], dx[i])])
         return neighbours
+
+    def do_a_star(self, ship, target):
+        """
+        param: source & target are cell positions
+        Sets parents for making path from source to target
+        """
+        PQ = []
+        source = ship.position
+        heappush(PQ, (0, self[source]))
+        self[source].cost = 0
+        visited = [] # for reseting grid later
+        while PQ:
+            current = heappop(PQ)[1]
+            current.visited = ship # visit cell
+            visited.append(current)
+            if current.position == target: # if end goal, we done
+                break
+
+            for neighbour in self.get_neighbours(current):
+                # if obstacle or we already visited, skip
+                if neighbour.is_occupied or (neighbour.visited is not None and neighbour.visited == ship):
+                    continue
+                # node.cost + distance from neighbour to node ( 1 )
+                new_cost = current.cost + 1 # instead of distance, halite possible 
+
+                if neighbour.visited is None or new_cost < neighbour.cost:
+                    # new cost 
+                    neighbour.cost = new_cost
+                    priority = new_cost + self.calculate_distance(neighbour.position, target) # distance is heuristic
+                    neighbour.visited = ship
+                    neighbour.a_star_parent = current
+                    visited.append(neighbour)
+                    heappush(PQ, (priority, neighbour))
+        return visited
+
+
+    def explore(self, ship, destination):
+        visited = self.do_a_star(ship, destination)
+        next_cell = self.find_next(ship.position, destination)
+        for node in visited: # reset
+            node.cost = None
+            node.a_star_parent = None
+            node.visited = None
+        target_direction =  self.get_target_direction(ship.position, next_cell.position)
+        direction = target_direction[0] if target_direction[0] is not None else target_direction[1]
+        return direction if direction is not None else Direction.Still
+
+    def find_next(self, position, destination):
+        start = self[position]
+        end = self[destination]
+        if end.is_occupied: # search for nearest cell to end that is not occupied and is part of path
+            end = self.search_closest(end)
+        x = end.a_star_parent
+        if x == start: 
+            return end
+        neighbours = self.get_neighbours(start)
+        while not x in neighbours: # move down the path until in neighbours of initial cell
+            x = x.a_star_parent
+        return x # retunr the neighbour we take
+        
+    def search_closest(self, start):
+        # bfs for closest cell
+        Q = deque([])
+        Q.append(start)
+        while Q:
+            cur = Q.popleft()
+            if not cur.is_occupied and cur.a_star_parent is not None:
+                return cur
+            for neighbour in self.get_neighbours(cur):
+                if neighbour not in Q:
+                    Q.append(neighbour)
 
     @staticmethod
     def _generate():
