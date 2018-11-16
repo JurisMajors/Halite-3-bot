@@ -8,6 +8,7 @@ from .positionals import Direction, Position
 from .common import read_input
 from heapq import heappush, heappop
 import logging
+import time
 from collections import deque
 
 
@@ -317,6 +318,8 @@ class GameMap:
                 surrounded = False
         if end.a_star_parent is None or end.is_occupied or surrounded: # search for nearest cell to end that is not occupied and is part of path
             end = self.search_closest(end)
+        if end is None:
+            return start
         x = end.a_star_parent
         if x == start: 
             return end
@@ -329,7 +332,10 @@ class GameMap:
         # bfs for closest cell
         Q = deque([])
         Q.append(start)
+        t = time.time()
         while Q:
+            if time.time() - t > 1:
+                return None
             cur = Q.popleft()
             if not cur.is_occupied and cur.a_star_parent is not None:
                 return cur

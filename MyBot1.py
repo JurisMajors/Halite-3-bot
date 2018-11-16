@@ -27,9 +27,6 @@ game = hlt.Game()
 # At this point "game" variable is populated with initial map data.
 # This is a good place to do computationally expensive start-up pre-processing.
 VERSION = sys.argv[1]
-game.ready("Sea_Whackers {}".format(VERSION))
-
-""" <<<Game Loop>>> """
 ship_state = {}
 ship_dest = {}  # destination -> ship.id
 halite_positions = {}  # halite -> position
@@ -48,6 +45,8 @@ C = float(sys.argv[11])
 CRASH_TURN = constants.MAX_TURNS
 CRASH_PERCENTAGE_TURN = float(sys.argv[12])
 CRASH_SELECTION_TURN = int(CRASH_PERCENTAGE_TURN* constants.MAX_TURNS)
+game.ready("Sea_Whackers {}".format(VERSION))
+
 
 
 # h_amount <= 0 to run minheap as maxheap
@@ -198,7 +197,7 @@ while True:
     # has_moved ID->True/False, moved or not
     # ships priority queue of (importance, ship) 
     ships, has_moved = shipPriorityQ(me, game_map)
-
+    start =time.time()
     # True if a ship moves into the shipyard this turn
     move_into_shipyard = False
 
@@ -286,6 +285,7 @@ while True:
         previous_position[ship.id] = ship.position
         # This ship has made a move
         has_moved[ship.id] = True
+    logging.info(time.time() - start)
 
     # check if shipyard is surrounded by ships
     shipyard_surrounded = True

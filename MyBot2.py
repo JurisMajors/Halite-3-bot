@@ -27,9 +27,6 @@ game = hlt.Game()
 # At this point "game" variable is populated with initial map data.
 # This is a good place to do computationally expensive start-up pre-processing.
 VERSION = sys.argv[1]
-game.ready("Sea_Whackers {}".format(VERSION))
-
-""" <<<Game Loop>>> """
 ship_state = {}
 ship_dest = {}  # destination -> ship.id
 halite_positions = {}  # halite -> position
@@ -48,6 +45,9 @@ C = float(sys.argv[11])
 CRASH_TURN = constants.MAX_TURNS
 CRASH_PERCENTAGE_TURN = float(sys.argv[12])
 CRASH_SELECTION_TURN = int(CRASH_PERCENTAGE_TURN* constants.MAX_TURNS)
+game.ready("Sea_Whackers {}".format(VERSION))
+
+""" <<<Game Loop>>> """
 
 
 
@@ -202,6 +202,7 @@ while True:
 
     # True if a ship moves into the shipyard this turn
     move_into_shipyard = False
+    start = time.time()
 
     if game.turn_number == CRASH_SELECTION_TURN:
         CRASH_TURN = selectCrashTurn()
@@ -287,7 +288,7 @@ while True:
         previous_position[ship.id] = ship.position
         # This ship has made a move
         has_moved[ship.id] = True
-
+    logging.info(time.time() - start)
     # check if shipyard is surrounded by ships
     shipyard_surrounded = True
     for direction in Direction.get_all_cardinals():
