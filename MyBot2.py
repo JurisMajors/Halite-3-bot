@@ -62,8 +62,8 @@ def halitePriorityQ(shipyard_pos, game_map):
     for y in range(SCAN_AREA):
         for x in range(SCAN_AREA):
             p = Position((top_left.x + x) % game_map.width, (top_left.y + y) % game_map.height)  # position of patch
-            factor = f(game_map[p].halite_amount * -1, game_map.calculate_distance(p,
-                                                                                   shipyard_pos))  # f(negative halite amount,  distance from shipyard to patch)
+            factor = f(game_map[p].halite_amount * -1,
+                game_map.calculate_distance(p, shipyard_pos))  # f(negative halite amount,  distance from shipyard to patch)
             halite_positions[factor] = p
             heappush(h, factor)  # add negative halite amounts so that would act as maxheap
     return h
