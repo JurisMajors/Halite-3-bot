@@ -22,11 +22,14 @@ def run_iteration(variables1, variables2): # run iteration of bots with variable
 	bot2_variables = " ".join(map(str, variables2))
 
 	cmd = '{0}\\halite.exe --replay-directory {0}\\replays/ -vvv --width {1} --height {1}'.format(BASE_DIR, map_size)
-	cmd += ' "python {0}\\MyBot1.py {1}" "python {0}\\MyBot2.py {2}" '.format(BASE_DIR, bot1_variables, bot2_variables)
+	cmd += ' "python {0}\\MyBot1.py {1}" "python {0}\\MyBot2.py {2}" >> data.txt'.format(BASE_DIR, bot1_variables, bot2_variables)
 
 	os.system(cmd)
 
 DEFAULT_VARIABLES = [1, 30, 50, 0.7, 0.95, 300, 10, 220, 0, 2, 1, 0.8]
 run_iteration(DEFAULT_VARIABLES, DEFAULT_VARIABLES)
+#with open("game.data", "r") as f:
+#	contents = f.readlines()
+
 
 

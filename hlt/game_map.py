@@ -315,7 +315,7 @@ class GameMap:
         for n in self.get_neighbours(end):
             if not n.is_occupied:
                 surrounded = False
-        if end.is_occupied or surrounded: # search for nearest cell to end that is not occupied and is part of path
+        if end.a_star_parent is None or end.is_occupied or surrounded: # search for nearest cell to end that is not occupied and is part of path
             end = self.search_closest(end)
         x = end.a_star_parent
         if x == start: 
