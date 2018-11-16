@@ -311,7 +311,11 @@ class GameMap:
     def find_next(self, position, destination):
         start = self[position]
         end = self[destination]
-        if end.is_occupied: # search for nearest cell to end that is not occupied and is part of path
+        surrounded = True
+        for n in self.get_neighbours(end):
+            if not n.is_occupied:
+                surrounded = False
+        if end.is_occupied or surrounded: # search for nearest cell to end that is not occupied and is part of path
             end = self.search_closest(end)
         x = end.a_star_parent
         if x == start: 
@@ -328,6 +332,7 @@ class GameMap:
         while Q:
             cur = Q.popleft()
             if not cur.is_occupied and cur.a_star_parent is not None:
+                logging.info(cur.a_star_parent)
                 return cur
             for neighbour in self.get_neighbours(cur):
                 if neighbour not in Q:
