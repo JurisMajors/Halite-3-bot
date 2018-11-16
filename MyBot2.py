@@ -25,8 +25,8 @@ import time
 game = hlt.Game()
 # At this point "game" variable is populated with initial map data.
 # This is a good place to do computationally expensive start-up pre-processing.
-
-game.ready("Sea_Whackers")
+VERSION = 2
+game.ready("Sea_Whackers {}".format(VERSION))
 
 """ <<<Game Loop>>> """
 ship_state = {}
