@@ -21,3 +21,5 @@ hlt/__pycache__/game_map.cpython-36.pyc
 *.pyc
 hlt/__pycache__/game_map.cpython-36.pyc
 hlt/__pycache__/game_map.cpython-36.pyc
+*.pyc
+*.xml
