@@ -24,7 +24,7 @@ def run_iteration(variables1, variables2, seed ): # run iteration of bots with v
 	bot1_variables = " ".join(map(str, variables1))
 	bot2_variables = " ".join(map(str, variables2))
 
-	cmd = '{0}\\halite.exe --replay-directory {0}\\replays/ --no-replay --results-as-json -vvv -s {2} --width {1} --height {1}'.format(BASE_DIR, map_size, seed)
+	cmd = '{0}\\halite.exe --replay-directory {0}\\replays/ --no-replay --no-logs --results-as-json -vvv -s {2} --width {1} --height {1}'.format(BASE_DIR, map_size, seed)
 	cmd += ' "python {0}\\MyBot1.py {1}" "python {0}\\MyBot2.py {2}" > data.json'.format(BASE_DIR, bot1_variables, bot2_variables)
 	# save output in data.json, > for rewrite , >> for appending outputs
 	os.system(cmd) # run
@@ -35,10 +35,10 @@ def get_result():
 		data = json.load(f)		
 	return data['stats']['0']['score'], data['stats']['1']['score']
 
-POPULATION_SIZE = 200
+POPULATION_SIZE = 150
 # assuming population size 200, we need about 21 selected invidiuals
-PARENT_AMOUNT = 21
-GENERATIONS = 2
+PARENT_AMOUNT = 18
+GENERATIONS = 100
 MUTATION_CHANCE = 0.05
 DEFAULT_VARIABLES = [0, 30, 50, 0.7, 0.95, 300, 10, 220, 0, 2, 1, 0.8]
 PARAM_AMOUNT = len(DEFAULT_VARIABLES)
@@ -54,7 +54,7 @@ def populate():
 		VERSION = _
 		SCAN_AREA = random.randint(10, 50)
 		PERCENTAGE_SWITCH = random.randint(0, 200)
-		SMALL_PERCENTAGE = round(random.random(), 2)
+		SMALL_PERCENTAGE = round(random.random(), 2) 
 		BIG_PERCENTAGE = round(random.random(), 2)
 		MEDIUM_HALITE = random.randint(100, 900)
 		HALITE_STOP = random.randint(1, 10)
@@ -62,7 +62,7 @@ def populate():
 		A = round(random.random(), 2)
 		B = round(random.random(), 2)
 		C = round(random.random(), 2) + 0.1 # shouldnt be zero
-		CRASH_PERCENTAGE_TURN = random.random()
+		CRASH_PERCENTAGE_TURN = round(random.random(), 2) + 0.1
 		population[VERSION] = [VERSION, SCAN_AREA, PERCENTAGE_SWITCH, SMALL_PERCENTAGE, BIG_PERCENTAGE, MEDIUM_HALITE, HALITE_STOP, 
 							 SPAWN_TURN, A, B, C, CRASH_PERCENTAGE_TURN]
 def get_fitness(version):
@@ -103,7 +103,7 @@ def crossover(selected_versions):
 	# crossover of previously selected versions
 	biggest_version = max(selected_versions)
 	# clear population
-	for version in population.keys(): 
+	for version in list(population.keys()): 
 		if version not in selected_versions and not version == 0:
 			# delete all versions that have not been selected for next gen
 			del population[version] 
@@ -155,15 +155,15 @@ def determine_best(): # writes best one so far in text file
 	best_param = population[best_version]
 	best_fitness = fitness[best_version]
 	print("BEST IN THIS GENERATION: {}, {}".format(best_score, best_param))
-	output = " FITNESS: {}, SCORE: {}, PARAMETERS: {} \n".format(best_fitness, best_score,str(best_param))
+	output = " FITNESS: {}, SCORE: {}, PARAMETERS: {} \n".format(best_fitness, best_score, str(best_param))
 	with open("best.txt", "a") as f:
 		f.write(output)
 
 
 populate()
 for g in range(GENERATIONS):
-	print("GENERATION: {}".format(g))
 	seed = random.randint(1, 5000)
+	print("GENERATION: {}/{}".format(g,GENERATIONS))
 	print("SEED: {}".format(seed))
 	
 	determine_scores(seed)
