@@ -18,6 +18,7 @@ import random
 #   (print statements) are reserved for the engine-bot communication.
 import logging
 import time
+import sys
 
 """ <<<Game Begin>>> """
 
@@ -25,27 +26,29 @@ import time
 game = hlt.Game()
 # At this point "game" variable is populated with initial map data.
 # This is a good place to do computationally expensive start-up pre-processing.
-
-game.ready("Sea_Whackers")
-
-""" <<<Game Loop>>> """
+VERSION = sys.argv[1]
 ship_state = {}
 ship_dest = {}  # destination -> ship.id
 halite_positions = {}  # halite -> position
 previous_position = {}  # ship.id-> previous pos
 # search area for halite relative to shipyard
-SCAN_AREA = 30
-PERCENTAGE_SWITCH = 50  # when switch collectable percentage of max halite
-SMALL_PERCENTAGE = 0.7
-BIG_PERCENTAGE = 0.95
-MEDIUM_HALITE = 300  # definition of medium patch size for stopping and collecting patch if on the way
-HALITE_STOP = 10  # halite left at patch to stop collecting at that patch
-SPAWN_TURN = 220  # until which turn to spawn ships
-A = 0
-B = 2
-C = 1
+SCAN_AREA = int(sys.argv[2])
+PERCENTAGE_SWITCH = int(sys.argv[3])  # when switch collectable percentage of max halite
+SMALL_PERCENTAGE = float(sys.argv[4])
+BIG_PERCENTAGE = float(sys.argv[5])
+MEDIUM_HALITE = int(sys.argv[6])  # definition of medium patch size for stopping and collecting patch if on the way
+HALITE_STOP = int(sys.argv[7])  # halite left at patch to stop collecting at that patch
+SPAWN_TURN = int(sys.argv[8])  # until which turn to spawn ships
+A = float(sys.argv[9])
+B = float(sys.argv[10])
+C = float(sys.argv[11])
 CRASH_TURN = constants.MAX_TURNS
-CRASH_SELECTION_TURN = int(0.8 * constants.MAX_TURNS)
+CRASH_PERCENTAGE_TURN = float(sys.argv[12])
+CRASH_SELECTION_TURN = int(CRASH_PERCENTAGE_TURN* constants.MAX_TURNS)
+game.ready("Sea_Whackers {}".format(VERSION))
+
+""" <<<Game Loop>>> """
+
 
 
 # h_amount <= 0 to run minheap as maxheap
@@ -59,8 +62,8 @@ def halitePriorityQ(shipyard_pos, game_map):
     for y in range(SCAN_AREA):
         for x in range(SCAN_AREA):
             p = Position((top_left.x + x) % game_map.width, (top_left.y + y) % game_map.height)  # position of patch
-            factor = f(game_map[p].halite_amount * -1, game_map.calculate_distance(p,
-                                                                                   shipyard_pos))  # f(negative halite amount,  distance from shipyard to patch)
+            factor = f(game_map[p].halite_amount * -1,
+                game_map.calculate_distance(p, shipyard_pos))  # f(negative halite amount,  distance from shipyard to patch)
             halite_positions[factor] = p
             heappush(h, factor)  # add negative halite amounts so that would act as maxheap
     return h
@@ -199,6 +202,7 @@ while True:
 
     # True if a ship moves into the shipyard this turn
     move_into_shipyard = False
+    start = time.time()
 
     if game.turn_number == CRASH_SELECTION_TURN:
         CRASH_TURN = selectCrashTurn()
@@ -284,7 +288,7 @@ while True:
         previous_position[ship.id] = ship.position
         # This ship has made a move
         has_moved[ship.id] = True
-
+    logging.info(time.time() - start)
     # check if shipyard is surrounded by ships
     shipyard_surrounded = True
     for direction in Direction.get_all_cardinals():
