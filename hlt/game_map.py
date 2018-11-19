@@ -318,15 +318,12 @@ class GameMap:
                 surrounded = False
         if end.a_star_parent is None or end.is_occupied or surrounded: # search for nearest cell to end that is not occupied and is part of path
             end = self.search_closest(end)
-        if end is None:
+        if end is None or end == start:
             return start
-        x = end.a_star_parent
-        if x == start: 
-            return end
         neighbours = self.get_neighbours(start)
-        while not x in neighbours: # move down the path until in neighbours of initial cell
-            x = x.a_star_parent
-        return x # retunr the neighbour we take
+        while not end in neighbours: # move down the path until in neighbours of initial cell
+            end = end.a_star_parent
+        return end # retunr the neighbour we take
         
     def search_closest(self, start):
         # bfs for closest cell
@@ -335,6 +332,8 @@ class GameMap:
         t = time.time()
         while Q:
             if time.time() - t > 1:
+                logging.info(Q)
+                logging.info("TAKES TOO MUCH TIME, STANDING STILL")
                 return None
             cur = Q.popleft()
             if not cur.is_occupied and cur.a_star_parent is not None:
