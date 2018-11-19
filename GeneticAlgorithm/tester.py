@@ -183,3 +183,18 @@ for t in range(TOURNAMENT_AMOUNT):
 	print("TOURNAMENT {} FINISHED".format(t+1))
 write_stats()
 print("!!!!!!!!!!!!!!!!!!!!!!!!!!!!!FINISHED!!!!!!!!!!!!!!!!!!!!!!!!!!!!!")
+
+# FOR DETERMINING SCORES
+# def scores(results):
+# 	score = 0
+# 	multiplier = len(results)
+# 	for i in results:
+# 		score += i*multiplier
+# 		multiplier -= 1
+# 	print( score)
+# scores([0.2, 0.2, 0.3, 0.4, 0.4] )
+# scores([0.1, 0.1, 0.2, 0.5, 0.1])
+# scores([0.2, 0.0, 0.0, 0.3, 0.5] )
+# scores([0.2, 0.1, 0.2, 0.4, 0.6] )
+# scores([0.2, 0.2, 0.3, 0.2, 0.3] )
+
