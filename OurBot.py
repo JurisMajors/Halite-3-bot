@@ -185,10 +185,10 @@ def make_returning_move(game_map, ship, me, has_moved, command_queue):
 
 def enemy_near_shipyard(shipyard_pos):
     nearby_enemy_ships = []
-    for y in range(-1*SHIPYARD_VICINITY, SHIPYARD_VICINITY+1):
-        for x in range(-1*SHIPYARD_VICINITY, SHIPYARD_VICINITY+1):
-            if game_map[x][y].is_occupied() and not game_map[x][y].ship in me.get_ships():
-                nearby_enemy_ships.append((x,y))
+    for y in range(-1*SHIPYARD_VICINITY + me.shipyard.position.y, SHIPYARD_VICINITY+1 + me.shipyard.position.y):
+        for x in range(-1*SHIPYARD_VICINITY + me.shipyard.position.x, SHIPYARD_VICINITY+1 + me.shipyard.position.x):
+            if game_map[Position(x,y)].is_occupied and not game_map[Position(x,y)].ship in me.get_ships():
+                nearby_enemy_ships.append(Position(x,y))
     return nearby_enemy_ships
 
 
