@@ -149,7 +149,7 @@ def make_returning_move(game_map, ship, me, has_moved, command_queue):
         # Occupied by own ship that can move, perform swap
         if other_ship in me.get_ships() \
                 and other_ship.halite_amount >= game_map[target_pos].halite_amount * 0.1 \
-                and not has_moved[other_ship.id]:
+                and not has_moved[other_ship.id] and not ship_state[other_ship.id] == "returning":
             # Move other ship to this position
             command_queue.append(other_ship.move(Direction.invert(move)))
             game_map[ship.position].mark_unsafe(other_ship)
