@@ -28,9 +28,10 @@ game = hlt.Game()
 VARIABLES = ["YEEHAW", 0, 50, 129, 0.87, 0.85, 290, 9, 221, 0.01, 0.98, 1.05, 0.92]
 VERSION = VARIABLES[1]
 ship_state = {}
-ship_dest = {}  # destination -> ship.id
+ship_dest = {}  # ship.id -> destination
 halite_positions = {}  # halite -> position
 previous_position = {}  # ship.id-> previous pos
+previous_state = {} # ship.id -> previous state
 # search area for halite relative to shipyard
 SCAN_AREA = int(VARIABLES[2])
 PERCENTAGE_SWITCH = int(VARIABLES[3])  # when switch collectable percentage of max halite
@@ -46,6 +47,7 @@ CRASH_TURN = constants.MAX_TURNS
 CRASH_PERCENTAGE_TURN = float(VARIABLES[12])
 CRASH_SELECTION_TURN = int(CRASH_PERCENTAGE_TURN* constants.MAX_TURNS)
 SHIPYARD_VICINITY = 2
+KILL_ENEMY_SHIP = 500 # If enemy ship has at least this halite kill it if near dropoff or shipyard
 game.ready("Sea_Whackers {}".format(VERSION))
 
 
@@ -177,12 +179,24 @@ def make_returning_move(game_map, ship, me, has_moved, command_queue):
 
     return move, target_pos, has_moved, command_queue
 
-def enemy_near_shipyard(shipyard_pos):
+def enemy_near_shipyard():
+    """
+    Returns a list of position objects of all enemy ships near the shipyard
+    and enemy ships near dropoffs that carry more than KILL_ENEMY_SHIP halite
+    """
     nearby_enemy_ships = []
+    # Check shipyard vicinity
     for y in range(-1*SHIPYARD_VICINITY + me.shipyard.position.y, SHIPYARD_VICINITY+1 + me.shipyard.position.y):
         for x in range(-1*SHIPYARD_VICINITY + me.shipyard.position.x, SHIPYARD_VICINITY+1 + me.shipyard.position.x):
             if game_map[Position(x,y)].is_occupied and not game_map[Position(x,y)].ship in me.get_ships():
                 nearby_enemy_ships.append(Position(x,y))
+    dropoffs = me.get_dropoffs()
+    # Check vicinity of all dropoffs
+    for dropoff in dropoffs:
+        for y in range(-1*SHIPYARD_VICINITY + dropoff.position.y, SHIPYARD_VICINITY+1 + dropoff.position.y):
+            for x in range(-1*SHIPYARD_VICINITY + dropoff.position.x, SHIPYARD_VICINITY+1 + dropoff.position.x):
+                if game_map[Position(x,y)].is_occupied and not game_map[Position(x,y)].ship in me.get_ships() and game_map[Position(x,y)].ship.halite_amount > KILL_ENEMY_SHIP:
+                    nearby_enemy_ships.append(Position(x,y))
     return nearby_enemy_ships
 
 
@@ -207,7 +221,7 @@ while True:
     if game.turn_number == CRASH_SELECTION_TURN:
         CRASH_TURN = selectCrashTurn()
         
-    nearby_enemy_ships = enemy_near_shipyard(me.shipyard.position)
+    nearby_enemy_ships = enemy_near_shipyard()
 
     while ships:  # go through all ships
         ship = heappop(ships)[1]
@@ -227,6 +241,7 @@ while True:
         if ship_state[ship.id] == "returning" and game.turn_number >= CRASH_TURN and game_map.calculate_distance(
                 ship.position, me.shipyard.position) < 2:
             # if returning after crash turn, suicide
+            previous_state[ship.id] = ship_state[ship.id]
             ship_state[ship.id] = "harakiri"
         elif (ship_state[ship.id] == "collecting" or ship_state[
             ship.id] == "exploring") and game.turn_number >= CRASH_TURN:
@@ -235,6 +250,7 @@ while True:
         elif ship_state[ship.id] == "exploring" and (
                 ship.position == ship_dest[ship.id] or game_map[ship.position].halite_amount > MEDIUM_HALITE):
             # collect if reached destination or on medium sized patch
+            previous_state[ship.id] = ship_state[ship.id]
             ship_state[ship.id] = "collecting"
         elif ship_state[ship.id] == "exploring" and ship.halite_amount >= constants.MAX_HALITE * return_percentage:
             # return if ship is 70+% full
@@ -245,14 +261,26 @@ while True:
             ship_h_positions = {}
             ship_h, ship_h_positions = halitePriorityQ(ship.position, game_map, ship_h_positions)
             findNewDestination(ship_h, ship.id, ship_h_positions)
+            previous_state[ship.id] = ship_state[ship.id]
             ship_state[ship.id] = "exploring"
         elif ship_state[ship.id] == "collecting" and ship.halite_amount >= constants.MAX_HALITE * return_percentage:  # return to shipyard if enough halite
             # return ship is 70% full
             ship_state, ship_dest = returnShip(ship.id, ship_dest, ship_state)
         elif ship_state[ship.id] == "returning" and ship.position == ship_dest[ship.id]:
             # explore again when back in shipyard
+            previous_state[ship.id] = ship_state[ship.id]
             ship_state[ship.id] = "exploring"
             findNewDestination(h, ship.id, halite_positions)
+        elif ship_state[ship.id] == "KillEnemyNearDropoff":
+            if game_map.calculate_distance(ship.position, ship_dest[ship.id]) == 1:
+                target_direction =  game_map.get_target_direction(ship.position, ship_dest[ship.id])
+                move = target_direction[0] if target_direction[0] is not None else target_direction[1]
+            else:
+                move = game_map.explore(ship, ship_dest[ship.id])
+            game_map[ship.position.directional_offset(move)].mark_unsafe(ship)
+            command_queue.append(ship.move(move))
+            ship_state[ship.id] = previous_state[ship.id]
+            previous_state[ship.id] = ship_state[ship.id]
 
         logging.info("ship:{} , state:{} ".format(ship.id, ship_state[ship.id]))
         logging.info("destination: {}, {} ".format(ship_dest[ship.id].x, ship_dest[ship.id].y))
