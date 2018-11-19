@@ -106,6 +106,9 @@ class Position:
     def __ne__(self, other):
         return not self.__eq__(other)
 
+    def __lt__(self, other):
+        return self.x < other.x
+
     def __repr__(self):
         return "{}({}, {})".format(self.__class__.__name__,
                                    self.x,

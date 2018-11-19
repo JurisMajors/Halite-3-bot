@@ -49,6 +49,7 @@ CRASH_SELECTION_TURN = int(CRASH_PERCENTAGE_TURN * constants.MAX_TURNS)
 SHIPYARD_VICINITY = 2
 KILL_ENEMY_SHIP = 500  # If enemy ship has at least this halite kill it if near dropoff or shipyard
 HALITE_PATCH_THRESHOLD = 400  # Minimum halite needed to join a halite cluster
+MIN_CLUSTER_SIZE = 4  # Minimum number of patches in a cluster
 game.ready("Sea_Whackers {}".format(VERSION))
 
 
@@ -191,10 +192,12 @@ def make_returning_move(game_map, ship, me, has_moved, command_queue):
 def create_halite_clusters(game_map):
     """
     Creates halite clusters of adjacent halite patches with halite > HALITE_PATCH_THRESHOLD
-    :return: cluster_map
+    :return: centers a list of positions for the centers of clusters, sorted by cluster value
     """
+    logging.info("Map size: {} by {}".format(game_map.width, game_map.height))
     # map of size MAPSIZE where -1 means not in a cluster else the value is the ID of the cluster (starting at 1)
-    cluster_map = [game_map.height][game_map.width]
+    cluster_map = [[0 for _ in range(game_map.width)] for _ in range(game_map.height)]
+    # cluster_map = [game_map.height][game_map.width]
     current_cluster_id = 1
     for i in range(game_map.height):
         for j in range(game_map.width):
@@ -205,7 +208,7 @@ def create_halite_clusters(game_map):
             else:  # Create new cluster
                 cluster_dfs(game_map, cluster_map, current_cluster_id, i, j)
                 current_cluster_id += 1
-    #  All pathces on the map should be assigned -1 or a cluster ID
+    #  All patches on the map should be assigned -1 or a cluster ID
     #  Log the current cluster map
     res = ""
     for i in range(game_map.height):
@@ -217,11 +220,45 @@ def create_halite_clusters(game_map):
     logging.info("Halite Cluster map:")
     logging.info(res)
 
-    # Maybe return a sorted list of cluster centers/dropoff spots?
-    return cluster_map
+    clusters = [[] for _ in range(current_cluster_id - 1)]
+    for i in range(game_map.height):
+        for j in range(game_map.width):
+            if cluster_map[i][j] != -1:
+                clusters[cluster_map[i][j] - 1].append(Position(j, i))
+
+    cluster_value = [0 for _ in range(current_cluster_id - 1)]  # cluster ID starts at 0
+    for i, clust in enumerate(clusters):
+        for patch in clust:
+            cluster_value[i] += game_map[patch].halite_amount
+
+    # Sort by cluster value
+    clusters = [c for _, c in sorted(zip(cluster_value, clusters), reverse=True)]
+
+    # Remove small clusters
+    clusters = [c for c in clusters if len(c) >= MIN_CLUSTER_SIZE]
+
+    # Find centers in all usable clusters
+    centers = [Position(0, 0) for _ in clusters]
+    xsum = [0 for _ in clusters]
+    ysum = [0 for _ in clusters]
+    for i, c in enumerate(clusters):
+        for patch in c:
+            xsum[i] += patch.x
+            ysum[i] += patch.y
+
+    center_info = ""
+    for i, c in enumerate(clusters):
+        centers[i] = Position(int(xsum[i] / len(c)), int(ysum[i] / len(c)))
+        center_info += str(centers[i]) + " "
+
+    logging.info(center_info)
+
+    # A list of centers where the first center has most halite and the last has the least halite
+    return centers
 
 
 def cluster_dfs(game_map, cluster_map, id, i, j):
+    # logging.info("Cluster DFS trying for ({},{})".format(i, j))
     if game_map[Position(j, i)].halite_amount < HALITE_PATCH_THRESHOLD:  # Not in any cluster
         cluster_map[i][j] = -1
         return
@@ -231,9 +268,14 @@ def cluster_dfs(game_map, cluster_map, id, i, j):
     cluster_map[i][j] = id
     dy = [-1, 0, 1, 0]
     dx = [0, -1, 0, 1]
-    for i in range(4):
-        newI = i + dy
-        newJ = j + dx
+    for k in range(4):
+        newI = (i + dy[k]) % game_map.height
+        newJ = (j + dx[k]) % game_map.width
+        if newI < 0:
+            newI += game_map.height
+        if newJ < 0:
+            newJ += game_map.width
+        # logging.info("NewI,NewJ = {},{}".format(newI, newJ))
         cluster_dfs(game_map, cluster_map, id, newI, newJ)
 
 
@@ -263,8 +305,12 @@ while True:
     game.update_frame()
     me = game.me
     game_map = game.game_map
-    # Djikstra the graph
+    # Dijkstra the graph
     game_map.dijkstra(me.shipyard)
+    # Calculate halite clusters
+    if game.turn_number == 1:
+        create_halite_clusters(game_map)
+
     return_percentage = BIG_PERCENTAGE if game.turn_number < PERCENTAGE_SWITCH else SMALL_PERCENTAGE
 
     command_queue = []

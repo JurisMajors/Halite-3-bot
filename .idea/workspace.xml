@@ -1,10 +1,10 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <project version="4">
   <component name="ChangeListManager">
-    <list default="true" id="cadb2441-7d58-4a7b-b087-949290c3e2d4" name="Default Changelist" comment="Finished Dijkstra.&#10;Made returning ships use Dijkstra">
+    <list default="true" id="cadb2441-7d58-4a7b-b087-949290c3e2d4" name="Default Changelist" comment="">
       <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/OurBot.py" beforeDir="false" afterPath="$PROJECT_DIR$/OurBot.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/run_game.bat" beforeDir="false" afterPath="$PROJECT_DIR$/run_game.bat" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/hlt/positionals.py" beforeDir="false" afterPath="$PROJECT_DIR$/hlt/positionals.py" afterDir="false" />
     </list>
     <option name="EXCLUDED_CONVERTED_TO_IGNORED" value="true" />
     <option name="SHOW_DIALOG" value="false" />
@@ -26,28 +26,28 @@
         <counts>
           <entry key="bat" value="3" />
           <entry key="gitignore" value="4" />
-          <entry key="log" value="12" />
-          <entry key="py" value="7" />
+          <entry key="log" value="22" />
+          <entry key="py" value="8" />
         </counts>
       </usages-collector>
       <usages-collector id="statistics.file.types.open">
         <counts>
-          <entry key="PLAIN_TEXT" value="19" />
-          <entry key="Python" value="7" />
+          <entry key="PLAIN_TEXT" value="29" />
+          <entry key="Python" value="8" />
         </counts>
       </usages-collector>
       <usages-collector id="statistics.file.extensions.edit">
         <counts>
           <entry key="bat" value="30" />
           <entry key="gitignore" value="100" />
-          <entry key="py" value="4139" />
-          <entry key="txt" value="206" />
+          <entry key="py" value="5731" />
+          <entry key="txt" value="250" />
         </counts>
       </usages-collector>
       <usages-collector id="statistics.file.types.edit">
         <counts>
-          <entry key="PLAIN_TEXT" value="336" />
-          <entry key="Python" value="4139" />
+          <entry key="PLAIN_TEXT" value="380" />
+          <entry key="Python" value="5731" />
         </counts>
       </usages-collector>
     </session>
@@ -57,10 +57,22 @@
       <file pinned="false" current-in-tab="true">
         <entry file="file://$PROJECT_DIR$/OurBot.py">
           <provider selected="true" editor-type-id="text-editor">
-            <state relative-caret-position="68">
-              <caret line="190" column="26" selection-start-line="190" selection-start-column="4" selection-end-line="190" selection-end-column="26" />
+            <state relative-caret-position="338">
+              <caret line="250" column="74" selection-start-line="250" selection-start-column="74" selection-end-line="250" selection-end-column="74" />
               <folding>
-                <marker date="1542663290052" expanded="true" signature="9704:9879" ph="..." />
+                <marker date="1542666014166" expanded="true" signature="11264:11660" ph="..." />
+              </folding>
+            </state>
+          </provider>
+        </entry>
+      </file>
+      <file pinned="false" current-in-tab="false">
+        <entry file="file://$PROJECT_DIR$/hlt/positionals.py">
+          <provider selected="true" editor-type-id="text-editor">
+            <state relative-caret-position="504">
+              <caret line="109" column="31" selection-start-line="109" selection-start-column="31" selection-end-line="109" selection-end-column="31" />
+              <folding>
+                <marker date="1542665923255" expanded="true" signature="3238:3244" ph="..." />
               </folding>
             </state>
           </provider>
@@ -69,20 +81,8 @@
       <file pinned="false" current-in-tab="false">
         <entry file="file://$PROJECT_DIR$/bot-0.log">
           <provider selected="true" editor-type-id="text-editor">
-            <state relative-caret-position="17">
+            <state relative-caret-position="-595">
               <caret line="1" selection-start-line="1" selection-end-line="1" />
-            </state>
-          </provider>
-        </entry>
-      </file>
-      <file pinned="false" current-in-tab="false">
-        <entry file="file://$PROJECT_DIR$/hlt/entity.py">
-          <provider selected="true" editor-type-id="text-editor">
-            <state relative-caret-position="595">
-              <caret line="39" column="14" selection-start-line="39" selection-start-column="6" selection-end-line="39" selection-end-column="14" />
-              <folding>
-                <element signature="e#0#10#0" expanded="true" />
-              </folding>
             </state>
           </provider>
         </entry>
@@ -100,7 +100,7 @@
         <entry file="file://$PROJECT_DIR$/OldBot.py">
           <provider selected="true" editor-type-id="text-editor">
             <state relative-caret-position="623">
-              <caret line="322" lean-forward="true" selection-start-line="322" selection-end-line="322" />
+              <caret line="322" selection-start-line="322" selection-end-line="322" />
             </state>
           </provider>
         </entry>
@@ -151,6 +151,7 @@
       <find>352</find>
       <find>253</find>
       <find>289</find>
+      <find>create_halite_</find>
     </findStrings>
   </component>
   <component name="Git.Settings">
@@ -159,13 +160,13 @@
   <component name="IdeDocumentHistory">
     <option name="CHANGED_PATHS">
       <list>
-        <option value="$PROJECT_DIR$/hlt/positionals.py" />
         <option value="$PROJECT_DIR$/hlt/game_map.py" />
         <option value="$PROJECT_DIR$/random_game.bat" />
         <option value="$PROJECT_DIR$/MyBot.py" />
         <option value="$PROJECT_DIR$/.gitignore" />
         <option value="$PROJECT_DIR$/run_game.bat" />
         <option value="$PROJECT_DIR$/OldBot.py" />
+        <option value="$PROJECT_DIR$/hlt/positionals.py" />
         <option value="$PROJECT_DIR$/OurBot.py" />
       </list>
     </option>
@@ -279,7 +280,14 @@
       <option name="project" value="LOCAL" />
       <updated>1542662213339</updated>
     </task>
-    <option name="localTasksCounter" value="7" />
+    <task id="LOCAL-00007" summary="Created create halite clusters function">
+      <created>1542663303582</created>
+      <option name="number" value="00007" />
+      <option name="presentableId" value="LOCAL-00007" />
+      <option name="project" value="LOCAL" />
+      <updated>1542663303582</updated>
+    </task>
+    <option name="localTasksCounter" value="8" />
     <servers />
   </component>
   <component name="TodoView">
@@ -371,19 +379,13 @@
     <MESSAGE value="Added halite.exe" />
     <MESSAGE value="Finished Dijkstra.&#10;Made returning ships use Dijkstra" />
     <MESSAGE value="Remove a TODO." />
-    <option name="LAST_COMMIT_MESSAGE" value="Remove a TODO." />
+    <MESSAGE value="Created create halite clusters function" />
+    <option name="LAST_COMMIT_MESSAGE" value="Created create halite clusters function" />
   </component>
   <component name="editorHistoryManager">
     <entry file="file://$PROJECT_DIR$/replays/errorlog-20181113-180140+0100-1542128491-32-32-0.log" />
     <entry file="file://$PROJECT_DIR$/hlt/player.py">
       <provider selected="true" editor-type-id="text-editor" />
-    </entry>
-    <entry file="file://$PROJECT_DIR$/hlt/positionals.py">
-      <provider selected="true" editor-type-id="text-editor">
-        <state relative-caret-position="589">
-          <caret line="112" lean-forward="true" selection-start-line="112" selection-end-line="112" />
-        </state>
-      </provider>
     </entry>
     <entry file="file://$PROJECT_DIR$/replays/errorlog-20181113-194705+0100-1542041648-32-32-0.log" />
     <entry file="file://$PROJECT_DIR$/replays/errorlog-20181113-194823+0100-1542041648-32-32-0.log" />
@@ -405,13 +407,6 @@
       <provider selected="true" editor-type-id="text-editor">
         <state relative-caret-position="238">
           <caret line="30" column="40" selection-end-line="302" />
-        </state>
-      </provider>
-    </entry>
-    <entry file="file://$PROJECT_DIR$/bot-0.log">
-      <provider selected="true" editor-type-id="text-editor">
-        <state relative-caret-position="17">
-          <caret line="1" selection-start-line="1" selection-end-line="1" />
         </state>
       </provider>
     </entry>
@@ -459,16 +454,61 @@
     <entry file="file://$PROJECT_DIR$/OldBot.py">
       <provider selected="true" editor-type-id="text-editor">
         <state relative-caret-position="623">
-          <caret line="322" lean-forward="true" selection-start-line="322" selection-end-line="322" />
+          <caret line="322" selection-start-line="322" selection-end-line="322" />
+        </state>
+      </provider>
+    </entry>
+    <entry file="file://$PROJECT_DIR$/replays/errorlog-20181119-223549+0100-1542663348-32-32-0.log">
+      <provider selected="true" editor-type-id="text-editor">
+        <state relative-caret-position="255">
+          <caret line="15" column="22" lean-forward="true" selection-start-line="15" selection-end-line="16" />
+        </state>
+      </provider>
+    </entry>
+    <entry file="file://$PROJECT_DIR$/replays/errorlog-20181119-223751+0100-1542663471-32-32-0.log">
+      <provider selected="true" editor-type-id="text-editor" />
+    </entry>
+    <entry file="file://$PROJECT_DIR$/replays/errorlog-20181119-223807+0100-1542663487-64-64-0.log">
+      <provider selected="true" editor-type-id="text-editor" />
+    </entry>
+    <entry file="file://$PROJECT_DIR$/replays/errorlog-20181119-223957+0100-1542663597-40-40-0.log">
+      <provider selected="true" editor-type-id="text-editor" />
+    </entry>
+    <entry file="file://$PROJECT_DIR$/replays/errorlog-20181119-224044+0100-1542663644-40-40-0.log">
+      <provider selected="true" editor-type-id="text-editor" />
+    </entry>
+    <entry file="file://$PROJECT_DIR$/replays/errorlog-20181119-224628+0100-1542663911-56-56-0.log">
+      <provider selected="true" editor-type-id="text-editor" />
+    </entry>
+    <entry file="file://$PROJECT_DIR$/replays/errorlog-20181119-231702+0100-1542665822-48-48-0.log">
+      <provider selected="true" editor-type-id="text-editor" />
+    </entry>
+    <entry file="file://$PROJECT_DIR$/replays/errorlog-20181119-231743+0100-1542665863-56-56-0.log">
+      <provider selected="true" editor-type-id="text-editor" />
+    </entry>
+    <entry file="file://$PROJECT_DIR$/hlt/positionals.py">
+      <provider selected="true" editor-type-id="text-editor">
+        <state relative-caret-position="504">
+          <caret line="109" column="31" selection-start-line="109" selection-start-column="31" selection-end-line="109" selection-end-column="31" />
+          <folding>
+            <marker date="1542665923255" expanded="true" signature="3238:3244" ph="..." />
+          </folding>
+        </state>
+      </provider>
+    </entry>
+    <entry file="file://$PROJECT_DIR$/bot-0.log">
+      <provider selected="true" editor-type-id="text-editor">
+        <state relative-caret-position="-595">
+          <caret line="1" selection-start-line="1" selection-end-line="1" />
         </state>
       </provider>
     </entry>
     <entry file="file://$PROJECT_DIR$/OurBot.py">
       <provider selected="true" editor-type-id="text-editor">
-        <state relative-caret-position="68">
-          <caret line="190" column="26" selection-start-line="190" selection-start-column="4" selection-end-line="190" selection-end-column="26" />
+        <state relative-caret-position="338">
+          <caret line="250" column="74" selection-start-line="250" selection-start-column="74" selection-end-line="250" selection-end-column="74" />
           <folding>
-            <marker date="1542663290052" expanded="true" signature="9704:9879" ph="..." />
+            <marker date="1542666014166" expanded="true" signature="11264:11660" ph="..." />
           </folding>
         </state>
       </provider>
