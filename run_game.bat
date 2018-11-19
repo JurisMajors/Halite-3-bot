@@ -1,1 +1,1 @@
-halite.exe --replay-directory replays/ -vvv --width 32 --height 32 -s 1 "python OurBot.py" "python OurBot.py"
+halite.exe --replay-directory replays/ -vvv "python OurBot.py" "python OldBot.py"
