@@ -257,7 +257,6 @@ while True:
             ship_state, ship_dest = returnShip(ship.id, ship_dest, ship_state)
         elif ship_state[ship.id] == "collecting" and game_map[ship.position].halite_amount < HALITE_STOP:
             # Keep exploring if current halite patch is empty
-            # TODO: change the line below to find a better destination close to current ship postion
             ship_h_positions = {}
             ship_h, ship_h_positions = halitePriorityQ(ship.position, game_map, ship_h_positions)
             findNewDestination(ship_h, ship.id, ship_h_positions)
