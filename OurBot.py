@@ -45,6 +45,7 @@ C = float(VARIABLES[11])
 CRASH_TURN = constants.MAX_TURNS
 CRASH_PERCENTAGE_TURN = float(VARIABLES[12])
 CRASH_SELECTION_TURN = int(CRASH_PERCENTAGE_TURN* constants.MAX_TURNS)
+SHIPYARD_VICINITY = 2
 game.ready("Sea_Whackers {}".format(VERSION))
 
 
@@ -182,6 +183,14 @@ def make_returning_move(game_map, ship, me, has_moved, command_queue):
 
     return move, target_pos, has_moved, command_queue
 
+def enemy_near_shipyard(shipyard_pos):
+    nearby_enemy_ships = []
+    for y in range(-1*SHIPYARD_VICINITY, SHIPYARD_VICINITY+1):
+        for x in range(-1*SHIPYARD_VICINITY, SHIPYARD_VICINITY+1):
+            if game_map[x][y].is_occupied() and not game_map[x][y].ship is in me.get_ships():
+                nearby_enemy_ships.append((x,y))
+    return nearby_enemy_ships
+
 
 while True:
     game.update_frame()
@@ -203,6 +212,8 @@ while True:
 
     if game.turn_number == CRASH_SELECTION_TURN:
         CRASH_TURN = selectCrashTurn()
+        
+    nearby_enemy_ships = enemy_near_shipyard(me.shipyard.position)
 
     while ships:  # go through all ships
         ship = heappop(ships)[1]
