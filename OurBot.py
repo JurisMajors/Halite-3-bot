@@ -48,7 +48,7 @@ CRASH_PERCENTAGE_TURN = float(VARIABLES[12])
 CRASH_SELECTION_TURN = int(CRASH_PERCENTAGE_TURN * constants.MAX_TURNS)
 SHIPYARD_VICINITY = 2
 KILL_ENEMY_SHIP = 500  # If enemy ship has at least this halite kill it if near dropoff or shipyard
-HALITE_PATCH_THRESHOLD = 400  # Minimum halite needed to join a halite cluster
+HALITE_PATCH_THRESHOLD = 350  # Minimum halite needed to join a halite cluster
 MIN_CLUSTER_SIZE = 4  # Minimum number of patches in a cluster
 game.ready("Sea_Whackers {}".format(VERSION))
 
@@ -239,16 +239,37 @@ def create_halite_clusters(game_map):
 
     # Find centers in all usable clusters
     centers = [Position(0, 0) for _ in clusters]
-    xsum = [0 for _ in clusters]
-    ysum = [0 for _ in clusters]
+    minx = [game_map.width for _ in clusters]
+    miny = [game_map.height for _ in clusters]
+    maxx = [0 for _ in clusters]
+    maxy = [0 for _ in clusters]
     for i, c in enumerate(clusters):
         for patch in c:
-            xsum[i] += patch.x
-            ysum[i] += patch.y
+            if patch.x > maxx[i]:
+                maxx[i] = patch.x
+            elif patch.x < minx[i]:
+                minx[i] = patch.x
+            if patch.y > maxy[i]:
+                maxy[i] = patch.y
+            elif patch.y < miny[i]:
+                miny[i] = patch.y
 
+    logging.info("Found {} clusters".format(len(clusters)))
     center_info = ""
     for i, c in enumerate(clusters):
-        centers[i] = Position(int(xsum[i] / len(c)), int(ysum[i] / len(c)))
+        xdiff = maxx[i] - minx[i]
+        ydiff = maxy[i] - miny[i]
+        if xdiff > game_map.width / 2:
+            xcenter = (maxx[i] + ((game_map.width - xdiff) / 2)) % game_map.width
+        else:
+            xcenter = minx[i] + xdiff / 2
+        xcenter = int(xcenter)
+        if ydiff > game_map.height / 2:
+            ycenter = (maxy[i] + ((game_map.height - ydiff) / 2)) % game_map.height
+        else:
+            ycenter = miny[i] + ydiff / 2
+        ycenter = int(ycenter)
+        centers[i] = Position(xcenter, ycenter)
         center_info += str(centers[i]) + " "
 
     logging.info(center_info)
