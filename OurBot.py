@@ -187,7 +187,7 @@ def enemy_near_shipyard(shipyard_pos):
     nearby_enemy_ships = []
     for y in range(-1*SHIPYARD_VICINITY, SHIPYARD_VICINITY+1):
         for x in range(-1*SHIPYARD_VICINITY, SHIPYARD_VICINITY+1):
-            if game_map[x][y].is_occupied() and not game_map[x][y].ship is in me.get_ships():
+            if game_map[x][y].is_occupied() and not game_map[x][y].ship in me.get_ships():
                 nearby_enemy_ships.append((x,y))
     return nearby_enemy_ships
 
