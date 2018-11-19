@@ -245,9 +245,13 @@ while True:
         elif ship_state[ship.id] == "exploring" and ship.halite_amount >= constants.MAX_HALITE * return_percentage:
             # return if ship is 70+% full
             ship_state, ship_dest = returnShip(ship.id, ship_dest, ship_state)
-        elif ship_state[ship.id] == "collecting" and (game_map[
-                                                          ship.position].halite_amount < HALITE_STOP or ship.halite_amount >= constants.MAX_HALITE * return_percentage):  # return to shipyard if enough halite
-            # return if patch has little halite or ship is 70% full
+        elif ship_state[ship.id] == "collecting" and game_map[ship.position].halite_amount < HALITE_STOP:
+            # Keep exploring if current halite patch is empty
+            # TODO: change the line below to find a better destination close to current ship postion
+            findNewDestination(h, ship.id)
+            ship_state[ship.id] = "exploring"
+        elif ship_state[ship.id] == "collecting" and ship.halite_amount >= constants.MAX_HALITE * return_percentage:  # return to shipyard if enough halite
+            # return ship is 70% full
             ship_state, ship_dest = returnShip(ship.id, ship_dest, ship_state)
         elif ship_state[ship.id] == "returning" and ship.position == ship_dest[ship.id]:
             # explore again when back in shipyard
