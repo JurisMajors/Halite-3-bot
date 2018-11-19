@@ -172,6 +172,3 @@ for g in range(GENERATIONS):
 	selected = selection()
 	crossover(selected)
 	mutation()
-	
-
-
