@@ -25,7 +25,7 @@ import time
 game = hlt.Game()
 # At this point "game" variable is populated with initial map data.
 # This is a good place to do computationally expensive start-up pre-processing.
-VARIABLES = ["YEEHAW", 0, 50, 129, 0.87, 0.85, 290, 9, 221, 0.01, 0.98, 1.05, 0.92]
+VARIABLES = ["YEEHAW", 0, 50, 129, 0.87, 0.85, 290, 9, 221, 0.01, 0.98, 1.05, 0.92, 500, 350, 4]
 VERSION = VARIABLES[1]
 ship_state = {}
 ship_dest = {}  # ship.id -> destination
@@ -47,9 +47,9 @@ CRASH_TURN = constants.MAX_TURNS
 CRASH_PERCENTAGE_TURN = float(VARIABLES[12])
 CRASH_SELECTION_TURN = int(CRASH_PERCENTAGE_TURN * constants.MAX_TURNS)
 SHIPYARD_VICINITY = 2
-KILL_ENEMY_SHIP = 500  # If enemy ship has at least this halite kill it if near dropoff or shipyard
-HALITE_PATCH_THRESHOLD = 350  # Minimum halite needed to join a halite cluster
-MIN_CLUSTER_SIZE = 4  # Minimum number of patches in a cluster
+KILL_ENEMY_SHIP = int(VARIABLES[13])  # If enemy ship has at least this halite kill it if near dropoff or shipyard
+HALITE_PATCH_THRESHOLD = int(VARIABLES[14])  # Minimum halite needed to join a halite cluster
+MIN_CLUSTER_SIZE = int(VARIABLES[15])  # Minimum number of patches in a cluster
 game.ready("Sea_Whackers {}".format(VERSION))
 
 
@@ -164,21 +164,18 @@ def make_returning_move(game_map, ship, me, has_moved, command_queue):
         elif other_ship not in me.get_ships():
             logging.info("ship {} going around enemy ship".format(ship.id))
             # If ship was trying to go north or south, go east or west (to move around)
-            if move == Direction.South or Direction.North:
-                # Go to the patch with the least halite.
-                if game_map[ship.position.directional_offset(Direction.East)].halite_amount < \
-                        game_map[ship.position.directional_offset(Direction.West)].halite_amount:
-                    move = Direction.East
-                else:
-                    move = Direction.West
-            # Same as previous but directions reversed.
-            else:
-                if game_map[ship.position.directional_offset(Direction.South)].halite_amount < \
-                        game_map[ship.position.directional_offset(Direction.North)].halite_amount:
-                    move = Direction.South
-                else:
-                    move = Direction.North
 
+            #  produces both moves that are not the direction going and not the inverse of that direction
+            possible_move1 = (move[1], move[0])
+            possible_move2 = (-1*move[1], -1*move[0])
+
+            new_pos1 = ship.position.directional_offset(possible_move1)
+            new_pos2 = ship.position.directional_offset(possible_move2)
+            # select the move which leads to a patch that has the least halite
+            if game_map[new_pos1].halite_amount < game_map[new_pos2].halite_amount:
+                move = possible_move1
+            else:
+                move = possible_move2
             # move = Direction.Still
             target_pos = ship.position.directional_offset(move)
         # Occupied by own unmovable ship
@@ -369,18 +366,22 @@ while True:
             # if returning after crash turn, suicide
             previous_state[ship.id] = ship_state[ship.id]
             ship_state[ship.id] = "harakiri"
+
         elif (ship_state[ship.id] == "collecting" or ship_state[
             ship.id] == "exploring") and game.turn_number >= CRASH_TURN:
             # return if at crash turn
             ship_state, ship_dest = returnShip(ship.id, ship_dest, ship_state)
-        elif ship_state[ship.id] == "exploring" and (
-                ship.position == ship_dest[ship.id] or game_map[ship.position].halite_amount > MEDIUM_HALITE):
+
+        elif ship_state[ship.id] == "exploring" and (ship.position == ship_dest[ship.id] 
+                                                or game_map[ship.position].halite_amount > MEDIUM_HALITE):
             # collect if reached destination or on medium sized patch
             previous_state[ship.id] = ship_state[ship.id]
             ship_state[ship.id] = "collecting"
+
         elif ship_state[ship.id] == "exploring" and ship.halite_amount >= constants.MAX_HALITE * return_percentage:
             # return if ship is 70+% full
             ship_state, ship_dest = returnShip(ship.id, ship_dest, ship_state)
+
         elif ship_state[ship.id] == "collecting" and game_map[ship.position].halite_amount < HALITE_STOP:
             # Keep exploring if current halite patch is empty
             ship_h_positions = {}
@@ -388,15 +389,17 @@ while True:
             findNewDestination(ship_h, ship.id, ship_h_positions)
             previous_state[ship.id] = ship_state[ship.id]
             ship_state[ship.id] = "exploring"
-        elif ship_state[
-            ship.id] == "collecting" and ship.halite_amount >= constants.MAX_HALITE * return_percentage:  # return to shipyard if enough halite
+
+        elif ship_state[ship.id] == "collecting" and ship.halite_amount >= constants.MAX_HALITE * return_percentage:  # return to shipyard if enough halite
             # return ship is 70% full
             ship_state, ship_dest = returnShip(ship.id, ship_dest, ship_state)
+
         elif ship_state[ship.id] == "returning" and ship.position == ship_dest[ship.id]:
             # explore again when back in shipyard
             previous_state[ship.id] = ship_state[ship.id]
             ship_state[ship.id] = "exploring"
             findNewDestination(h, ship.id, halite_positions)
+
         elif ship_state[ship.id] == "KillEnemyNearDropoff":
             if game_map.calculate_distance(ship.position, ship_dest[ship.id]) == 1:
                 target_direction = game_map.get_target_direction(ship.position, ship_dest[ship.id])
