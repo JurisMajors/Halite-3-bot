@@ -342,6 +342,15 @@ class GameMap:
                 if neighbour not in Q:
                     Q.append(neighbour)
 
+    def is_surrounded(self, position):
+        neighbours = position.get_surrounding_cardinals()
+        for neighbour in neighbours:
+            if not self[neighbour].is_occupied:
+                return False
+        return True
+
+
+
     @staticmethod
     def _generate():
         """
