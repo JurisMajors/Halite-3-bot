@@ -354,7 +354,12 @@ while True:
             previous_position[ship.id] = me.shipyard.position
         find_new_dest = False
         possible_moves = []
-        
+
+        # setup state
+        if ship.id not in ship_dest:  # if ship hasnt received a destination yet
+            findNewDestination(h, ship.id, halite_positions)
+            ship_state[ship.id] = "exploring"  # explore
+            
         for enemy_ship in nearby_enemy_ships:
             if game_map.calculate_distance(ship.position, enemy_ship) < 3:
                 previous_state[ship.id] = ship_state[ship.id]
@@ -363,11 +368,6 @@ while True:
                 ship_dest[ship.id] = enemy_ship
                 nearby_enemy_ships.remove((enemy_ship))
                 break
-
-        # setup state
-        if ship.id not in ship_dest:  # if ship hasnt received a destination yet
-            findNewDestination(h, ship.id, halite_positions)
-            ship_state[ship.id] = "exploring"  # explore
 
         # transition
         if ship_state[ship.id] == "returning" and game.turn_number >= CRASH_TURN and game_map.calculate_distance(
@@ -458,7 +458,7 @@ while True:
             game_map[ship.position.directional_offset(move)].mark_unsafe(ship)
             command_queue.append(ship.move(move))
             ship_state[ship.id] = previous_state[ship.id]
-            previous_state[ship.id] = ship_state[ship.id]
+            previous_state[ship.id] = "KillEnemyNearDropoff"
 
         previous_position[ship.id] = ship.position
         # This ship has made a move
