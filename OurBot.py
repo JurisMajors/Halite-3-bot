@@ -183,7 +183,7 @@ def make_returning_move(game_map, ship, me, has_moved, command_queue):
             move = Direction.Still
             target_pos = ship.position
 
-    return move, target_pos, has_moved, command_queue
+    return move, target_pos
 
 
 def create_halite_clusters(game_map):
@@ -427,8 +427,7 @@ while True:
             command_queue.append(ship.move(move))
 
         elif ship_state[ship.id] == "returning":  # if returning
-            move, target_pos, has_moved, command_queue = make_returning_move(game_map, ship, me, has_moved,
-                                                                             command_queue)
+            move, target_pos = make_returning_move(game_map, ship, me, has_moved, command_queue)
             # Track if we are moving a ship into the shipyard
             if target_pos == me.shipyard.position:
                 move_into_shipyard = True
