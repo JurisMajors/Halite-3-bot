@@ -359,6 +359,15 @@ while True:
         if ship.id not in ship_dest:  # if ship hasnt received a destination yet
             findNewDestination(h, ship.id, halite_positions)
             ship_state[ship.id] = "exploring"  # explore
+            
+        for enemy_ship in nearby_enemy_ships:
+            if game_map.calculate_distance(ship.position, enemy_ship) < 3:
+                previous_state[ship.id] = ship_state[ship.id]
+                ship_state[ship.id] = "KillEnemyNearDropoff"
+                logging.info("state: {}".format(ship_state[ship.id]))
+                ship_dest[ship.id] = enemy_ship
+                nearby_enemy_ships.remove((enemy_ship))
+                break
 
         # transition
         if ship_state[ship.id] == "returning" and game.turn_number >= CRASH_TURN and game_map.calculate_distance(
@@ -400,16 +409,6 @@ while True:
             ship_state[ship.id] = "exploring"
             findNewDestination(h, ship.id, halite_positions)
 
-        elif ship_state[ship.id] == "KillEnemyNearDropoff":
-            if game_map.calculate_distance(ship.position, ship_dest[ship.id]) == 1:
-                target_direction = game_map.get_target_direction(ship.position, ship_dest[ship.id])
-                move = target_direction[0] if target_direction[0] is not None else target_direction[1]
-            else:
-                move = game_map.explore(ship, ship_dest[ship.id])
-            game_map[ship.position.directional_offset(move)].mark_unsafe(ship)
-            command_queue.append(ship.move(move))
-            ship_state[ship.id] = previous_state[ship.id]
-            previous_state[ship.id] = ship_state[ship.id]
 
         logging.info("ship:{} , state:{} ".format(ship.id, ship_state[ship.id]))
         logging.info("destination: {}, {} ".format(ship_dest[ship.id].x, ship_dest[ship.id].y))
@@ -448,6 +447,17 @@ while True:
                 target_dir = game_map.get_target_direction(ship.position, target_pos)
                 move = target_dir[0] if target_dir[0] is not None else target_dir[1]
             command_queue.append(ship.move(move))
+            
+        elif ship_state[ship.id] == "KillEnemyNearDropoff":
+            if game_map.calculate_distance(ship.position, ship_dest[ship.id]) == 1:
+                target_direction = game_map.get_target_direction(ship.position, ship_dest[ship.id])
+                move = target_direction[0] if target_direction[0] is not None else target_direction[1]
+            else:
+                move = game_map.explore(ship, ship_dest[ship.id])
+            game_map[ship.position.directional_offset(move)].mark_unsafe(ship)
+            command_queue.append(ship.move(move))
+            ship_state[ship.id] = previous_state[ship.id]
+            previous_state[ship.id] = "KillEnemyNearDropoff"
 
         previous_position[ship.id] = ship.position
         # This ship has made a move
