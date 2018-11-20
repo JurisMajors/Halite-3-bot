@@ -350,50 +350,56 @@ def produce_move(ship):
             move = target_direction[0] if target_direction[0] is not None else target_direction[1]
         else:
             move = game_map.explore(ship, destination)
-        ship_state[ship.id] = previous_state[ship.id]
-        previous_state[ship.id] = "assasinate"
+        state_switch(ship.id, previous_state[ship.id])
 
     return move
 
 def state_transition(ship):
     # transition
+    new_state = None
     if ship_state[ship.id] == "returning" and game.turn_number >= CRASH_TURN and game_map.calculate_distance(
             ship.position, me.shipyard.position) < 2:
         # if returning after crash turn, suicide
-        state_switch(ship.id, "harakiri")
+        new_state = "harakiri"
+        #state_switch(ship.id, "harakiri")
 
     elif (ship_state[ship.id] == "collecting" or ship_state[
         ship.id] == "exploring") and game.turn_number >= CRASH_TURN:
         # return if at crash turn
-        state_switch(ship.id, "returning")
+        new_state = "returning"
+        #state_switch(ship.id, "returning")
 
     elif ship_state[ship.id] == "exploring" and (ship.position == ship_dest[ship.id] 
                                             or game_map[ship.position].halite_amount > MEDIUM_HALITE):
         # collect if reached destination or on medium sized patch
-        state_switch(ship.id, "collecting")
-
+        new_state = "collecting"
+        #state_switch(ship.id, "collecting")
 
     elif ship_state[ship.id] == "exploring" and ship.halite_amount >= constants.MAX_HALITE * return_percentage:
         # return if ship is 70+% full
-        state_switch(ship.id, "returning")
-
+        new_state = "returning"
+        #state_switch(ship.id, "returning")
 
     elif ship_state[ship.id] == "collecting" and game_map[ship.position].halite_amount < HALITE_STOP:
         # Keep exploring if current halite patch is empty
         ship_h_positions = {}
         ship_h, ship_h_positions = halitePriorityQ(ship.position, game_map, ship_h_positions)
         findNewDestination(ship_h, ship.id, ship_h_positions)
-        state_switch(ship.id, "exploring")
-
+        new_state = "exploring"
+        #state_switch(ship.id, "exploring")
 
     elif ship_state[ship.id] == "collecting" and ship.halite_amount >= constants.MAX_HALITE * return_percentage:  # return to shipyard if enough halite
         # return ship is 70% full
-        state_switch(ship.id, "returning")
+        new_state = "returning"
+        #state_switch(ship.id, "returning")
 
     elif ship_state[ship.id] == "returning" and ship.position == ship_dest[ship.id]:
         # explore again when back in shipyard
-        state_switch(ship.id, "exploring")
+        new_state = "exploring"
+        #state_switch(ship.id, "exploring")
         findNewDestination(h, ship.id, halite_positions)    
+    if new_state is not None:
+        state_switch(ship.id, new_state)
 
 while True:
     game.update_frame()
