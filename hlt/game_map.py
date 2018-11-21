@@ -21,11 +21,11 @@ class MapCell:
         self.ship = None
         self.structure = None
 
-        # Parameters for Dijkstra
+        # Parameters for Dijkstra (to nearest dropoff/shipyard)
         self.weight_to_shipyard = 0
         self.parent = None
 
-        #Parameters for AStar
+        # Parameters for AStar
         self.visited = None
         self.a_star_parent = None
         self.cost = None
@@ -218,13 +218,21 @@ class GameMap:
         final_direction = min(possible_moves, key=lambda t: t[1])[0]
         return final_direction
 
-    def create_graph(self):
+    def create_graph(self, dropoff_list):
 
         """
-        Assigns the correct value to weight_to_shipyard, and direction_to_shipyard for each cell in this map
-        by using Dijkstra using the shipyard as source.
+        Assigns the correct value to weight_to_shipyard, and parent for each cell in this map
+        by using Dijkstra using all different dropoffs as source and prioritizing the closest one.
+        dropoff_list is a list that holds the position for all dropoffs and the shipyard
         """
-        pass
+        # set distance to infinity on all nodes
+        for i in range(self.height):
+            for j in range(self.width):
+                self._cells[i][j].weight_to_shipyard = 1_000_000
+
+        # Do Dijkstra from all different sources
+        for dropoff in dropoff_list:
+            self.dijkstra(self[dropoff])
 
     def dijkstra(self, source_cell):
         """
@@ -233,12 +241,7 @@ class GameMap:
         """
         # Priority Queue with map cells
         PQ = []
-        # set distance to infinity on all nodes
-        for i in range(self.height):
-            for j in range(self.width):
-                self._cells[i][j].weight_to_shipyard = 1_000_000
-        # for cell in self._cells:
-        #     cell.weight_to_shipyard = 1_000_000
+
         source_cell.weight_to_shipyard = 0
         heappush(PQ, (source_cell.weight_to_shipyard, source_cell))
         while PQ:
@@ -273,12 +276,12 @@ class GameMap:
         source = ship.position
         heappush(PQ, (0, self[source]))
         self[source].cost = 0
-        visited = [] # for reseting grid later
+        visited = []  # for reseting grid later
         while PQ:
             current = heappop(PQ)[1]
-            current.visited = ship # visit cell
+            current.visited = ship  # visit cell
             visited.append(current)
-            if current.position == target: # if end goal, we done
+            if current.position == target:  # if end goal, we done
                 break
 
             for neighbour in self.get_neighbours(current):
@@ -286,27 +289,26 @@ class GameMap:
                 if neighbour.is_occupied or (neighbour.visited is not None and neighbour.visited == ship):
                     continue
                 # node.cost + distance from neighbour to node ( 1 )
-                new_cost = current.cost + 1 # instead of distance, halite possible 
+                new_cost = current.cost + 1  # instead of distance, halite possible
 
                 if neighbour.visited is None or new_cost < neighbour.cost:
                     # new cost 
                     neighbour.cost = new_cost
-                    priority = new_cost + self.calculate_distance(neighbour.position, target) # distance is heuristic
+                    priority = new_cost + self.calculate_distance(neighbour.position, target)  # distance is heuristic
                     neighbour.visited = ship
                     neighbour.a_star_parent = current
                     visited.append(neighbour)
                     heappush(PQ, (priority, neighbour))
         return visited
 
-
     def explore(self, ship, destination):
         visited = self.do_a_star(ship, destination)
         next_cell = self.find_next(ship.position, destination)
-        for node in visited: # reset
+        for node in visited:  # reset
             node.cost = None
             node.a_star_parent = None
             node.visited = None
-        target_direction =  self.get_target_direction(ship.position, next_cell.position)
+        target_direction = self.get_target_direction(ship.position, next_cell.position)
         direction = target_direction[0] if target_direction[0] is not None else target_direction[1]
         return direction if direction is not None else Direction.Still
 
@@ -317,15 +319,15 @@ class GameMap:
         for n in self.get_neighbours(end):
             if not n.is_occupied:
                 surrounded = False
-        if end.a_star_parent is None or end.is_occupied or surrounded: # search for nearest cell to end that is not occupied and is part of path
+        if end.a_star_parent is None or end.is_occupied or surrounded:  # search for nearest cell to end that is not occupied and is part of path
             end = self.search_closest(end)
         if end is None or end == start:
             return start
         neighbours = self.get_neighbours(start)
-        while not end in neighbours: # move down the path until in neighbours of initial cell
+        while not end in neighbours:  # move down the path until in neighbours of initial cell
             end = end.a_star_parent
-        return end # retunr the neighbour we take
-        
+        return end  # retunr the neighbour we take
+
     def search_closest(self, start):
         # bfs for closest cell
         Q = deque([])
