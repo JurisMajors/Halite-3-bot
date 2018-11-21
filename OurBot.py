@@ -338,6 +338,7 @@ def check_shipyard_blockade(enemies, ship_position):
 def state_switch(ship_id, new_state):
     previous_state[ship_id] = ship_state[ship_id]
     if new_state == "returning":
+        # TODO: remove this: target is not always shipyard
         ship_dest[ship_id] = me.shipyard.position
     ship_state[ship_id] = new_state
 
@@ -427,6 +428,7 @@ def state_transition(ship):
         # return ship is 70% full
         new_state = "returning"
 
+    # TODO: do not look at ship_dest for returning ships, it can vary
     elif ship_state[ship.id] == "returning" and ship.position == ship_dest[ship.id]:
         # explore again when back in shipyard
         new_state = "exploring"
