@@ -25,13 +25,18 @@ import time
 game = hlt.Game()
 # At this point "game" variable is populated with initial map data.
 # This is a good place to do computationally expensive start-up pre-processing.
-VARIABLES = ["YEEHAW", 0, 50, 129, 0.87, 0.85, 290, 9, 221, 0.01, 0.98, 1.05, 0.92, 500, 350, 4]
-VERSION = VARIABLES[1]
-ship_state = {}
+
+ship_state = {} # ship.id -> ship state
 ship_dest = {}  # ship.id -> destination
-halite_positions = {}  # halite -> position
 previous_position = {}  # ship.id-> previous pos
 previous_state = {}  # ship.id -> previous state
+ship_shipyards = {} # ship.id -> shipyard.id
+shipyard_halite = {} # shipyard.id -> halite priority queue
+shipyard_pos = {} # shipyard.id -> shipyard position
+shipyard_halite_pos = {} # shipyard.id -> halite pos dictionary
+
+VARIABLES = ["YEEHAW", 0, 50, 129, 0.87, 0.85, 290, 9, 221, 0, 1, 0, 0.01, 0.98, 1.05, 0.92, 500, 350, 4, 0.2]
+VERSION = VARIABLES[1]
 # search area for halite relative to shipyard
 SCAN_AREA = int(VARIABLES[2])
 PERCENTAGE_SWITCH = int(VARIABLES[3])  # when switch collectable percentage of max halite
@@ -40,26 +45,30 @@ BIG_PERCENTAGE = float(VARIABLES[5])
 MEDIUM_HALITE = int(VARIABLES[6])  # definition of medium patch size for stopping and collecting patch if on the way
 HALITE_STOP = int(VARIABLES[7])  # halite left at patch to stop collecting at that patch
 SPAWN_TURN = int(VARIABLES[8])  # until which turn to spawn ships
+# Coefficients for halite heuristics
 A = float(VARIABLES[9])
 B = float(VARIABLES[10])
 C = float(VARIABLES[11])
-CRASH_TURN = constants.MAX_TURNS
-CRASH_PERCENTAGE_TURN = float(VARIABLES[12])
+D = float(VARIABLES[12])
+E = float(VARIABLES[13])
+F = float(VARIABLES[14])
+CRASH_TURN = constants.MAX_TURNS # 
+CRASH_PERCENTAGE_TURN = float(VARIABLES[15])
 CRASH_SELECTION_TURN = int(CRASH_PERCENTAGE_TURN * constants.MAX_TURNS)
 SHIPYARD_VICINITY = 2
-KILL_ENEMY_SHIP = int(VARIABLES[13])  # If enemy ship has at least this halite kill it if near dropoff or shipyard
-HALITE_PATCH_THRESHOLD = int(VARIABLES[14])  # Minimum halite needed to join a halite cluster
-MIN_CLUSTER_SIZE = int(VARIABLES[15])  # Minimum number of patches in a cluster
+KILL_ENEMY_SHIP = int(VARIABLES[16])  # If enemy ship has at least this halite kill it if near dropoff or shipyard
+HALITE_PATCH_THRESHOLD = int(VARIABLES[17])  # Minimum halite needed to join a halite cluster
+MIN_CLUSTER_SIZE = int(VARIABLES[18])  # Minimum number of patches in a cluster
+DETERMINE_CLUSTER_TURN = int(VARIABLES[19] * constants.MAX_TURNS)
 game.ready("Sea_Whackers {}".format(VERSION))
-
 
 # h_amount <= 0 to run minheap as maxheap
 def f(h_amount, h_distance):  # function for determining patch priority
-    return h_amount / (A * h_distance * h_distance + B * h_distance + C)
+    return (A * h_amount * h_amount + B * h_amount + C ) / (D * h_distance * h_distance + E * h_distance + F)
 
-
-def halitePriorityQ(pos, game_map, h_pos):
+def halitePriorityQ(pos):
     h = []  # stores halite amount * -1 with its position in a minheap
+    h_pos = {}
     top_left = Position(int(-1 * SCAN_AREA / 2), int(-1 * SCAN_AREA / 2)) + pos  # top left of scan area
     for y in range(SCAN_AREA):
         for x in range(SCAN_AREA):
@@ -69,7 +78,6 @@ def halitePriorityQ(pos, game_map, h_pos):
             h_pos[factor] = p
             heappush(h, factor)  # add negative halite amounts so that would act as maxheap
     return h, h_pos
-
 
 def shipPriorityQ(me, game_map):
     ships = []  # ship priority queue
@@ -103,7 +111,6 @@ def selectCrashTurn():
     # set the crash turn to be turn s.t. all ships make it
     return crash_turn if crash_turn > CRASH_SELECTION_TURN else CRASH_SELECTION_TURN
 
-
 def findNewDestination(h, ship_id, halite_pos):
     ''' h: priority queue of halite factors,
         halite_pos: dictionary of halite factor -> patch position '''
@@ -113,14 +120,12 @@ def findNewDestination(h, ship_id, halite_pos):
         biggest_halite = heappop(h)
     ship_dest[ship_id] = halite_pos[biggest_halite]  # set the destination
 
-
 def clearDictionaries():
     # clear dictionaries of crushed ships
     for ship_id in list(ship_dest.keys()):
         if not me.has_ship(ship_id):
             del ship_dest[ship_id]
             del ship_state[ship_id]
-
 
 def get_dijkstra_move(current_position):
     """
@@ -132,7 +137,6 @@ def get_dijkstra_move(current_position):
     dirs = game_map.get_target_direction(ship.position, new_pos)
     new_dir = dirs[0] if dirs[0] is not None else dirs[1]
     return new_pos, new_dir
-
 
 def make_returning_move(ship, has_moved, command_queue):
     """
@@ -148,12 +152,17 @@ def make_returning_move(ship, has_moved, command_queue):
         # Occupied by own ship that can move, perform swap
         if other_ship in me.get_ships() \
                 and other_ship.halite_amount >= game_map[target_pos].halite_amount * 0.1 \
-                and not has_moved[other_ship.id] and not ship_state[other_ship.id] == "returning":
-            # Move other ship to this position
-            command_queue.append(other_ship.move(Direction.invert(move)))
-            game_map[ship.position].mark_unsafe(other_ship)
-            has_moved[other_ship.id] = True
-
+                and not has_moved[other_ship.id]:
+            if ship_state[other_ship.id] == "returning":
+                # Let this ship process first since it has not moved
+                other_move = make_returning_move(other_ship, has_moved, command_queue)
+                if game_map[target_pos].is_occupied:
+                    move = Direction.Still
+            else:
+                # Move other ship to this position
+                command_queue.append(other_ship.move(Direction.invert(move)))
+                game_map[ship.position].mark_unsafe(other_ship)
+                has_moved[other_ship.id] = True
         # Occupied by enemy ship, try to go around
         elif other_ship not in me.get_ships():
             # logging.info("ship {} going around enemy ship".format(ship.id))
@@ -174,8 +183,9 @@ def make_returning_move(ship, has_moved, command_queue):
         # Occupied by own unmovable ship
         else:
             move = Direction.Still
-    return move
 
+    has_moved[ship.id] = True
+    return move
 
 def create_halite_clusters(game_map):
     """
@@ -265,7 +275,6 @@ def create_halite_clusters(game_map):
     # A list of centers where the first center has most halite and the last has the least halite
     return centers
 
-
 def cluster_dfs(game_map, cluster_map, id, i, j):
     # logging.info("Cluster DFS trying for ({},{})".format(i, j))
     if game_map[Position(j, i)].halite_amount < HALITE_PATCH_THRESHOLD:  # Not in any cluster
@@ -286,7 +295,6 @@ def cluster_dfs(game_map, cluster_map, id, i, j):
             newJ += game_map.width
         # logging.info("NewI,NewJ = {},{}".format(newI, newJ))
         cluster_dfs(game_map, cluster_map, id, newI, newJ)
-
 
 def enemy_near_shipyard():
     """
@@ -400,8 +408,7 @@ def state_transition(ship):
 
     elif ship_state[ship.id] == "collecting" and game_map[ship.position].halite_amount < HALITE_STOP:
         # Keep exploring if current halite patch is empty
-        ship_h_positions = {}
-        ship_h, ship_h_positions = halitePriorityQ(ship.position, game_map, ship_h_positions)
+        ship_h, ship_h_positions = halitePriorityQ(ship.position)
         findNewDestination(ship_h, ship.id, ship_h_positions)
         new_state = "exploring"
 
@@ -413,10 +420,40 @@ def state_transition(ship):
     elif ship_state[ship.id] == "returning" and ship.position == ship_dest[ship.id]:
         # explore again when back in shipyard
         new_state = "exploring"
-        findNewDestination(h, ship.id, halite_positions)
+        shipyard = ship_shipyards[ship.id]
+        findNewDestination(shipyard_halite[shipyard], ship.id, shipyard_halite_pos[shipyard])    
     if new_state is not None:
         state_switch(ship.id, new_state)
 
+def doHalitePriorities():
+    ''' determines halite priority queues 
+    and positions for all dropoffs, shipyards '''
+    shipyard_halite[me.shipyard.id], shipyard_halite_pos[me.shipyard.id] = halitePriorityQ(me.shipyard.position)
+    shipyard_pos[me.shipyard.id] = me.shipyard.position
+    for dropoff in me.get_dropoffs():
+            shipyard_halite[dropoff.id], 
+            shipyard_halite_pos[dropoff.id] = halitePriorityQ(dropoff.position)
+            shipyard_pos[dropoff.id] = dropoff.position
+
+def closestShipyardID(ship):
+    ''' returns shipyard id that is closest to ship '''
+    distance = game_map.calculate_distance(ship.position, me.shipyard.position)
+    shipyard_id = me.shipyard.id
+    for dropoff in me.get_dropoffs():
+        new_distance = game_map.calculate_distance(ship.position, dropoff.position)
+        if new_distance < distance:
+            distance = new_distance
+            shipyard_id = dropoff.id
+    return shipyard_id
+
+def getFleet(position, fleet_size):
+    ''' returns list of fleet_size amount 
+        of ships closest to the position'''
+    distances = []
+    for s in me.get_ships():
+        distances.append((game_map.calculate_distance(position, s.position), s))
+    distances.sort(key = lambda x : x[0])
+    return [t[1] for t in distances[:fleet_size]]
 
 while True:
     game.update_frame()
@@ -425,23 +462,22 @@ while True:
     # Dijkstra the graph
     game_map.dijkstra(me.shipyard)
     # Calculate halite clusters
-    if game.turn_number == 1:
-        create_halite_clusters(game_map)
+    if game.turn_number == DETERMINE_CLUSTER_TURN:
+        cluster_centers = create_halite_clusters(game_map)
+    # determine the turn for harikiri state
+    if game.turn_number == CRASH_SELECTION_TURN:
+        CRASH_TURN = selectCrashTurn()
 
     return_percentage = BIG_PERCENTAGE if game.turn_number < PERCENTAGE_SWITCH else SMALL_PERCENTAGE
-
     command_queue = []
     # priority Q of patch function values of function f(halite, distance)
-    h, halite_positions = halitePriorityQ(me.shipyard.position, game_map, halite_positions)
+    doHalitePriorities()
     # has_moved ID->True/False, moved or not
     # ships priority queue of (importance, ship) 
     ships, has_moved = shipPriorityQ(me, game_map)
     start = time.time()
     # True if a ship moves into the shipyard this turn
     move_into_shipyard = False
-
-    if game.turn_number == CRASH_SELECTION_TURN:
-        CRASH_TURN = selectCrashTurn()
 
     nearby_enemy_ships = enemy_near_shipyard()
 
@@ -451,11 +487,13 @@ while True:
             continue
         if ship.id not in previous_position:  # if new ship the
             previous_position[ship.id] = me.shipyard.position
+        ship_shipyards[ship.id] = me.shipyard.id
+        shipyard_id = ship_shipyards[ship.id]
 
         # setup state
         if ship.id not in ship_dest:  # if ship hasnt received a destination yet
-            findNewDestination(h, ship.id, halite_positions)
-            previous_state[ship.id] = "exploring"
+            findNewDestination(shipyard_halite[shipyard_id], ship.id, shipyard_halite_pos[shipyard_id])
+            previous_state[ship.id] = "exploring" 
             ship_state[ship.id] = "exploring"  # explore
 
         enemy_position = check_shipyard_blockade(nearby_enemy_ships, ship.position)
@@ -477,6 +515,8 @@ while True:
 
         command_queue.append(ship.move(move))
         game_map[ship.position.directional_offset(move)].mark_unsafe(ship)
+        if move != Direction.Still and game_map[ship.position].ship == ship:
+            game_map[ship.position].ship = None
         previous_position[ship.id] = ship.position
 
         # This ship has made a move

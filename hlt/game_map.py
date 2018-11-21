@@ -143,6 +143,7 @@ class GameMap:
         # Use edge if its faster than normal
         if abs(target.y - source.y) > (self.height - abs(target.y - source.y)) and horizontal is not None:
             horizontal = Direction.invert(horizontal)
+
         vertical = Direction.East if target.x > source.x else Direction.West if target.x < source.x else None
         if abs(target.x - source.x) > (self.width - abs(target.x - source.x)) and vertical is not None:
             vertical = Direction.invert(vertical)
@@ -331,7 +332,7 @@ class GameMap:
         Q.append(start)
         t = time.time()
         while Q:
-            if time.time() - t > 1:
+            if time.time() - t > .5:
                 logging.info(Q)
                 logging.info("TAKES TOO MUCH TIME, STANDING STILL")
                 return None
@@ -348,8 +349,6 @@ class GameMap:
             if not self[neighbour].is_occupied:
                 return False
         return True
-
-
 
     @staticmethod
     def _generate():

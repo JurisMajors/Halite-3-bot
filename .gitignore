@@ -14,6 +14,7 @@ replays
 bad.py
 .idea/*
 *.pyc
+hlt/__pycache__/*.pyc
 hlt/__pycache__/game_map.cpython-36.pyc
 hlt/__pycache__/entity.cpython-36.pyc
 hlt/__pycache__/entity.cpython-36.pyc

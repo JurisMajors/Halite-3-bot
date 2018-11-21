@@ -80,8 +80,8 @@ class Position:
         """
         return [self.directional_offset(current_direction) for current_direction in Direction.get_all_cardinals()]
 
+
     def __add__(self, other):
-        #return Position((self.x + other.x) % GameMap.width, (self.y + other.y) % GameMap.height)
         return Position(self.x + other.x, self.y + other.y)
 
     def __sub__(self, other):
