@@ -323,36 +323,64 @@ def state_switch(ship_id, new_state):
 def produce_move(ship):
     state = ship_state[ship.id]
     destination = ship_dest[ship.id]
+    ''' produces move for ship ''' 
+    if state == "collecting" or ship.halite_amount < game_map[ship.position].halite_amount / 10: 
+        # collecting or Cannot move, stay stil
+        move = Direction.Still
 
-    
-    if ship.halite_amount < game_map[ship.position].halite_amount / 10:
+    elif state == "exploring":  # if exploring move to its destinition in ship_dest dictionary
+        move = game_map.explore(ship, ship_dest[ship.id])
+
+    elif state == "returning":  # if returning
+        move = make_returning_move(ship, has_moved, command_queue)
+
+    elif state == "collecting":
+        move = Direction.Still  # collect
+
+    elif state == "harakiri":
+        if ship.position == me.shipyard.position:  # if at shipyard
+            move = Direction.Still  # let other ships crash in to you
+        else:  # otherwise move to the shipyard
+            target_dir = game_map.get_target_direction(ship.position, me.shipyard.position)
+            move = target_dir[0] if target_dir[0] is not None else target_dir[1]
+        
+    elif ship_state[ship.id] == "assasinate":
+        if game_map.calculate_distance(ship.position, destination) == 1:
+            target_direction = game_map.get_target_direction(ship.position, destination)
+            move = target_direction[0] if target_direction[0] is not None else target_direction[1]
+        else:
+            move = game_map.explore(ship, destination)
+        state_switch(ship.id, previous_state[ship.id])
+   if ship.halite_amount < game_map[ship.position].halite_amount / 10:
         return Direction.Still
 
-    mover = {
-        "collecting": # collecting or Cannot move, stay stil
-            return Direction.Still,
-        "exploring": # if exploring move to its destinition in ship_dest dictionary
-            return game_map.explore(ship, destination),
-        "returning": # if returning
-            return make_returning_move(ship, has_moved, command_queue),
-        "collecting": # collect
-            return Direction.Still,
-        "harakiri": # crash into base at end of the game
-            if ship.position == me.shipyard.position:  # if at shipyard
-                return Direction.Still  # let other ships crash in to you
-            else:  # otherwise move to the shipyard
-                target_dir = game_map.get_target_direction(ship.position, me.shipyard.position)
-                return target_dir[0] if target_dir[0] is not None else target_dir[1]
-        "assasinate": # if enemy ships are close to shipyard or dropoff
-            state_switch(ship.id, previous_state[ship.id])
-            if game_map.calculate_distance(ship.position, destination) == 1:
-                target_direction = game_map.get_target_direction(ship.position, destination)
-                return target_direction[0] if target_direction[0] is not None else target_direction[1]
-            else:
-                return game_map.explore(ship, destination),
-    }
+    # mover = {
+    #     "collecting": # collecting or Cannot move, stay stil
+    #         return Direction.Still,
+    #     "exploring": # if exploring move to its destinition in ship_dest dictionary
+    #         return game_map.explore(ship, destination),
+    #     "returning": # if returning
+    #         return make_returning_move(ship, has_moved, command_queue),
+    #     "collecting": # collect
+    #         return Direction.Still,
+    #     "harakiri": # crash into base at end of the game
+    #         if ship.position == me.shipyard.position:  # if at shipyard
+    #             return Direction.Still  # let other ships crash in to you
+    #         else:  # otherwise move to the shipyard
+    #             target_dir = game_map.get_target_direction(ship.position, me.shipyard.position)
+    #             return target_dir[0] if target_dir[0] is not None else target_dir[1]
+    #     "assasinate": # if enemy ships are close to shipyard or dropoff
+    #         state_switch(ship.id, previous_state[ship.id])
+    #         if game_map.calculate_distance(ship.position, destination) == 1:
+    #             target_direction = game_map.get_target_direction(ship.position, destination)
+    #             return target_direction[0] if target_direction[0] is not None else target_direction[1]
+    #         else:
+    #             return game_map.explore(ship, destination),
+    # }
 
-    return mover.get(state, "nothing")
+    # return mover.get(state, "nothing")
+
+    return move
 
 def state_transition(ship):
     # transition
