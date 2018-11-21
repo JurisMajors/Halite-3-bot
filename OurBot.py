@@ -151,12 +151,17 @@ def make_returning_move(ship, has_moved, command_queue):
         # Occupied by own ship that can move, perform swap
         if other_ship in me.get_ships() \
                 and other_ship.halite_amount >= game_map[target_pos].halite_amount * 0.1 \
-                and not has_moved[other_ship.id] and not ship_state[other_ship.id] == "returning":
-            # Move other ship to this position
-            command_queue.append(other_ship.move(Direction.invert(move)))
-            game_map[ship.position].mark_unsafe(other_ship)
-            has_moved[other_ship.id] = True
-
+                and not has_moved[other_ship.id]:
+            if ship_state[other_ship.id] == "returning":
+                # Let this ship process first since it has not moved
+                other_move = make_returning_move(other_ship, has_moved, command_queue)
+                if game_map[target_pos].is_occupied:
+                    move = Direction.Still
+            else:
+                # Move other ship to this position
+                command_queue.append(other_ship.move(Direction.invert(move)))
+                game_map[ship.position].mark_unsafe(other_ship)
+                has_moved[other_ship.id] = True
         # Occupied by enemy ship, try to go around
         elif other_ship not in me.get_ships():
             #logging.info("ship {} going around enemy ship".format(ship.id))
@@ -173,10 +178,12 @@ def make_returning_move(ship, has_moved, command_queue):
                 move = possible_move1
             else:
                 move = possible_move2
-        
+
         # Occupied by own unmovable ship
         else:
             move = Direction.Still
+
+    has_moved[ship.id] = True
     return move
 
 def create_halite_clusters(game_map):
@@ -485,6 +492,8 @@ while True:
 
         command_queue.append(ship.move(move))
         game_map[ship.position.directional_offset(move)].mark_unsafe(ship)
+        if move != Direction.Still and game_map[ship.position].ship == ship:
+            game_map[ship.position].ship = None
         previous_position[ship.id] = ship.position
         
         # This ship has made a move
