@@ -68,7 +68,7 @@ KILL_ENEMY_SHIP = int(VARIABLES[16])
 HALITE_PATCH_THRESHOLD = int(VARIABLES[17])
 MIN_CLUSTER_SIZE = int(VARIABLES[18])  # Minimum number of patches in a cluster
 DETERMINE_CLUSTER_TURN = int(VARIABLES[19] * constants.MAX_TURNS)
-CLUSTER_AMOUNT = float(VARIABLES[20]) # percentage of whole cluster amount 
+CLUSTER_AMOUNT = float(VARIABLES[20])  # percentage of whole cluster amount
 
 game.ready("Sea_Whackers {}".format(VERSION))
 
@@ -101,7 +101,8 @@ def ship_priority_q(me, game_map):
     for s in me.get_ships():
         has_moved[s.id] = False
         if s.id in ship_state:
-            shipyard = shipyard_pos[ship_shipyards[ship.id]] # its shipyard position
+            shipyard = shipyard_pos[ship_shipyards[
+                ship.id]]  # its shipyard position
             # importance, the lower the number, bigger importance
             if ship_state[s.id] == "returning":
                 importance = game_map.calculate_distance(s.position, shipyard) / (
@@ -122,7 +123,8 @@ def ship_priority_q(me, game_map):
 def select_crash_turn():
     distance = 0
     for ship in me.get_ships():
-        shipyard = shipyard_pos[ship_shipyards[ship.id]] # its shipyard position
+        shipyard = shipyard_pos[ship_shipyards[
+            ship.id]]  # its shipyard position
         d = game_map.calculate_distance(shipyard, ship.position)
         if d > distance:  # get maximum distance away of shipyard
             distance = d
@@ -259,8 +261,8 @@ def create_halite_clusters(game_map):
     cluster_value = [0 for _ in range(current_cluster_id - 1)]
     for i, clust in enumerate(clusters):
         for patch in clust:  # use heuristic to deremine cluster value
-            cluster_value[i] += game_map[patch].halite_amount
-                                  
+            cluster_value[i] += f(game_map[patch].halite_amount,
+                                  game_map.calculate_distance(patch, me.shipyard.position))
 
     # Sort by cluster value
     clusters = [c for _, c in sorted(
@@ -462,7 +464,8 @@ def state_transition(ship):
         find_new_destination(
             shipyard_halite[shipyard_id], ship.id, shipyard_halite_pos[shipyard_id])
 
-    elif ship_state[ship.id] == "build" and game_map[ship_dest[ship.id]].has_structure: # if someone already build dropoff there
+    # if someone already build dropoff there
+    elif ship_state[ship.id] == "build" and game_map[ship_dest[ship.id]].has_structure:
         ship_h, ship_h_positions = halite_priority_q(ship.position)
         find_new_destination(ship_h, ship.id, ship_h_positions)
         new_state = "exploring"
@@ -549,7 +552,8 @@ while True:
     # priority Q of patch function values of function f(halite, distance)
     do_halite_priorities()
 
-    # if clusters determined, more than 13 ships, we have clusters and nobody is building at this frame
+    # if clusters determined, more than 13 ships, we have clusters and nobody
+    # is building at this frame
     if clusters_determined and len(me.get_ships()) > 13 and len(cluster_centers) > 0 and not "build" in ship_state.values():
         dropoff_pos = cluster_centers.pop(0)  # remove from list
         fleet = get_fleet(dropoff_pos, 1)
@@ -608,10 +612,9 @@ while True:
         # logging.info("destination: {}, {} ".format(ship_dest[ship.id].x,
         # ship_dest[ship.id].y))
 
-
         if ship_state[ship.id] == "waiting" or (ship_state[ship.id] == "build" and ship_dest[ship.id] == ship.position):
             if me.halite_amount >= constants.DROPOFF_COST and not dropoff_built:
-                
+
                 command_queue.append(ship.make_dropoff())
                 dropoff_built = True
             else:
