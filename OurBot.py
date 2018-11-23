@@ -464,8 +464,9 @@ def state_transition(ship):
         find_new_destination(
             shipyard_halite[shipyard_id], ship.id, shipyard_halite_pos[shipyard_id])
 
-    # if someone already build dropoff there
+    # if someone already build dropoff there before us
     elif ship_state[ship.id] == "build" and game_map[ship_dest[ship.id]].has_structure:
+        # explore
         ship_h, ship_h_positions = halite_priority_q(ship.position)
         find_new_destination(ship_h, ship.id, ship_h_positions)
         new_state = "exploring"
@@ -530,6 +531,32 @@ def bfs_unoccupied(position):
             if neighbour.position not in Q:
                 Q.append(neighbour.position)
 
+def is_builder(ship):
+    ''' checks if this ship is a builder '''
+    return ship_state[ship.id] == "waiting" or (ship_state[ship.id] == "build" and ship_dest[ship.id] == ship.position)
+
+def should_build():
+    # if clusters determined, more than 13 ships, we have clusters and nobody
+    # is building at this turn (in order to not build too many)
+    return clusters_determined and len(me.get_ships()) > 10 and len(cluster_centers) > 0 and not "build" in ship_state.values():
+
+def send_ships(dropoff_pos, ship_amount):
+    '''sends a fleet of size ship_amount to build a dropoff and explore in dropoff_pos'''
+    fleet = get_fleet(dropoff_pos, ship_amount)
+    closest_ship = fleet.pop(0) # remove and get closest ship
+
+    state_switch(closest_ship.id, "build") # will build dropoff
+    # if dropoffs position already has a structure (e.g. other dropoff) or somebody is going there already
+    if game_map[dropoff_pos].has_structure or dropoff_pos in ship_dest.values():
+        # bfs for closer valid unoccupied position
+        dropoff_pos = bfs_unoccupied(dropoff_pos)
+    ship_dest[closest_ship.id] = dropoff_pos # go to the dropoff
+    h, h_pos = halite_priority_q(dropoff_pos) # for rest of the fleet to explore
+    for fleet_ship in fleet: # for other fleet members
+        # explore in area of the new dropoff
+        state_switch(ship.id, "exploring") 
+        find_new_destination(h, fleet_ship.id, h_pos)
+
 clusters_determined = False
 while True:
     game.update_frame()
@@ -552,22 +579,9 @@ while True:
     # priority Q of patch function values of function f(halite, distance)
     do_halite_priorities()
 
-    # if clusters determined, more than 13 ships, we have clusters and nobody
-    # is building at this frame
-    if clusters_determined and len(me.get_ships()) > 13 and len(cluster_centers) > 0 and not "build" in ship_state.values():
+    if should_build():
         dropoff_pos = cluster_centers.pop(0)  # remove from list
-        fleet = get_fleet(dropoff_pos, 1)
-        closest_ship = fleet[0]
-        state_switch(closest_ship.id, "build")
-        if game_map[dropoff_pos].has_structure or game_map[dropoff_pos].is_occupied or dropoff_pos in ship_dest.values():  # if someone going there
-            # bfs closer
-            dropoff_pos = bfs_unoccupied(dropoff_pos)
-        ship_dest[closest_ship.id] = dropoff_pos
-
-        # for fleet_ship in fleet:
-        #     new_state = "build" if fleet_ship == closest_ship else "exploring"
-        #     state_switch(ship.id, new_state)
-        #     ship_dest[fleet_ship.id] = dropoff_pos
+        send_ships(dropoff_pos, 5) # sends ships to position where closest will build dropoff
 
     # has_moved ID->True/False, moved or not
     # ships priority queue of (importance, ship)
@@ -575,7 +589,7 @@ while True:
     start = time.time()
     # True if a ship moves into the shipyard this turn
     move_into_shipyard = False
-    dropoff_built = False
+    dropoff_built = False # whether a dropoff has been built this turn so that wouldnt use too much halite
 
     nearby_enemy_ships = enemy_near_shipyard()
 
@@ -612,16 +626,18 @@ while True:
         # logging.info("destination: {}, {} ".format(ship_dest[ship.id].x,
         # ship_dest[ship.id].y))
 
-        if ship_state[ship.id] == "waiting" or (ship_state[ship.id] == "build" and ship_dest[ship.id] == ship.position):
+        # if ship is dropoff builder
+        if is_builder(ship):
+            # if enough halite and havent built a dropoff this turn
             if me.halite_amount >= constants.DROPOFF_COST and not dropoff_built:
-
                 command_queue.append(ship.make_dropoff())
+                do_halite_priorities() # recalc all dictionaries
                 dropoff_built = True
-            else:
-                ship_state[ship.id] = "waiting"
+            else: # cant build
+                ship_state[ship.id] = "waiting" # wait in the position
                 command_queue.append(ship.move(Direction.Still))
                 has_moved[ship.id] = True
-        else:
+        else: # not associated with building a dropoff, so move regularly
             move = produce_move(ship)
 
             command_queue.append(ship.move(move))
@@ -630,7 +646,7 @@ while True:
                 game_map[ship.position].ship = None
             previous_position[ship.id] = ship.position
 
-        clear_dictionaries()  # of crashed ships
+        clear_dictionaries()  # of crashed or transformed ships
         # This ship has made a move
         has_moved[ship.id] = True
 
