@@ -512,8 +512,9 @@ def get_fleet(position, fleet_size):
         of ships closest to the position'''
     distances = []
     for s in me.get_ships():
-        distances.append(
-            (game_map.calculate_distance(position, s.position), s))
+        if s.id not in ship_shipyards.keys() or ship_shipyards[s.id] == me.shipyard.id:
+            distances.append(
+                (game_map.calculate_distance(position, s.position), s))
     distances.sort(key=lambda x: x[0])
     return [t[1] for t in distances[:fleet_size]]
 
