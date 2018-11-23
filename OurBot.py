@@ -37,7 +37,7 @@ shipyard_pos = {}  # shipyard.id -> shipyard position
 shipyard_halite_pos = {}  # shipyard.id -> halite pos dictionary
 
 VARIABLES = ["YEEHAW", 0, 50, 129, 0.87, 0.85, 290, 9,
-             221, 0, 1, 0, 0.01, 0.98, 1.05, 0.92, 500, 350, 4, 0.3, 0.5]
+             221, 0, 1, 0, 0.01, 0.98, 1.05, 0.75, 500, 350, 4, 0.3, 0.5]
 VERSION = VARIABLES[1]
 # search area for halite relative to shipyard
 SCAN_AREA = int(VARIABLES[2])
@@ -101,16 +101,17 @@ def ship_priority_q(me, game_map):
     for s in me.get_ships():
         has_moved[s.id] = False
         if s.id in ship_state:
+            shipyard = shipyard_pos[ship_shipyards[ship.id]] # its shipyard position
             # importance, the lower the number, bigger importance
             if ship_state[s.id] == "returning":
-                importance = game_map.calculate_distance(s.position, me.shipyard.position) / (
+                importance = game_map.calculate_distance(s.position, shipyard) / (
                     game_map.width * 2)  # 0,1 range
             elif ship_state[s.id] == "exploring":
                 importance = game_map.calculate_distance(
-                    s.position, me.shipyard.position)  # normal distance
+                    s.position, shipyard)  # normal distance
             else:  # collecting
                 importance = game_map.calculate_distance(s.position,
-                                                         me.shipyard.position) * game_map.width * 2  # normal distance * X since processing last
+                                                         shipyard) * game_map.width * 2  # normal distance * X since processing last
         else:
             importance = 0  # newly spawned ships max importance
         heappush(ships, (importance, s))
@@ -121,12 +122,13 @@ def ship_priority_q(me, game_map):
 def select_crash_turn():
     distance = 0
     for ship in me.get_ships():
-        d = game_map.calculate_distance(me.shipyard.position, ship.position)
+        shipyard = shipyard_pos[ship_shipyards[ship.id]] # its shipyard position
+        d = game_map.calculate_distance(shipyard, ship.position)
         if d > distance:  # get maximum distance away of shipyard
             distance = d
-    crash_turn = constants.MAX_TURNS - distance - 4
+    crash_turn = constants.MAX_TURNS - distance - 5
     # set the crash turn to be turn s.t. all ships make it
-    return crash_turn if crash_turn > CRASH_SELECTION_TURN else CRASH_SELECTION_TURN
+    return max(crash_turn, CRASH_SELECTION_TURN)
 
 
 def find_new_destination(h, ship_id, halite_pos):
@@ -176,8 +178,9 @@ def make_returning_move(ship, has_moved, command_queue):
                 and not has_moved[other_ship.id]:
             if ship_state[other_ship.id] == "returning":
                 # Let this ship process first since it has not moved
-                other_move = make_returning_move(
-                    other_ship, has_moved, command_queue)
+                if target_pos not in get_dropoff_positions():
+                    other_move = make_returning_move(
+                        other_ship, has_moved, command_queue)
                 if game_map[target_pos].is_occupied:
                     move = Direction.Still
             else:
@@ -400,11 +403,12 @@ def exploring(ship, destination):
 
 
 def harakiri(ship, destination):
-    if ship.position == me.shipyard.position:  # if at shipyard
+    shipyard = shipyard_pos[ship_shipyards[ship.id]]
+    if ship.position == shipyard:  # if at shipyard
         return Direction.Still  # let other ships crash in to you
     else:  # otherwise move to the shipyard
         target_dir = game_map.get_target_direction(
-            ship.position, me.shipyard.position)
+            ship.position, shipyard)
         return target_dir[0] if target_dir[0] is not None else target_dir[1]
 
 
@@ -421,8 +425,9 @@ def assassinate(ship, destination):
 def state_transition(ship):
     # transition
     new_state = None
+    shipyard_id = ship_shipyards[ship.id]
     if ship_state[ship.id] == "returning" and game.turn_number >= CRASH_TURN and game_map.calculate_distance(
-            ship.position, me.shipyard.position) < 2:
+            ship.position, shipyard_pos[shipyard_id]) < 2:
         # if returning after crash turn, suicide
         new_state = "harakiri"
 
@@ -454,9 +459,13 @@ def state_transition(ship):
     elif ship_state[ship.id] == "returning" and ship.position in get_dropoff_positions():
         # explore again when back in shipyard
         new_state = "exploring"
-        shipyard = ship_shipyards[ship.id]
         find_new_destination(
-            shipyard_halite[shipyard], ship.id, shipyard_halite_pos[shipyard])
+            shipyard_halite[shipyard_id], ship.id, shipyard_halite_pos[shipyard_id])
+
+    elif ship_state[ship.id] == "build" and game_map[ship_dest[ship.id]].has_structure: # if someone already build dropoff there
+        ship_h, ship_h_positions = halite_priority_q(ship.position)
+        find_new_destination(ship_h, ship.id, ship_h_positions)
+        new_state = "exploring"
 
     if new_state is not None:
         state_switch(ship.id, new_state)
@@ -540,7 +549,7 @@ while True:
     # priority Q of patch function values of function f(halite, distance)
     do_halite_priorities()
 
-    # if clusters already determined
+    # if clusters determined, more than 13 ships, we have clusters and nobody is building at this frame
     if clusters_determined and len(me.get_ships()) > 13 and len(cluster_centers) > 0 and not "build" in ship_state.values():
         dropoff_pos = cluster_centers.pop(0)  # remove from list
         fleet = get_fleet(dropoff_pos, 1)
@@ -573,6 +582,7 @@ while True:
         if ship.id not in previous_position:  # if new ship the
             previous_position[ship.id] = me.shipyard.position
 
+        # set the closest shipyard
         ship_shipyards[ship.id] = closest_shipyard_id(ship)
         shipyard_id = ship_shipyards[ship.id]
 
@@ -598,9 +608,10 @@ while True:
         # logging.info("destination: {}, {} ".format(ship_dest[ship.id].x,
         # ship_dest[ship.id].y))
 
-        clear_dictionaries()  # of crashed ships
+
         if ship_state[ship.id] == "waiting" or (ship_state[ship.id] == "build" and ship_dest[ship.id] == ship.position):
             if me.halite_amount >= constants.DROPOFF_COST and not dropoff_built:
+                
                 command_queue.append(ship.make_dropoff())
                 dropoff_built = True
             else:
@@ -616,6 +627,7 @@ while True:
                 game_map[ship.position].ship = None
             previous_position[ship.id] = ship.position
 
+        clear_dictionaries()  # of crashed ships
         # This ship has made a move
         has_moved[ship.id] = True
 

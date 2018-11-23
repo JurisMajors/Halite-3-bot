@@ -335,7 +335,7 @@ class GameMap:
         t = time.time()
         while Q:
             if time.time() - t > .5:
-                logging.info(Q)
+                #logging.info(Q)
                 logging.info("TAKES TOO MUCH TIME, STANDING STILL")
                 return None
             cur = Q.popleft()
