@@ -285,7 +285,7 @@ class GameMap:
         heappush(PQ, (0, self[source]))
         # determine whether reachable
         s = time.time()
-        reachable = self.is_reachable(self[source], self[target])
+        reachable = self.is_reachable(ship, self[source], self[target]) and self.is_reachable(ship, self[target], self[source])
         self[source].cost = 0
         lowest_distance = self.calculate_distance(source, target)  # init
         closest_pos = source
@@ -369,10 +369,10 @@ class GameMap:
 
         return path  # return the neighbour we arrived
 
-    def is_reachable(self, start_cell, end_cell):
+    def is_reachable(self, ship, start_cell, end_cell):
         ''' Flood fill algorithm from end cell.
          Returns True if start_cell is reachable from end_cell'''
-        if end_cell.is_occupied:
+        if end_cell.is_occupied and not end_cell.ship == ship:
             return False
         Q = deque([])
         Q.append(end_cell)

@@ -38,7 +38,7 @@ shipyard_pos = {}  # shipyard.id -> shipyard position
 shipyard_halite_pos = {}  # shipyard.id -> halite pos dictionary
 
 VARIABLES = ["YEEHAW", 0, 50, 129, 0.87, 0.85, 290, 9,
-             0.65, 0, 1, 0, 0.01, 0.98, 1.05, 0.85, 500, 450, 4, 0.25, 0.6]
+             0.7, 0, 1, 0, 0.01, 0.98, 1.05, 0.9, 500, 450, 4, 0.2, 0.5]
 VERSION = VARIABLES[1]
 # search area for halite relative to shipyard
 SCAN_AREA = int(VARIABLES[2])
@@ -267,7 +267,8 @@ def create_halite_clusters(game_map):
     cluster_value = [0 for _ in range(current_cluster_id - 1)]
     for i, clust in enumerate(clusters):
         for patch in clust:  # determine cluster value
-            cluster_value[i] += game_map[patch].halite_amount / game_map.calculate_distance(patch, me.shipyard.position)
+            cluster_value[i] += game_map[patch].halite_amount
+        cluster_value[i] = f(cluster_value[i],  game_map.calculate_distance(clust[0], me.shipyard.position))
 
     # Sort by cluster value
     clusters = [c for _, c in sorted(
@@ -662,7 +663,7 @@ while True:
         if is_builder(ship):
             # if enough halite and havent built a dropoff this turn
             if me.halite_amount >= constants.DROPOFF_COST and not dropoff_built:
-                send_ships(ship.position, 7)
+                send_ships(ship.position, 5)
                 command_queue.append(ship.make_dropoff())
                 do_halite_priorities()  # recalc all dictionaries
                 dropoff_built = True
