@@ -418,10 +418,8 @@ def exploring(ship, destination):
     # move in calculated direction
     ship_path[ship.id][0][1] -= 1  # take that direction
     direction = ship_path[ship.id][0][0]
-    logging.info(ship_path[ship.id])
     if ship_path[ship.id][0][1] == 0:  # if no more left that direction remove it
         del ship_path[ship.id][0]
-    logging.info(direction)
     return direction
 
 
@@ -673,7 +671,6 @@ while True:
                 command_queue.append(ship.move(Direction.Still))
         else:  # not associated with building a dropoff, so move regularly
             move = produce_move(ship)
-            logging.info(move)
             command_queue.append(ship.move(move))
             previous_position[ship.id] = ship.position
             
