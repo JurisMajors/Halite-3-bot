@@ -117,7 +117,7 @@ class GameMap:
         target = self.normalize(target)
         resulting_position = abs(source - target)
         return min(resulting_position.x, self.width - resulting_position.x) + \
-               min(resulting_position.y, self.height - resulting_position.y)
+            min(resulting_position.y, self.height - resulting_position.y)
 
     def normalize(self, position):
         """
@@ -145,6 +145,7 @@ class GameMap:
             horizontal = Direction.invert(horizontal)
 
         vertical = Direction.East if target.x > source.x else Direction.West if target.x < source.x else None
+
         if abs(target.x - source.x) > (self.width - abs(target.x - source.x)) and vertical is not None:
             vertical = Direction.invert(vertical)
         return (horizontal,
@@ -163,7 +164,8 @@ class GameMap:
         destination = self.normalize(destination)
         possible_moves = []
         distance = abs(destination - source)
-        y_cardinality, x_cardinality = self.get_target_direction(source, destination)
+        y_cardinality, x_cardinality = self.get_target_direction(
+            source, destination)
 
         if distance.x != 0:
             possible_moves.append(x_cardinality if distance.x < (self.width / 2)
@@ -203,14 +205,18 @@ class GameMap:
         return move
 
     def select_best_direction(self, prev_position, ship, destination):
-        # selects best direction that is not occupied but with smallest distance to destination
-        possible_moves = []  # (direction, distance to destination if taken that direction)
+        # selects best direction that is not occupied but with smallest
+        # distance to destination
+        # (direction, distance to destination if taken that direction)
+        possible_moves = []
         for direction in Direction.get_all_cardinals():  # for 4 directions
             next_position = ship.position.directional_offset(direction)
             if not (self[next_position].is_occupied or self[prev_position] == self[
-                next_position]):  # check if the position is valid
-                # that is.. if its not occupied and not previous position (so the ship doesnt wiggle back and forth)
-                possible_moves.append((direction, self.calculate_distance(next_position, destination)))
+                    next_position]):  # check if the position is valid
+                # that is.. if its not occupied and not previous position (so
+                # the ship doesnt wiggle back and forth)
+                possible_moves.append(
+                    (direction, self.calculate_distance(next_position, destination)))
 
         if len(possible_moves) == 0:
             return Direction.Still
@@ -219,7 +225,6 @@ class GameMap:
         return final_direction
 
     def create_graph(self, dropoff_list):
-
         """
         Assigns the correct value to weight_to_shipyard, and parent for each cell in this map
         by using Dijkstra using all different dropoffs as source and prioritizing the closest one.
@@ -248,9 +253,11 @@ class GameMap:
             dist_cell = heappop(PQ)
             dist = dist_cell[0]
             cell = dist_cell[1]
-            if cell.weight_to_shipyard < dist: continue
+            if cell.weight_to_shipyard < dist:
+                continue
             for neighbour in self.get_neighbours(cell):
-                new_dist = dist + neighbour.halite_amount + 50 # Maybe divide halite amount by 10 here
+                new_dist = dist + neighbour.halite_amount + \
+                    50  # Maybe divide halite amount by 10 here
                 if new_dist < neighbour.weight_to_shipyard:
                     neighbour.weight_to_shipyard = new_dist
                     neighbour.parent = cell
@@ -264,7 +271,8 @@ class GameMap:
         dx = [0, -1, 0, 1]
         neighbours = []
         for i in range(len(dy)):
-            neighbours.append(self[source_cell.position + Position(dy[i], dx[i])])
+            neighbours.append(
+                self[source_cell.position + Position(dy[i], dx[i])])
         return neighbours
 
     def do_a_star(self, ship, target):
@@ -275,75 +283,115 @@ class GameMap:
         PQ = []
         source = ship.position
         heappush(PQ, (0, self[source]))
+        # determine whether reachable
+        s = time.time()
+        reachable = self.is_reachable(self[source], self[target])
         self[source].cost = 0
-        visited = []  # for reseting grid later
+        lowest_distance = self.calculate_distance(source, target)  # init
+        closest_pos = source
+        visited = []  # visited nodes
+
         while PQ:
             current = heappop(PQ)[1]
             current.visited = ship  # visit cell
             visited.append(current)
-            if current.position == target:  # if end goal, we done
-                break
+            distance_to_target = self.calculate_distance(
+                current.position, target)
+
+            if distance_to_target < lowest_distance:  # get lowest
+                closest_pos = current.position
+                lowest_distance = distance_to_target
+
+            if reachable:  # look for the actual target
+                if current.position == target:  # if end goal, we done
+                    break
+            else:  # if moving very far away from end point terminate
+                if lowest_distance + int(self.width / 6) <= distance_to_target:
+                    break
 
             for neighbour in self.get_neighbours(current):
                 # if obstacle or we already visited, skip
                 if neighbour.is_occupied or (neighbour.visited is not None and neighbour.visited == ship):
                     continue
                 # node.cost + distance from neighbour to node ( 1 )
-                new_cost = current.cost + 1  # instead of distance, halite possible
+                new_cost = current.cost + 1
 
                 if neighbour.visited is None or new_cost < neighbour.cost:
-                    # new cost 
+                    # new cost
                     neighbour.cost = new_cost
-                    priority = new_cost + self.calculate_distance(neighbour.position, target)  # distance is heuristic
-                    neighbour.visited = ship
+                    # distance is the heuristic
+                    priority = new_cost + \
+                        self.calculate_distance(neighbour.position, target)
                     neighbour.a_star_parent = current
                     visited.append(neighbour)
                     heappush(PQ, (priority, neighbour))
-        return visited
+        return (visited, target) if reachable else (visited, closest_pos)
 
     def explore(self, ship, destination):
-        visited = self.do_a_star(ship, destination)
-        next_cell = self.find_next(ship.position, destination)
+        if self.is_surrounded(ship.position):
+            return [[Direction.Still, 1]]
+
+        visited, new_destination = self.do_a_star(ship, destination)
+        path = self.find_path(ship.position, new_destination)
+
         for node in visited:  # reset
             node.cost = None
             node.a_star_parent = None
             node.visited = None
-        target_direction = self.get_target_direction(ship.position, next_cell.position)
-        direction = target_direction[0] if target_direction[0] is not None else target_direction[1]
-        return direction if direction is not None else Direction.Still
+        return path
 
-    def find_next(self, position, destination):
+    def find_path(self, position, destination):
         start = self[position]
         end = self[destination]
-        surrounded = True
-        for n in self.get_neighbours(end):
-            if not n.is_occupied:
-                surrounded = False
-        if end.a_star_parent is None or end.is_occupied or surrounded:  # search for nearest cell to end that is not occupied and is part of path
-            end = self.search_closest(end)
-        if end is None or end == start:
-            return start
-        neighbours = self.get_neighbours(start)
-        while not end in neighbours:  # move down the path until in neighbours of initial cell
-            end = end.a_star_parent
-        return end  # retunr the neighbour we take
+        path = []
 
-    def search_closest(self, start):
-        # bfs for closest cell
+        if end == start:
+            return  [[Direction.Still, 1]]
+            
+        while not end == start:  # move down the path until in neighbours of initial cell
+            next_cell = end.a_star_parent
+            t_direction = self.get_target_direction(
+                next_cell.position, end.position)
+            direction = t_direction[0] if t_direction[
+                0] is not None else t_direction[1]
+            direction = direction if direction is not None else Direction.Still
+
+            if path:  # if not length zero check last element
+                previous = path[0]  # last element
+                if previous[0] == direction:  # if same direction
+                    # increment the amount of times to move that direction
+                    previous[1] += 1
+                else:  # new direction
+                    path.insert(0, [direction, 1])
+            else:  # empty
+                path.insert(0, [direction, 1])
+            end = next_cell
+
+        return path  # return the neighbour we arrived
+
+    def is_reachable(self, start_cell, end_cell):
+        ''' Flood fill algorithm from end cell.
+         Returns True if start_cell is reachable from end_cell'''
+        if end_cell.is_occupied:
+            return False
         Q = deque([])
-        Q.append(start)
-        t = time.time()
+        Q.append(end_cell)
+        visited = []
         while Q:
-            if time.time() - t > .5:
-                logging.info(Q)
-                logging.info("TAKES TOO MUCH TIME, STANDING STILL")
-                return None
             cur = Q.popleft()
-            if not cur.is_occupied and cur.a_star_parent is not None:
-                return cur
+            visited.append(cur)
+
+            if self.calculate_distance(cur.position, end_cell.position) > 10:
+                return True
+            if cur == start_cell:
+                return True
+            
             for neighbour in self.get_neighbours(cur):
-                if neighbour not in Q:
+                if neighbour == start_cell:  # needed because start will be occupied by our ship
+                    return True
+                if not neighbour.is_occupied and neighbour not in Q and neighbour not in visited:
                     Q.append(neighbour)
+        return False
 
     def is_surrounded(self, position):
         neighbours = position.get_surrounding_cardinals()
@@ -359,7 +407,8 @@ class GameMap:
         :return: The map object
         """
         map_width, map_height = map(int, read_input().split())
-        game_map = [[None for _ in range(map_width)] for _ in range(map_height)]
+        game_map = [[None for _ in range(map_width)]
+                    for _ in range(map_height)]
         for y_position in range(map_height):
             cells = read_input().split()
             for x_position in range(map_width):

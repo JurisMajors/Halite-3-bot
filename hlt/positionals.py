@@ -1,6 +1,5 @@
 from . import commands
 
-
 class Direction:
     """
     Holds positional tuples in relation to cardinal directions
