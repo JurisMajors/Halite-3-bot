@@ -34,7 +34,9 @@ def mlp_model(model_name, load=True):
 		clf = pickle.load(open(model_name, 'rb'))
 	else:
 		print("INITIALIZING MLP CLASSIFIER")
-		clf = MLPClassifier(hidden_layer_sizes = (64, 128, 64), learning_rate='invscaling')
+		#clf = MLPClassifier(hidden_layer_sizes = (64, 128, 64), learning_rate='invscaling')# mlp2
+		#clf = MLPClassifier(hidden_layer_sizes = (128, 128), learning_rate='adaptive') # mlp
+		clf = MLPClassifier(hidden_layer_sizes = (64,64,64), learning_rate='adaptive') # mlp3
 		clf.fit(train_in, train_out)
 		pickle.dump(clf, open(model_name, 'wb'))
 	print("TESTING")
@@ -73,5 +75,6 @@ def SGD_model(model_name, load=True):
 #svm_model("clf.sav", True) # 0.72
 #mlp_model("mlp2.sav", True) # 0.7842
 #mlp_model("mlp.sav", True) # 0.7899
+mlp_model("mlp3.sav", False) # 0.7899
 #tree_model('tree.sav', False) # 0.722
 #SGD_model('sgd.sav', False) # 0.70

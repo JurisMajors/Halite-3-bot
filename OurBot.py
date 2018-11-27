@@ -22,7 +22,7 @@ import logging
 import time
 
 """ <<<Game Begin>>> """
-dropoff_clf = pickle.load(open('DropoffClassifier/clf.sav', 'rb'))
+dropoff_clf = pickle.load(open('DropoffClassifier/mlp.sav', 'rb'))
 # This game object contains the initial game state.
 game = hlt.Game()
 # At this point "game" variable is populated with initial map data.
@@ -38,8 +38,8 @@ shipyard_halite = {}  # shipyard.id -> halite priority queue
 shipyard_pos = {}  # shipyard.id -> shipyard position
 shipyard_halite_pos = {}  # shipyard.id -> halite pos dictionary
 
-VARIABLES = ["YEEHAW", 0, 50, 129, 0.87, 0.85, 290, 9,
-             0.65, 0, 1, 0, 0.01, 0.98, 1.05, 0.9, 500, 450, 4, 0.1, 0.5, 20, 4, 7]
+VARIABLES = ["YEEHAW", 0, 36, 129, 0.87, 0.85, 290, 9,
+             0.65, 0, 1, 0, 0.01, 0.98, 1.05, 0.9, 500, 450, 4, 0.15, 0.5, 20, 4, 7]
 VERSION = VARIABLES[1]
 # search area for halite relative to shipyard
 SCAN_AREA = int(VARIABLES[2])
@@ -157,10 +157,12 @@ def clear_dictionaries():
         if not me.has_ship(ship_id):
             del ship_dest[ship_id]
             del ship_state[ship_id]
-            del ship_path[ship_id]
             del previous_state[ship_id]
             del previous_position[ship_id]
             del ship_shipyards[ship_id]
+            if ship_id in ship_path:
+                del ship_path[ship_id]
+
 
 
 def get_dijkstra_move(current_position):
@@ -424,7 +426,6 @@ def exploring(ship, destination):
         direction = ship_path[ship.id][0][0]
         if game_map[ship.position.directional_offset(direction)].is_occupied and not direction == Direction.Still:
             ship_path[ship.id] = game_map.explore(ship, destination)
-
     # move in calculated direction
     ship_path[ship.id][0][1] -= 1  # take that direction
     direction = ship_path[ship.id][0][0]
@@ -518,13 +519,13 @@ def do_halite_priorities():
         shipyard_pos[dropoff.id] = dropoff.position
 
 
-def closest_shipyard_id(ship):
+def closest_shipyard_id(ship_pos):
     ''' returns shipyard id that is closest to ship '''
-    distance = game_map.calculate_distance(ship.position, me.shipyard.position)
+    distance = game_map.calculate_distance(ship_pos, me.shipyard.position)
     shipyard_id = me.shipyard.id
     for dropoff in me.get_dropoffs():
         new_distance = game_map.calculate_distance(
-            ship.position, dropoff.position)
+            ship_pos, dropoff.position)
         if new_distance < distance:
             distance = new_distance
             shipyard_id = dropoff.id
@@ -544,7 +545,7 @@ def get_fleet(position, fleet_size):
         of ships closest to the position'''
     distances = []
     for s in me.get_ships():
-        if (s.id not in ship_shipyards.keys() or ship_shipyards[s.id] == me.shipyard.id) and (s.id not in ship_state or not (ship_state[s.id] == "build" or "fleet")):
+        if closest_shipyard_id(s.position) == me.shipyard.id and (s.id not in ship_state or not (ship_state[s.id] == "build" or ship_state[s.id] == "fleet")):
             distances.append(
                 (game_map.calculate_distance(position, s.position), s))
     distances.sort(key=lambda x: x[0])
@@ -572,12 +573,13 @@ def is_builder(ship):
 def should_build():
     # if clusters determined, more than 13 ships, we have clusters and nobody
     # is building at this turn (in order to not build too many)
-    return clusters_determined and len(me.get_ships()) > 10 and len(cluster_centers) > 0 and not "build" in ship_state.values()
+    return clusters_determined and len(me.get_ships()) > 10 and len(cluster_centers) > 0 and not "waiting" in ship_state.values()
 
 
 def send_ships(pos, ship_amount):
-    '''sends a fleet of size ship_amount to build a dropoff and explore in dropoff_pos'''
+    '''sends a fleet of size ship_amount to explore around pos'''
     fleet = get_fleet(pos, ship_amount)
+    logging.info("FLEET {}".format(fleet))
     # for rest of the fleet to explore
     h, h_pos = halite_priority_q(pos)
     for fleet_ship in fleet:  # for other fleet members
@@ -585,9 +587,9 @@ def send_ships(pos, ship_amount):
             previous_state[fleet_ship.id] = "exploring"
             has_moved[fleet_ship.id] = False
         # explore in area of the new dropoff
+        del ship_path[fleet_ship.id]
         state_switch(fleet_ship.id, "fleet")
         find_new_destination(h, fleet_ship.id, h_pos)
-        logging.info("id {}, dest {}, pos {}".format(fleet_ship.id, ship_dest[fleet_ship.id], fleet_ship.position))
 
 
 def get_cell_data(x, y, center):
@@ -656,7 +658,7 @@ def filter_clusters(centers, max_centers):
     for i, d in enumerate(centers_copy):
         halite, pos = d
 
-        if halite < 5000:  # if 5x5 area contains less than 5k then remove it
+        if halite < 7200:  # if 5x5 area contains less than 5k then remove it
             if d in centers:  # if not removed arldy
                 centers.remove(d)
 
@@ -704,10 +706,12 @@ while True:
     if should_build():
         _, dropoff_pos = cluster_centers.pop(0)  # remove from list
         # sends ships to position where closest will build dropoff
+        dropoff_pos = game_map.normalize(dropoff_pos)
         fleet = get_fleet(dropoff_pos, 1)
 
         if len(fleet) > 0:
             closest_ship = fleet.pop(0)  # remove and get closest ship
+            logging.info("BUILDER {}".format(closest_ship.id))
 
             state_switch(closest_ship.id, "build")  # will build dropoff
             # if dropoffs position already has a structure (e.g. other dropoff) or
@@ -716,6 +720,7 @@ while True:
                 # bfs for closer valid unoccupied position
                 dropoff_pos = bfs_unoccupied(dropoff_pos)
             ship_dest[closest_ship.id] = dropoff_pos  # go to the dropoff
+            del ship_path[closest_ship.id]
 
         else:  # if builder not available
             cluster_centers.insert(0, (_, dropoff_pos))
@@ -740,7 +745,7 @@ while True:
             previous_position[ship.id] = me.shipyard.position
 
         # set the closest shipyard
-        ship_shipyards[ship.id] = closest_shipyard_id(ship)
+        ship_shipyards[ship.id] = closest_shipyard_id(ship.position)
         shipyard_id = ship_shipyards[ship.id]
 
         # setup state
@@ -754,17 +759,15 @@ while True:
             nearby_enemy_ships, ship.position)
         if enemy_position is not None:
             state_switch(ship.id, "assassinate")
-            # logging.info("state: {}".format(ship_state[ship.id]))
             ship_dest[ship.id] = enemy_position
             nearby_enemy_ships.remove(enemy_position)
 
         # transition
         state_transition(ship)
-
-        # logging.info("ship:{} , state:{} ".format(ship.id, ship_state[ship.id]))
-        # logging.info("destination: {}, {} ".format(ship_dest[ship.id].x,
-        # ship_dest[ship.id].y))
-
+        if ship.id == 4:
+            logging.info(ship_state[ship.id])
+            logging.info(dropoff_built)
+            logging.info(me.halite_amount)
         # if ship is dropoff builder
         if is_builder(ship):
             # if enough halite and havent built a dropoff this turn
@@ -785,7 +788,6 @@ while True:
             game_map[ship.position.directional_offset(move)].mark_unsafe(ship)
             if move != Direction.Still and game_map[ship.position].ship == ship:
                 game_map[ship.position].ship = None
-
         clear_dictionaries()  # of crashed or transformed ships
         # This ship has made a move
         has_moved[ship.id] = True
