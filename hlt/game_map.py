@@ -282,6 +282,7 @@ class GameMap:
         """
         PQ = []
         source = ship.position
+        target = self.normalize(target)
         heappush(PQ, (0, self[source]))
         # determine whether reachable
         s = time.time()
@@ -325,6 +326,7 @@ class GameMap:
                     neighbour.a_star_parent = current
                     visited.append(neighbour)
                     heappush(PQ, (priority, neighbour))
+
         return (visited, target) if reachable else (visited, closest_pos)
 
     def explore(self, ship, destination):
@@ -338,6 +340,7 @@ class GameMap:
             node.cost = None
             node.a_star_parent = None
             node.visited = None
+
         return path
 
     def find_path(self, position, destination):
