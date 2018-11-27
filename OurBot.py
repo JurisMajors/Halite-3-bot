@@ -587,7 +587,8 @@ def send_ships(pos, ship_amount):
             previous_state[fleet_ship.id] = "exploring"
             has_moved[fleet_ship.id] = False
         # explore in area of the new dropoff
-        del ship_path[fleet_ship.id]
+
+        ship_path[fleet_ship.id] = []
         state_switch(fleet_ship.id, "fleet")
         find_new_destination(h, fleet_ship.id, h_pos)
 
@@ -720,7 +721,7 @@ while True:
                 # bfs for closer valid unoccupied position
                 dropoff_pos = bfs_unoccupied(dropoff_pos)
             ship_dest[closest_ship.id] = dropoff_pos  # go to the dropoff
-            del ship_path[closest_ship.id]
+            ship_path[closest_ship.id] = []
 
         else:  # if builder not available
             cluster_centers.insert(0, (_, dropoff_pos))
