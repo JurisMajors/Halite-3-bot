@@ -38,8 +38,8 @@ shipyard_halite = {}  # shipyard.id -> halite priority queue
 shipyard_pos = {}  # shipyard.id -> shipyard position
 shipyard_halite_pos = {}  # shipyard.id -> halite pos dictionary
 
-VARIABLES = ["YEEHAW", 0, 36, 129, 0.87, 0.85, 290, 9,
-             0.65, 0, 1, 0, 0.01, 0.98, 1.05, 0.9, 500, 450, 4, 0.15, 0.5, 20, 4, 7]
+VARIABLES = ["YEEHAW", 0, 50, 129, 0.87, 0.85, 290, 9,
+             0.5, 0, 1, 0, 0.01, 0.98, 1.05, 0.9, 500, 450, 4, 0.15, 0.5, 20, 4, 7]
 VERSION = VARIABLES[1]
 # search area for halite relative to shipyard
 SCAN_AREA = int(VARIABLES[2])
@@ -148,7 +148,7 @@ def find_new_destination(h, ship_id, halite_pos):
     while halite_pos[
             biggest_halite] in ship_dest.values():  # get biggest halite while its a position no other ship goes to
         biggest_halite = heappop(h)
-    ship_dest[ship_id] = halite_pos[biggest_halite]  # set the destination
+    ship_dest[ship_id] = game_map.normalize(halite_pos[biggest_halite])  # set the destination
 
 
 def clear_dictionaries():
@@ -578,7 +578,7 @@ def should_build():
 
 def send_ships(pos, ship_amount):
     '''sends a fleet of size ship_amount to explore around pos'''
-    fleet = get_fleet(pos, ship_amount)
+    fleet = get_fleet(game_map.normalize(pos), ship_amount)
     logging.info("FLEET {}".format(fleet))
     # for rest of the fleet to explore
     h, h_pos = halite_priority_q(pos)
@@ -591,6 +591,8 @@ def send_ships(pos, ship_amount):
         ship_path[fleet_ship.id] = []
         state_switch(fleet_ship.id, "fleet")
         find_new_destination(h, fleet_ship.id, h_pos)
+        logging.info(fleet_ship.id)
+        logging.info(ship_dest[fleet_ship.id])
 
 
 def get_cell_data(x, y, center):
@@ -760,15 +762,15 @@ while True:
             nearby_enemy_ships, ship.position)
         if enemy_position is not None:
             state_switch(ship.id, "assassinate")
-            ship_dest[ship.id] = enemy_position
+            ship_dest[ship.id] = game_map.normalize(enemy_position)
             nearby_enemy_ships.remove(enemy_position)
 
         # transition
         state_transition(ship)
-        if ship.id == 4:
-            logging.info(ship_state[ship.id])
-            logging.info(dropoff_built)
-            logging.info(me.halite_amount)
+        logging.info("Ship state {}".format(ship_state[ship.id]))
+        logging.info("Ship dest {}".format(ship_dest[ship.id]))
+        logging.info(ship.position)
+        logging.info(ship.id)
         # if ship is dropoff builder
         if is_builder(ship):
             # if enough halite and havent built a dropoff this turn
