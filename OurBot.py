@@ -3,7 +3,6 @@
 
 # Import the Halite SDK, which will let you interact with the game.
 import hlt
-from sklearn.svm import SVC
 import pickle
 # This library contains constant values.
 from hlt import constants
