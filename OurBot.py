@@ -217,7 +217,12 @@ def return_a_star_move(ship):
 def move_ship_to_position(ship, destination):
     # moves ship to destination
     # destination is 1 move away from ship
-    pass
+    vector = destination - ship.position
+    move = (vector.x, vector.y)
+    has_moved[ship.id] = True
+    command_queue.append(ship.move(move))
+    game_map[destination].mark_unsafe(ship)
+    game_map[ship.position].ship = None
 
 
 def create_halite_clusters(game_map):
