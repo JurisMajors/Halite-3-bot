@@ -25,6 +25,7 @@ class MapCell:
         self.weight_to_shipyard = 0
         self.parent = None
         self.djikstra_distance = None
+        self.djikstra_dest = None
 
         # Parameters for AStar
         self.visited = None
@@ -238,7 +239,7 @@ class GameMap:
 
         # Do Dijkstra from all different sources
         for dropoff in dropoff_list:
-            self.dijkstra( self[dropoff])
+            self.dijkstra(self[dropoff])
 
     def dijkstra(self, source_cell):
         """
@@ -251,6 +252,7 @@ class GameMap:
         source_cell.weight_to_shipyard = 0
         node_distance = 0
         source_cell.djikstra_distance = node_distance
+        source_cell.djikstra_dest = source_cell.position
         heappush(PQ, (source_cell.weight_to_shipyard, source_cell))
         while PQ:
             dist_cell = heappop(PQ)
@@ -265,9 +267,9 @@ class GameMap:
                 if new_dist < neighbour.weight_to_shipyard:
                     neighbour.weight_to_shipyard = new_dist
                     neighbour.parent = cell
+                    neighbour.djikstra_dest = source_cell.position
                     neighbour.djikstra_distance = node_distance
                     heappush(PQ, (new_dist, neighbour))
-
 
     def get_neighbours(self, source_cell):
         """
@@ -291,8 +293,9 @@ class GameMap:
         target = self.normalize(target)
         heappush(PQ, (0, self[source]))
         # determine whether reachable
-        s = time.time()
-        reachable = self.is_reachable(ship, self[source], self[target]) and self.is_reachable(ship, self[target], self[source])
+
+        reachable = self.is_reachable(ship, self[source], self[
+                                      target]) and self.is_reachable(ship, self[target], self[source])
         self[source].cost = 0
         lowest_distance = self.calculate_distance(source, target)  # init
         closest_pos = source
@@ -355,8 +358,8 @@ class GameMap:
         path = []
 
         if end == start:
-            return  [[Direction.Still, 1]]
-            
+            return [[Direction.Still, 1]]
+
         while not end == start:  # move down the path until in neighbours of initial cell
             next_cell = end.a_star_parent
             t_direction = self.get_target_direction(
@@ -394,7 +397,7 @@ class GameMap:
                 return True
             if cur == start_cell:
                 return True
-            
+
             for neighbour in self.get_neighbours(cur):
                 if neighbour == start_cell:  # needed because start will be occupied by our ship
                     return True

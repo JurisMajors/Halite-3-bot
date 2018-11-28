@@ -37,7 +37,7 @@ shipyard_halite = {}  # shipyard.id -> halite priority queue
 shipyard_pos = {}  # shipyard.id -> shipyard position
 shipyard_halite_pos = {}  # shipyard.id -> halite pos dictionary
 
-VARIABLES = ["YEEHAW", 0, 50, 129, 0.87, 0.85, 290, 9,
+VARIABLES = ["YEEHAW", 0, 50, 129, 0.87, 0.85, 290, 100,
              0.5, 0, 1, 0, 0.01, 0.98, 1.05, 0.9, 500, 450, 4, 0.15, 0.5, 20, 4, 7]
 VERSION = VARIABLES[1]
 # search area for halite relative to shipyard
@@ -191,161 +191,57 @@ def make_returning_move(ship, has_moved, command_queue):
         other_ship = game_map[target_pos].ship
         # target position occupied by own ship
         if me.has_ship(other_ship.id):
+
             if ship_state[other_ship.id] in ["exploring", "build", "fleet"]:
                 # if other ship has enough halite and hasnt made a move yet:
-                if other_ship.halite_amount < game_map[other_ship.position].halite_amount / 10 and \
-                        has_moved[other_ship] == False:
+                if other_ship.halite_amount > game_map[other_ship.position].halite_amount / 10 and \
+                        not has_moved[other_ship.id]:
                     # move stays the same target move
                     # move other_ship to ship.destination
                     # hence swapping ships
                     move_ship_to_position(other_ship, ship.position)
                 else:
-                    move = return_a_star_move(ship)
+                    move = a_star_move(ship)
+
             elif ship_state[other_ship.id] in ["returning", "harakiri"]:
                 move = Direction.Still
             elif ship_state[other_ship.id] in ["collecting"]:
-                move = return_a_star_move(ship)
+                move = a_star_move(ship)
+
         else:  # target position occupied by enemy ship
-            move = return_a_star_move(ship)
+            move = a_star_move(ship)
 
     has_moved[ship.id] = True
     return move
 
 
-def return_a_star_move(ship):
-    return Direction.Still
+def a_star_move(ship):
+    dest = game_map[ship.position].djikstra_dest
+    return exploring(ship, dest)
 
 
 def move_ship_to_position(ship, destination):
     # moves ship to destination
     # destination is 1 move away from ship
-    vector = destination - ship.position
-    move = (vector.x, vector.y)
+    normalized_dest = game_map.normalize(destination)
+    for d in Direction.get_all_cardinals():
+        if ship.position.directional_offset(d) == destination:
+            move = d
+            break
+
     has_moved[ship.id] = True
     command_queue.append(ship.move(move))
     game_map[destination].mark_unsafe(ship)
     game_map[ship.position].ship = None
 
+def djikstra_destination(position):
+    # retursn destination that djikstra wants u to go to from position
+    destination = game_map[position]
 
-def create_halite_clusters(game_map):
-    """
-    Creates halite clusters of adjacent halite patches with halite > HALITE_PATCH_THRESHOLD
-    :return: centers a list of positions for the centers of clusters, sorted by cluster value
-    """
-    # logging.info("Map size: {} by {}".format(game_map.width, game_map.height))
-    # map of size MAPSIZE where -1 means not in a cluster else the value is
-    # the ID of the cluster (starting at 1)
-    cluster_map = [[0 for _ in range(game_map.width)]
-                   for _ in range(game_map.height)]
-    # cluster_map = [game_map.height][game_map.width]
-    current_cluster_id = 1
-    for i in range(game_map.height):
-        for j in range(game_map.width):
-            # Not in any cluster
-            if game_map[Position(j, i)].halite_amount < HALITE_PATCH_THRESHOLD:
-                cluster_map[i][j] = -1
-            elif cluster_map[i][j] != 0:  # Already in cluster
-                continue
-            else:  # Create new cluster
-                cluster_dfs(game_map, cluster_map, current_cluster_id, i, j)
-                current_cluster_id += 1
-    #  All patches on the map should be assigned -1 or a cluster ID
-    #  Log the current cluster map
-    res = ""
-    for i in range(game_map.height):
-        line = ""
-        for j in range(game_map.width):
-            line += str(cluster_map[i][j]) + " "
-        res += line + '\n'
+    while destination.position not in get_dropoff_positions():
+        destination = destination.parent
 
-    # logging.info("Halite Cluster map:")
-    # logging.info(res)
-
-    clusters = [[] for _ in range(current_cluster_id - 1)]
-    for i in range(game_map.height):
-        for j in range(game_map.width):
-            if cluster_map[i][j] != -1:
-                clusters[cluster_map[i][j] - 1].append(Position(j, i))
-
-    # cluster ID starts at 0
-    cluster_value = [0 for _ in range(current_cluster_id - 1)]
-    for i, clust in enumerate(clusters):
-        for patch in clust:  # determine cluster value
-            cluster_value[i] += game_map[patch].halite_amount
-        cluster_value[i] = f(cluster_value[i], game_map.calculate_distance(
-            clust[0], me.shipyard.position))
-
-    # Sort by cluster value
-    clusters = [c for _, c in sorted(
-        zip(cluster_value, clusters), reverse=True)]
-
-    # Remove small clusters
-    clusters = [c for c in clusters if len(c) >= MIN_CLUSTER_SIZE]
-
-    # Find centers in all usable clusters
-    centers = [Position(0, 0) for _ in clusters]
-    minx = [game_map.width for _ in clusters]
-    miny = [game_map.height for _ in clusters]
-    maxx = [0 for _ in clusters]
-    maxy = [0 for _ in clusters]
-    for i, c in enumerate(clusters):
-        for patch in c:
-            if patch.x > maxx[i]:
-                maxx[i] = patch.x
-            elif patch.x < minx[i]:
-                minx[i] = patch.x
-            if patch.y > maxy[i]:
-                maxy[i] = patch.y
-            elif patch.y < miny[i]:
-                miny[i] = patch.y
-
-    # logging.info("Found {} clusters".format(len(clusters)))
-    center_info = ""
-    for i, c in enumerate(clusters):
-        xdiff = maxx[i] - minx[i]
-        ydiff = maxy[i] - miny[i]
-        if xdiff > game_map.width / 2:
-            xcenter = (maxx[i] + ((game_map.width - xdiff) / 2)
-                       ) % game_map.width
-        else:
-            xcenter = minx[i] + xdiff / 2
-        xcenter = int(xcenter)
-        if ydiff > game_map.height / 2:
-            ycenter = (maxy[i] + ((game_map.height - ydiff) / 2)
-                       ) % game_map.height
-        else:
-            ycenter = miny[i] + ydiff / 2
-        ycenter = int(ycenter)
-        centers[i] = Position(xcenter, ycenter)
-        center_info += str(centers[i]) + " "
-
-    # logging.info(center_info)
-
-    # A list of centers where the first center has most halite and the last
-    # has the least halite
-    return centers
-
-
-def cluster_dfs(game_map, cluster_map, id, i, j):
-    # logging.info("Cluster DFS trying for ({},{})".format(i, j))
-    if game_map[Position(j, i)].halite_amount < HALITE_PATCH_THRESHOLD:  # Not in any cluster
-        cluster_map[i][j] = -1
-        return
-    if cluster_map[i][j] != 0:  # Already in cluster
-        return
-
-    cluster_map[i][j] = id
-    dy = [-1, 0, 1, 0]
-    dx = [0, -1, 0, 1]
-    for k in range(4):
-        newI = (i + dy[k]) % game_map.height
-        newJ = (j + dx[k]) % game_map.width
-        if newI < 0:
-            newI += game_map.height
-        if newJ < 0:
-            newJ += game_map.width
-        # logging.info("NewI,NewJ = {},{}".format(newI, newJ))
-        cluster_dfs(game_map, cluster_map, id, newI, newJ)
+    return destination.position
 
 
 def enemy_near_shipyard():
@@ -380,8 +276,10 @@ def check_shipyard_blockade(enemies, ship_position):
 def state_switch(ship_id, new_state):
     if ship_id not in previous_state:
         previous_state[ship_id] = "exploring"
-    elif not previous_state[ship_id] == new_state:
-        previous_state[ship_id] = ship_state[ship_id]
+    if new_state == "returning": # reset path to empty list
+        ship_path[ship_id] = []
+    
+    previous_state[ship_id] = ship_state[ship_id]
     ship_state[ship_id] = new_state
 
 
@@ -577,7 +475,6 @@ def should_build():
 def send_ships(pos, ship_amount):
     '''sends a fleet of size ship_amount to explore around pos'''
     fleet = get_fleet(game_map.normalize(pos), ship_amount)
-    logging.info("FLEET {}".format(fleet))
     # for rest of the fleet to explore
     h, h_pos = halite_priority_q(pos)
     for fleet_ship in fleet:  # for other fleet members
@@ -589,8 +486,6 @@ def send_ships(pos, ship_amount):
         ship_path[fleet_ship.id] = []
         state_switch(fleet_ship.id, "fleet")
         find_new_destination(h, fleet_ship.id, h_pos)
-        logging.info(fleet_ship.id)
-        logging.info(ship_dest[fleet_ship.id])
 
 
 def get_cell_data(x, y, center):
@@ -770,10 +665,7 @@ while True:
 
         # transition
         state_transition(ship)
-        logging.info("Ship state {}".format(ship_state[ship.id]))
-        logging.info("Ship dest {}".format(ship_dest[ship.id]))
-        logging.info(ship.position)
-        logging.info(ship.id)
+
         # if ship is dropoff builder
         if is_builder(ship):
             # if enough halite and havent built a dropoff this turn
