@@ -78,6 +78,7 @@ FLEET_SIZE = int(VARIABLES[23])  # fleet size to send for new dropoff
 game.ready("Sea_Whackers {}".format(VERSION))
 NR_OF_PLAYERS = len(game.players.keys())
 
+
 # h_amount <= 0 to run minheap as maxheap
 
 
@@ -113,7 +114,7 @@ def ship_priority_q(me, game_map):
             # importance, the lower the number, bigger importance
             if ship_state[s.id] == "returning":
                 importance = game_map.calculate_distance(s.position, shipyard) / (
-                    game_map.width * 2)  # 0,1 range
+                        game_map.width * 2)  # 0,1 range
             elif ship_state[s.id] == "exploring":
                 importance = game_map.calculate_distance(
                     s.position, shipyard)  # normal distance
@@ -145,7 +146,7 @@ def find_new_destination(h, ship_id, halite_pos):
         halite_pos: dictionary of halite factor -> patch position '''
     biggest_halite = heappop(h)  # get biggest halite
     while halite_pos[
-            biggest_halite] in ship_dest.values():  # get biggest halite while its a position no other ship goes to
+        biggest_halite] in ship_dest.values():  # get biggest halite while its a position no other ship goes to
         biggest_halite = heappop(h)
     ship_dest[ship_id] = game_map.normalize(halite_pos[biggest_halite])  # set the destination
 
@@ -161,7 +162,6 @@ def clear_dictionaries():
             del ship_shipyards[ship_id]
             if ship_id in ship_path:
                 del ship_path[ship_id]
-
 
 
 def get_dijkstra_move(current_position):
@@ -187,47 +187,42 @@ def make_returning_move(ship, has_moved, command_queue):
     # Target is occupied
     if game_map[target_pos].is_occupied:
         other_ship = game_map[target_pos].ship
-        # Occupied by own ship that can move, perform swap
-        if other_ship in me.get_ships() \
-                and other_ship.halite_amount >= game_map[target_pos].halite_amount * 0.1 \
-                and not has_moved[other_ship.id]:
-            if ship_state[other_ship.id] == "returning":
-                # Let this ship process first since it has not moved
-                if target_pos not in get_dropoff_positions():
-                    other_move = make_returning_move(
-                        other_ship, has_moved, command_queue)
-                if game_map[target_pos].is_occupied:
-                    move = Direction.Still
-            else:
-                # Move other ship to this position
-                command_queue.append(other_ship.move(Direction.invert(move)))
-                game_map[ship.position].mark_unsafe(other_ship)
-                has_moved[other_ship.id] = True
-        # Occupied by enemy ship, try to go around
-        elif other_ship not in me.get_ships():
-            # logging.info("ship {} going around enemy ship".format(ship.id))
-            # If ship was trying to go north or south, go east or west (to move
-            # around)
-
-            # produces both moves that are not the direction going and not the
-            # inverse of that direction
-            possible_move1 = (move[1], move[0])
-            possible_move2 = (-1 * move[1], -1 * move[0])
-
-            new_pos1 = ship.position.directional_offset(possible_move1)
-            new_pos2 = ship.position.directional_offset(possible_move2)
-            # select the move which leads to a patch that has the least halite
-            if game_map[new_pos1].halite_amount < game_map[new_pos2].halite_amount:
-                move = possible_move1
-            else:
-                move = possible_move2
-
-        # Occupied by own unmovable ship
-        else:
-            move = Direction.Still
+        # target position occupied by own ship
+        if me.has_ship(other_ship.id):
+            if ship_state[other_ship.id] in ["exploring", "build", "fleet"]:
+                # if other ship has enough halite and hasnt made a move yet:
+                if other_ship.halite_amount < game_map[other_ship.position].halite_amount / 10 and \
+                        has_moved[other_ship] == False:
+                    # move stays the same target move
+                    # move other_ship to ship.destination
+                    # hence swapping ships
+                    move_ship_to_position(other_ship, ship.position)
+                else:
+                    move = return_a_star_move(ship)
+            elif ship_state[other_ship.id] in ["returning", "harakiri"]:
+                move = Direction.Still
+            elif ship_state[other_ship.id] in ["collecting"]:
+                move = return_a_star_move(ship)
+        else:  # target position occupied by enemy ship
+            move = return_a_star_move(ship)
 
     has_moved[ship.id] = True
     return move
+
+
+def return_a_star_move(ship):
+    return Direction.Still
+
+
+def move_ship_to_position(ship, destination):
+    # moves ship to destination
+    # destination is 1 move away from ship
+    vector = destination - ship.position
+    move = (vector.x, vector.y)
+    has_moved[ship.id] = True
+    command_queue.append(ship.move(move))
+    game_map[destination].mark_unsafe(ship)
+    game_map[ship.position].ship = None
 
 
 def create_halite_clusters(game_map):
@@ -275,7 +270,7 @@ def create_halite_clusters(game_map):
     for i, clust in enumerate(clusters):
         for patch in clust:  # determine cluster value
             cluster_value[i] += game_map[patch].halite_amount
-        cluster_value[i] = f(cluster_value[i],  game_map.calculate_distance(
+        cluster_value[i] = f(cluster_value[i], game_map.calculate_distance(
             clust[0], me.shipyard.position))
 
     # Sort by cluster value
@@ -463,7 +458,7 @@ def state_transition(ship):
         new_state = "harakiri"
 
     elif (ship_state[ship.id] == "collecting" or ship_state[
-            ship.id] == "exploring") and game.turn_number >= CRASH_TURN:
+        ship.id] == "exploring") and game.turn_number >= CRASH_TURN:
         # return if at crash turn
         new_state = "returning"
 
@@ -483,7 +478,7 @@ def state_transition(ship):
         new_state = "exploring"
 
     elif ship_state[
-            ship.id] == "collecting" and ship.halite_amount >= constants.MAX_HALITE * return_percentage:  # return to shipyard if enough halite
+        ship.id] == "collecting" and ship.halite_amount >= constants.MAX_HALITE * return_percentage:  # return to shipyard if enough halite
         # return ship is 70% full
         new_state = "returning"
 
@@ -544,7 +539,8 @@ def get_fleet(position, fleet_size):
         of ships closest to the position'''
     distances = []
     for s in me.get_ships():
-        if closest_shipyard_id(s.position) == me.shipyard.id and (s.id not in ship_state or not (ship_state[s.id] == "build" or ship_state[s.id] == "fleet")):
+        if closest_shipyard_id(s.position) == me.shipyard.id and (
+                s.id not in ship_state or not (ship_state[s.id] == "build" or ship_state[s.id] == "fleet")):
             distances.append(
                 (game_map.calculate_distance(position, s.position), s))
     distances.sort(key=lambda x: x[0])
@@ -572,7 +568,8 @@ def is_builder(ship):
 def should_build():
     # if clusters determined, more than 13 ships, we have clusters and nobody
     # is building at this turn (in order to not build too many)
-    return clusters_determined and len(me.get_ships()) > 10 and len(cluster_centers) > 0 and not "waiting" in ship_state.values()
+    return clusters_determined and len(me.get_ships()) > 10 and len(
+        cluster_centers) > 0 and not "waiting" in ship_state.values()
 
 
 def send_ships(pos, ship_amount):
@@ -597,27 +594,28 @@ def send_ships(pos, ship_amount):
 def get_cell_data(x, y, center):
     cell = game_map[Position(x, y)]
     # normalized data of cell: halite amount and distance to shipyard
-    return [round(cell.halite_amount / 1000, 2), round(game_map.calculate_distance(cell.position, center) / game_map.width, 2)]
+    return [round(cell.halite_amount / 1000, 2),
+            round(game_map.calculate_distance(cell.position, center) / game_map.width, 2)]
 
 
 def get_patch_data(x, y, center):
-    pool = 4 # pool + 1 x pool + 1 size square inspected for data (svm trained on 5x5)
+    pool = 4  # pool + 1 x pool + 1 size square inspected for data (svm trained on 5x5)
     # add center info
-    total_halite = 0 # total 5x5 patch halite
+    total_halite = 0  # total 5x5 patch halite
     cntr_cell_data = get_cell_data(x, y, center)
     biggest_cell = Position(x, y)
-    biggest_halite = cntr_cell_data[0] 
-    area_d = [round(game_map.width / 64, 2)] + cntr_cell_data # data must contain normalized game_size
+    biggest_halite = cntr_cell_data[0]
+    area_d = [round(game_map.width / 64, 2)] + cntr_cell_data  # data must contain normalized game_size
 
     for diff_x in range(-1 * int(pool / 2), int(pool / 2) + 1):
         for diff_y in range(-1 * int(pool / 2), int(pool / 2) + 1):
 
-            new_coord_x, new_coord_y = x - diff_x, y - diff_y # get patch coordinates from centr
+            new_coord_x, new_coord_y = x - diff_x, y - diff_y  # get patch coordinates from centr
             total_halite += game_map[Position(new_coord_x,
-                                              new_coord_y)].halite_amount # add to total halite
+                                              new_coord_y)].halite_amount  # add to total halite
             c_data = get_cell_data(new_coord_x, new_coord_y, center)
 
-            if biggest_halite < c_data[0]: # determine cell with most halite
+            if biggest_halite < c_data[0]:  # determine cell with most halite
                 biggest_halite = c_data[0]
                 biggest_cell = Position(new_coord_x, new_coord_y)
 
