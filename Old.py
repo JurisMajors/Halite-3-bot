@@ -38,7 +38,7 @@ shipyard_pos = {}  # shipyard.id -> shipyard position
 shipyard_halite_pos = {}  # shipyard.id -> halite pos dictionary
 
 VARIABLES = ["YEEHAW", 1, 50, 129, 0.87, 0.85, 290, 9,
-             0.7, 0, 1, 0, 0.01, 0.98, 1.05, 0.9, 500, 450, 4, 1.1, 0.5]
+             0.5, 0, 1, 0, 0.01, 0.98, 1.05, 0.9, 500, 450, 4, 1.1, 0.5]
 VERSION = VARIABLES[1]
 # search area for halite relative to shipyard
 SCAN_AREA = int(VARIABLES[2])
@@ -593,7 +593,7 @@ while True:
         cluster_centers = create_halite_clusters(game_map)
         save_amount = int(len(cluster_centers) * CLUSTER_AMOUNT)
         cluster_centers = cluster_centers[:save_amount]
-        logging.info(cluster_centers)
+
     # determine the turn for harikiri state
     if game.turn_number == CRASH_SELECTION_TURN:
         CRASH_TURN = select_crash_turn()
@@ -607,15 +607,16 @@ while True:
         dropoff_pos = cluster_centers.pop(0)  # remove from list
         # sends ships to position where closest will build dropoff
         fleet = get_fleet(dropoff_pos, 1)
-        closest_ship = fleet.pop(0)  # remove and get closest ship
+        if len(fleet) > 0:
+            closest_ship = fleet.pop(0)  # remove and get closest ship
 
-        state_switch(closest_ship.id, "build")  # will build dropoff
-        # if dropoffs position already has a structure (e.g. other dropoff) or
-        # somebody is going there already
-        if game_map[dropoff_pos].has_structure or dropoff_pos in ship_dest.values():
-            # bfs for closer valid unoccupied position
-            dropoff_pos = bfs_unoccupied(dropoff_pos)
-        ship_dest[closest_ship.id] = dropoff_pos  # go to the dropoff
+            state_switch(closest_ship.id, "build")  # will build dropoff
+            # if dropoffs position already has a structure (e.g. other dropoff) or
+            # somebody is going there already
+            if game_map[dropoff_pos].has_structure or dropoff_pos in ship_dest.values():
+                # bfs for closer valid unoccupied position
+                dropoff_pos = bfs_unoccupied(dropoff_pos)
+            ship_dest[closest_ship.id] = dropoff_pos  # go to the dropoff
 
     # has_moved ID->True/False, moved or not
     # ships priority queue of (importance, ship)
