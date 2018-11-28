@@ -194,8 +194,8 @@ def make_returning_move(ship, has_moved, command_queue):
 
             if ship_state[other_ship.id] in ["exploring", "build", "fleet"]:
                 # if other ship has enough halite and hasnt made a move yet:
-                if other_ship.halite_amount > game_map[other_ship.position].halite_amount / 10 and \
-                        not has_moved[other_ship.id]:
+                if not has_moved[other_ship.id] and \
+                        (other_ship.halite_amount > game_map[other_ship.position].halite_amount / 10 or other_ship.position in get_dropoff_positions()):
                     # move stays the same target move
                     # move other_ship to ship.destination
                     # hence swapping ships
@@ -225,7 +225,8 @@ def move_ship_to_position(ship, destination):
     # destination is 1 move away from ship
     normalized_dest = game_map.normalize(destination)
     for d in Direction.get_all_cardinals():
-        if ship.position.directional_offset(d) == destination:
+        new_pos = game_map.normalize(ship.position.directional_offset(d))
+        if new_pos == normalized_dest:
             move = d
             break
 
@@ -233,15 +234,6 @@ def move_ship_to_position(ship, destination):
     command_queue.append(ship.move(move))
     game_map[destination].mark_unsafe(ship)
     game_map[ship.position].ship = None
-
-def djikstra_destination(position):
-    # retursn destination that djikstra wants u to go to from position
-    destination = game_map[position]
-
-    while destination.position not in get_dropoff_positions():
-        destination = destination.parent
-
-    return destination.position
 
 
 def enemy_near_shipyard():
@@ -276,9 +268,9 @@ def check_shipyard_blockade(enemies, ship_position):
 def state_switch(ship_id, new_state):
     if ship_id not in previous_state:
         previous_state[ship_id] = "exploring"
-    if new_state == "returning": # reset path to empty list
+    if new_state == "returning":  # reset path to empty list
         ship_path[ship_id] = []
-    
+
     previous_state[ship_id] = ship_state[ship_id]
     ship_state[ship_id] = new_state
 
