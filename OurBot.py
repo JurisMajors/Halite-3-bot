@@ -112,10 +112,10 @@ def ship_priority_q(me, game_map):
             shipyard = shipyard_pos[ship_shipyards[
                 ship.id]]  # its shipyard position
             # importance, the lower the number, bigger importance
-            if ship_state[s.id] == "returning":
-                importance = game_map.calculate_distance(s.position, shipyard) / (
-                        game_map.width * 2)  # 0,1 range
-            elif ship_state[s.id] == "exploring":
+            if ship_state[s.id] in ["returning", "harikiri"]:
+                importance = game_map[
+                    ship.position].djikstra_distance / (game_map.width * 2)
+            elif ship_state[s.id] in ["exploring", "fleet", "build"]:
                 importance = game_map.calculate_distance(
                     s.position, shipyard)  # normal distance
             else:  # collecting
@@ -126,8 +126,9 @@ def ship_priority_q(me, game_map):
         heappush(ships, (importance, s))
     return ships, has_moved
 
-
 # selects turn when to crash
+
+
 def select_crash_turn():
     distance = 0
     for ship in me.get_ships():
@@ -146,9 +147,10 @@ def find_new_destination(h, ship_id, halite_pos):
         halite_pos: dictionary of halite factor -> patch position '''
     biggest_halite = heappop(h)  # get biggest halite
     while halite_pos[
-        biggest_halite] in ship_dest.values():  # get biggest halite while its a position no other ship goes to
+            biggest_halite] in ship_dest.values():  # get biggest halite while its a position no other ship goes to
         biggest_halite = heappop(h)
-    ship_dest[ship_id] = game_map.normalize(halite_pos[biggest_halite])  # set the destination
+    ship_dest[ship_id] = game_map.normalize(
+        halite_pos[biggest_halite])  # set the destination
 
 
 def clear_dictionaries():
@@ -458,7 +460,7 @@ def state_transition(ship):
         new_state = "harakiri"
 
     elif (ship_state[ship.id] == "collecting" or ship_state[
-        ship.id] == "exploring") and game.turn_number >= CRASH_TURN:
+            ship.id] == "exploring") and game.turn_number >= CRASH_TURN:
         # return if at crash turn
         new_state = "returning"
 
@@ -478,7 +480,7 @@ def state_transition(ship):
         new_state = "exploring"
 
     elif ship_state[
-        ship.id] == "collecting" and ship.halite_amount >= constants.MAX_HALITE * return_percentage:  # return to shipyard if enough halite
+            ship.id] == "collecting" and ship.halite_amount >= constants.MAX_HALITE * return_percentage:  # return to shipyard if enough halite
         # return ship is 70% full
         new_state = "returning"
 
@@ -599,18 +601,21 @@ def get_cell_data(x, y, center):
 
 
 def get_patch_data(x, y, center):
-    pool = 4  # pool + 1 x pool + 1 size square inspected for data (svm trained on 5x5)
+    # pool + 1 x pool + 1 size square inspected for data (svm trained on 5x5)
+    pool = 4
     # add center info
     total_halite = 0  # total 5x5 patch halite
     cntr_cell_data = get_cell_data(x, y, center)
     biggest_cell = Position(x, y)
     biggest_halite = cntr_cell_data[0]
-    area_d = [round(game_map.width / 64, 2)] + cntr_cell_data  # data must contain normalized game_size
+    # data must contain normalized game_size
+    area_d = [round(game_map.width / 64, 2)] + cntr_cell_data
 
     for diff_x in range(-1 * int(pool / 2), int(pool / 2) + 1):
         for diff_y in range(-1 * int(pool / 2), int(pool / 2) + 1):
 
-            new_coord_x, new_coord_y = x - diff_x, y - diff_y  # get patch coordinates from centr
+            new_coord_x, new_coord_y = x - diff_x, y - \
+                diff_y  # get patch coordinates from centr
             total_halite += game_map[Position(new_coord_x,
                                               new_coord_y)].halite_amount  # add to total halite
             c_data = get_cell_data(new_coord_x, new_coord_y, center)
@@ -635,7 +640,8 @@ def clusters_with_classifier():
     # with 5 node jumps since model trained on 5x5 areas
     for x in range(cntr.x - int(x_size / 2), cntr.x + int(x_size / 2) + 1, 5):
         for y in range(cntr.y - int(y_size / 2), cntr.y + int(y_size / 2) + 1, 5):
-            p_data, total_halite, p_center = get_patch_data(x, y, cntr)  # get the data
+            p_data, total_halite, p_center = get_patch_data(
+                x, y, cntr)  # get the data
             prediction = dropoff_clf.predict(p_data)[0]  # predict on it
             if prediction == 1:  # if should be dropoff
                 # add node with most halite to centers

@@ -268,6 +268,7 @@ class GameMap:
                     neighbour.djikstra_distance = node_distance
                     heappush(PQ, (new_dist, neighbour))
 
+
     def get_neighbours(self, source_cell):
         """
         Returns a list of all neighbouring cells
