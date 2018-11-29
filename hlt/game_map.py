@@ -412,6 +412,13 @@ class GameMap:
                 return False
         return True
 
+    def set_total_halite(self):
+        self.total_halite = 0
+        for y in range(self.height):
+            for x in range(self.width):
+                self.total_halite += self[Position(x, y)].halite_amount
+
+
     @staticmethod
     def _generate():
         """
