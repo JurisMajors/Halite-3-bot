@@ -75,11 +75,8 @@ CLUSTER_TOO_CLOSE = int(VARIABLES[21])  # distance two clusters can be within
 MAX_CLUSTERS = int(VARIABLES[22])  # max amount of clusters
 FLEET_SIZE = int(VARIABLES[23])  # fleet size to send for new dropoff
 
-game.ready("Sea_Whackers {}".format(VERSION))
+game.ready("MLP")
 NR_OF_PLAYERS = len(game.players.keys())
-
-
-# h_amount <= 0 to run minheap as maxheap
 
 
 def f(h_amount, h_distance):  # function for determining patch priority
@@ -87,6 +84,7 @@ def f(h_amount, h_distance):  # function for determining patch priority
 
 
 def halite_priority_q(pos):
+    # h_amount <= 0 to run minheap as maxheap
     h = []  # stores halite amount * -1 with its position in a minheap
     h_pos = {}
     top_left = Position(int(-1 * SCAN_AREA / 2),
@@ -431,8 +429,7 @@ def get_fleet(position, fleet_size):
         of ships closest to the position'''
     distances = []
     for s in me.get_ships():
-        if closest_shipyard_id(s.position) == me.shipyard.id and (
-                s.id not in ship_state or not (ship_state[s.id] == "build" or ship_state[s.id] == "fleet")):
+        if is_fleet(s) and not s.position == position:
             distances.append(
                 (game_map.calculate_distance(position, s.position), s))
     distances.sort(key=lambda x: x[0])
@@ -452,21 +449,38 @@ def bfs_unoccupied(position):
                 Q.append(neighbour.position)
 
 
+def is_fleet(ship):
+    ''' returns if a ship is good for adding it to a fleet '''
+    return closest_shipyard_id(ship.position) == me.shipyard.id and me.has_ship(ship.id) and (
+        ship.id not in ship_state or not (ship_state[ship.id] not in ["fleet", "waiting", "returning"]))
+
+
 def is_builder(ship):
     ''' checks if this ship is a builder '''
     return ship_state[ship.id] == "waiting" or (ship_state[ship.id] == "build" and ship_dest[ship.id] == ship.position)
+
+
+def fleet_availability():
+    ''' returns how many ships are available atm'''
+    amount = 0
+    for s in me.get_ships():
+        if is_fleet(s):
+            amount += 1
+    return amount
 
 
 def should_build():
     # if clusters determined, more than 13 ships, we have clusters and nobody
     # is building at this turn (in order to not build too many)
     return clusters_determined and len(me.get_ships()) > 10 and len(
-        cluster_centers) > 0 and not "waiting" in ship_state.values()
+        cluster_centers) > 0 and fleet_availability() > 5 and \
+        not any_builders()
 
 
 def send_ships(pos, ship_amount):
     '''sends a fleet of size ship_amount to explore around pos'''
     fleet = get_fleet(game_map.normalize(pos), ship_amount)
+    logging.info("FLEET {}".format(fleet))
     # for rest of the fleet to explore
     h, h_pos = halite_priority_q(pos)
     for fleet_ship in fleet:  # for other fleet members
@@ -487,8 +501,12 @@ def get_cell_data(x, y, center):
             round(game_map.calculate_distance(cell.position, center) / game_map.width, 2)]
 
 
+def any_builders():
+    return "waiting" in ship_state.values() or "build" in ship_state.values()
+
+
 def get_patch_data(x, y, center):
-    # pool + 1 x pool + 1 size square inspected for data (svm trained on 5x5)
+    # pool + 1 x pool + 1 size square inspected for data (classifier trained on 5x5)
     pool = 4
     # add center info
     total_halite = 0  # total 5x5 patch halite
@@ -576,11 +594,19 @@ def too_close(centers, position):
 
 
 clusters_determined = False
+INITIAL_HALITE_STOP = HALITE_STOP
 while True:
 
     game.update_frame()
     me = game.me
     game_map = game.game_map
+    game_map.set_total_halite()
+    if game.turn_number == 1:
+        TOTAL_MAP_HALITE = game_map.total_halite
+
+    prcntg_halite_left = game_map.total_halite / TOTAL_MAP_HALITE
+    HALITE_STOP = prcntg_halite_left * prcntg_halite_left * INITIAL_HALITE_STOP
+
     # Dijkstra the graph based on all dropoffs
     game_map.create_graph(get_dropoff_positions())
 
