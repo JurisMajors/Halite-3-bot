@@ -24,8 +24,8 @@ class MapCell:
         # Parameters for Dijkstra (to nearest dropoff/shipyard)
         self.weight_to_shipyard = 0
         self.parent = None
-        self.djikstra_distance = None
-        self.djikstra_dest = None
+        self.dijkstra_distance = None
+        self.dijkstra_dest = None
 
         # Parameters for AStar
         self.visited = None
@@ -251,14 +251,14 @@ class GameMap:
 
         source_cell.weight_to_shipyard = 0
         node_distance = 0
-        source_cell.djikstra_distance = node_distance
-        source_cell.djikstra_dest = source_cell.position
+        source_cell.dijkstra_distance = node_distance
+        source_cell.dijkstra_dest = source_cell.position
         heappush(PQ, (source_cell.weight_to_shipyard, source_cell))
         while PQ:
             dist_cell = heappop(PQ)
             dist = dist_cell[0]
             cell = dist_cell[1]
-            node_distance += 1
+            # node_distance += 1
             if cell.weight_to_shipyard < dist:
                 continue
             for neighbour in self.get_neighbours(cell):
@@ -267,8 +267,8 @@ class GameMap:
                 if new_dist < neighbour.weight_to_shipyard:
                     neighbour.weight_to_shipyard = new_dist
                     neighbour.parent = cell
-                    neighbour.djikstra_dest = source_cell.position
-                    neighbour.djikstra_distance = node_distance
+                    neighbour.dijkstra_dest = source_cell.position
+                    neighbour.dijkstra_distance = cell.dijkstra_distance + 1
                     heappush(PQ, (new_dist, neighbour))
 
     def get_neighbours(self, source_cell):
