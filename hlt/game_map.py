@@ -258,7 +258,7 @@ class GameMap:
             dist_cell = heappop(PQ)
             dist = dist_cell[0]
             cell = dist_cell[1]
-            node_distance += 1
+            # node_distance += 1
             if cell.weight_to_shipyard < dist:
                 continue
             for neighbour in self.get_neighbours(cell):
