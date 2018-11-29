@@ -112,7 +112,7 @@ def ship_priority_q(me, game_map):
             # importance, the lower the number, bigger importance
             if ship_state[s.id] in ["returning", "harikiri"]:
                 importance = game_map[
-                    ship.position].djikstra_distance / (game_map.width * 2)
+                    ship.position].dijkstra_distance / (game_map.width * 2)
             elif ship_state[s.id] in ["exploring", "fleet", "build"]:
                 importance = game_map.calculate_distance(
                     s.position, shipyard)  # normal distance
@@ -203,7 +203,7 @@ def make_returning_move(ship, has_moved, command_queue):
 
             elif ship_state[other_ship.id] in ["returning", "harakiri"]:
                 move = Direction.Still
-            elif ship_state[other_ship.id] in ["collecting"]:
+            elif ship_state[other_ship.id] in ["collecting", "waiting"]:
                 move = a_star_move(ship)
 
         else:  # target position occupied by enemy ship
@@ -214,7 +214,7 @@ def make_returning_move(ship, has_moved, command_queue):
 
 
 def a_star_move(ship):
-    dest = game_map[ship.position].djikstra_dest
+    dest = game_map[ship.position].dijkstra_dest
     return exploring(ship, dest)
 
 
@@ -601,6 +601,7 @@ while True:
     me = game.me
     game_map = game.game_map
     game_map.set_total_halite()
+    
     if game.turn_number == 1:
         TOTAL_MAP_HALITE = game_map.total_halite
 
@@ -683,6 +684,10 @@ while True:
 
         # transition
         state_transition(ship)
+
+        logging.info("Ship {}, State {}".format(ship.id, ship_state[ship.id]))
+        logging.info("Destination {}".format(ship_dest[ship.id]))
+
 
         # if ship is dropoff builder
         if is_builder(ship):

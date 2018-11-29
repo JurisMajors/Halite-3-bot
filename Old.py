@@ -112,7 +112,7 @@ def ship_priority_q(me, game_map):
             # importance, the lower the number, bigger importance
             if ship_state[s.id] in ["returning", "harikiri"]:
                 importance = game_map[
-                    ship.position].djikstra_distance / (game_map.width * 2)
+                    ship.position].dijkstra_distance / (game_map.width * 2)
             elif ship_state[s.id] in ["exploring", "fleet", "build"]:
                 importance = game_map.calculate_distance(
                     s.position, shipyard)  # normal distance
@@ -214,7 +214,7 @@ def make_returning_move(ship, has_moved, command_queue):
 
 
 def a_star_move(ship):
-    dest = game_map[ship.position].djikstra_dest
+    dest = game_map[ship.position].dijkstra_dest
     return exploring(ship, dest)
 
 
