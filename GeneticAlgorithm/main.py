@@ -47,7 +47,7 @@ POPULATION_SIZE = 150
 PARENT_AMOUNT = 18
 GENERATIONS = 100
 MUTATION_CHANCE = 0.05
-DEFAULT_VARIABLES = [0, 50, 129, 0.87, 0.85, 290, 100,
+DEFAULT_VARIABLES = [0, 50, 0.3, 0.87, 0.85, 290, 100,
                      0.5, 0, 1, 0, 0.01, 0.98, 1.05, 0.9, 500, 0.15, 20, 4, 7]
 PARAM_AMOUNT = len(DEFAULT_VARIABLES)
 results = {}  # VERSION -> RESULT
@@ -62,7 +62,7 @@ def populate():
         # determine random parameters
         VERSION = v
         SCAN_AREA = random.randint(10, 64)
-        PERCENTAGE_SWITCH = random.randint(0, 200)
+        PERCENTAGE_SWITCH = round(random.random(), 2)
         SMALL_PERCENTAGE = round(random.random(), 2)
         BIG_PERCENTAGE = round(random.random(), 2)
         MEDIUM_HALITE = random.randint(100, 900)

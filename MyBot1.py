@@ -43,7 +43,7 @@ VERSION = VARIABLES[1]
 # search area for halite relative to shipyard
 SCAN_AREA = int(VARIABLES[2])
 # when switch collectable percentage of max halite
-PERCENTAGE_SWITCH = int(VARIABLES[3])
+PERCENTAGE_SWITCH = int(float(VARIABLES[3]) * constants.MAX_TURNS)
 SMALL_PERCENTAGE = float(VARIABLES[4])
 BIG_PERCENTAGE = float(VARIABLES[5])
 # definition of medium patch size for stopping and collecting patch if on
