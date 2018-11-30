@@ -47,8 +47,10 @@ POPULATION_SIZE = 150
 PARENT_AMOUNT = 18
 GENERATIONS = 100
 MUTATION_CHANCE = 0.05
+<<<<<<< HEAD
 DEFAULT_VARIABLES = [0, 50, 0.3, 0.87, 0.85, 290, 100,
                      0.5, 0, 1, 0, 0.01, 0.98, 1.05, 0.9, 500, 0.15, 20, 4, 7]
+=======
 PARAM_AMOUNT = len(DEFAULT_VARIABLES)
 results = {}  # VERSION -> RESULT
 population = {}  # VERSION -> VARIABLES
@@ -77,7 +79,6 @@ def populate():
         CRASH_PERCENTAGE_TURN = round(random.random() + 0.1, 2)
         KILL_ENEMY = random.randint(1, 1000)
         DETERMINE_CLUSTER_TURN = round(random.random() + 0.1, 2)
-        CLUSTER_TOO_CLOSE = random.randint(5, 30)
         MAX_CLUSTERS = random.randint(1, 10)
         FLEET_SIZE = random.randint(2, 10)
         population[VERSION] = [VERSION, SCAN_AREA, PERCENTAGE_SWITCH, SMALL_PERCENTAGE, BIG_PERCENTAGE, MEDIUM_HALITE, HALITE_STOP,
