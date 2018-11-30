@@ -19,6 +19,10 @@ from collections import deque
 #   (print statements) are reserved for the engine-bot communication.
 import logging
 import time
+import sys, os
+
+stderr = sys.stderr
+sys.stderr = open(os.devnull, 'w')
 
 """ <<<Game Begin>>> """
 dropoff_clf = pickle.load(open('DropoffClassifier/mlp.sav', 'rb'))
@@ -121,6 +125,7 @@ def ship_priority_q(me, game_map):
         heappush(ships, (importance, s))
     return ships, has_moved
 
+
 # selects turn when to crash
 
 
@@ -142,7 +147,7 @@ def find_new_destination(h, ship_id, halite_pos):
         halite_pos: dictionary of halite factor -> patch position '''
     biggest_halite = heappop(h)  # get biggest halite
     while halite_pos[
-            biggest_halite] in ship_dest.values():  # get biggest halite while its a position no other ship goes to
+        biggest_halite] in ship_dest.values():  # get biggest halite while its a position no other ship goes to
         biggest_halite = heappop(h)
     ship_dest[ship_id] = game_map.normalize(
         halite_pos[biggest_halite])  # set the destination
@@ -190,7 +195,8 @@ def make_returning_move(ship, has_moved, command_queue):
             if ship_state[other_ship.id] in ["exploring", "build", "fleet"]:
                 # if other ship has enough halite and hasnt made a move yet:
                 if not has_moved[other_ship.id] and \
-                        (other_ship.halite_amount > game_map[other_ship.position].halite_amount / 10 or other_ship.position in get_dropoff_positions()):
+                        (other_ship.halite_amount > game_map[
+                            other_ship.position].halite_amount / 10 or other_ship.position in get_dropoff_positions()):
                     # move stays the same target move
                     # move other_ship to ship.destination
                     # hence swapping ships
@@ -345,7 +351,7 @@ def state_transition(ship):
         new_state = "harakiri"
 
     elif (ship_state[ship.id] == "collecting" or ship_state[
-            ship.id] == "exploring") and game.turn_number >= CRASH_TURN:
+        ship.id] == "exploring") and game.turn_number >= CRASH_TURN:
         # return if at crash turn
         new_state = "returning"
 
@@ -365,7 +371,7 @@ def state_transition(ship):
         new_state = "exploring"
 
     elif ship_state[
-            ship.id] == "collecting" and ship.halite_amount >= constants.MAX_HALITE * return_percentage:  # return to shipyard if enough halite
+        ship.id] == "collecting" and ship.halite_amount >= constants.MAX_HALITE * return_percentage:  # return to shipyard if enough halite
         # return ship is 70% full
         new_state = "returning"
 
@@ -449,7 +455,7 @@ def bfs_unoccupied(position):
 def is_fleet(ship):
     ''' returns if a ship is good for adding it to a fleet '''
     return closest_shipyard_id(ship.position) == me.shipyard.id and me.has_ship(ship.id) and (
-        ship.id not in ship_state or not (ship_state[ship.id] not in ["fleet", "waiting", "returning"]))
+            ship.id not in ship_state or not (ship_state[ship.id] not in ["fleet", "waiting", "returning"]))
 
 
 def is_builder(ship):
@@ -471,7 +477,7 @@ def should_build():
     # is building at this turn (in order to not build too many)
     return clusters_determined and len(me.get_ships()) > 10 and len(
         cluster_centers) > 0 and fleet_availability() > 5 and \
-        not any_builders()
+           not any_builders()
 
 
 def send_ships(pos, ship_amount):
@@ -517,7 +523,7 @@ def get_patch_data(x, y, center):
         for diff_y in range(-1 * int(pool / 2), int(pool / 2) + 1):
 
             new_coord_x, new_coord_y = x - diff_x, y - \
-                diff_y  # get patch coordinates from centr
+                                       diff_y  # get patch coordinates from centr
             total_halite += game_map[Position(new_coord_x,
                                               new_coord_y)].halite_amount  # add to total halite
             c_data = get_cell_data(new_coord_x, new_coord_y, center)

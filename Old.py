@@ -19,6 +19,10 @@ from collections import deque
 #   (print statements) are reserved for the engine-bot communication.
 import logging
 import time
+import sys, os
+
+stderr = sys.stderr
+sys.stderr = open(os.devnull, 'w')
 
 """ <<<Game Begin>>> """
 dropoff_clf = pickle.load(open('DropoffClassifier/mlp.sav', 'rb'))
