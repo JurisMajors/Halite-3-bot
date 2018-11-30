@@ -38,7 +38,7 @@ shipyard_pos = {}  # shipyard.id -> shipyard position
 shipyard_halite_pos = {}  # shipyard.id -> halite pos dictionary
 
 VARIABLES = ["YEEHAW", 0, 50, 129, 0.87, 0.85, 290, 100,
-             0.5, 0, 1, 0, 0.01, 0.98, 1.05, 0.9, 500, 450, 4, 0.15, 0.5, 20, 4, 7]
+             0.5, 0, 1, 0, 0.01, 0.98, 1.05, 0.9, 500, 0.15, 20, 4, 7]
 VERSION = VARIABLES[1]
 # search area for halite relative to shipyard
 SCAN_AREA = int(VARIABLES[2])
@@ -60,20 +60,17 @@ C = float(VARIABLES[11])
 D = float(VARIABLES[12])
 E = float(VARIABLES[13])
 F = float(VARIABLES[14])
-CRASH_TURN = constants.MAX_TURNS  #
+CRASH_TURN = constants.MAX_TURNS
 CRASH_PERCENTAGE_TURN = float(VARIABLES[15])
 CRASH_SELECTION_TURN = int(CRASH_PERCENTAGE_TURN * constants.MAX_TURNS)
 SHIPYARD_VICINITY = 2
 # If enemy ship has at least this halite kill it if near dropoff or shipyard
 KILL_ENEMY_SHIP = int(VARIABLES[16])
 # Minimum halite needed to join a halite cluster
-HALITE_PATCH_THRESHOLD = int(VARIABLES[17])
-MIN_CLUSTER_SIZE = int(VARIABLES[18])  # Minimum number of patches in a cluster
-DETERMINE_CLUSTER_TURN = int(VARIABLES[19] * constants.MAX_TURNS)
-CLUSTER_AMOUNT = float(VARIABLES[20])  # percentage of whole cluster amount
-CLUSTER_TOO_CLOSE = int(VARIABLES[21])  # distance two clusters can be within
-MAX_CLUSTERS = int(VARIABLES[22])  # max amount of clusters
-FLEET_SIZE = int(VARIABLES[23])  # fleet size to send for new dropoff
+DETERMINE_CLUSTER_TURN = int(VARIABLES[17] * constants.MAX_TURNS)
+CLUSTER_TOO_CLOSE = int(VARIABLES[18])  # distance two clusters can be within
+MAX_CLUSTERS = int(VARIABLES[19])  # max amount of clusters
+FLEET_SIZE = int(VARIABLES[20])  # fleet size to send for new dropoff
 
 game.ready("MLP")
 NR_OF_PLAYERS = len(game.players.keys())
