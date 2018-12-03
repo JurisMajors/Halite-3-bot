@@ -611,6 +611,7 @@ while True:
         TOTAL_MAP_HALITE = game_map.total_halite
 
     prcntg_halite_left = game_map.total_halite / TOTAL_MAP_HALITE
+    logging.info(prcntg_halite_left)
     HALITE_STOP = prcntg_halite_left * prcntg_halite_left * INITIAL_HALITE_STOP
 
     # Dijkstra the graph based on all dropoffs
@@ -716,7 +717,7 @@ while True:
     surrounded_shipyard = game_map.is_surrounded(me.shipyard.position)
 
     if not dropoff_built and game.turn_number <= SPAWN_TURN and me.halite_amount >= constants.SHIP_COST \
-            and prcntg_halite_left < 0.65 and not (game_map[me.shipyard].is_occupied or surrounded_shipyard or "waiting" in ship_state.values()
+            and prcntg_halite_left > (1 - 0.65) and not (game_map[me.shipyard].is_occupied or surrounded_shipyard or "waiting" in ship_state.values()
                                                   or "build" in ship_state.values()):
         command_queue.append(me.shipyard.spawn())
     # Send your moves back to the game environment, ending this turn.
