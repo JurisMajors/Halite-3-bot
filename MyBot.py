@@ -218,13 +218,15 @@ def make_returning_move(ship, has_moved, command_queue):
 
 
 def a_star_move(ship):
-    dest = interim_djikstra_dest(game_map[ship.position]).position
+    cell = game_map[ship.position]
+    d_to_dijkstra_dest = game_map.calculate_distance(cell.position, cell.dijkstra_dest)
+    dest = interim_djikstra_dest(cell).position if d_to_dijkstra_dest > 10 else cell.dijkstra_dest
     return exploring(ship, dest)
 
 
 def interim_djikstra_dest(source_cell):
     cell = source_cell.parent
-    while not cell.is_occupied:
+    while cell.is_occupied:
         cell = cell.parent
         if time_left() < 0.5:
             logging.info("STANDING STILL TOO SLOW")
@@ -315,6 +317,19 @@ def collecting(ship, destination):
 def returning(ship, destination):
     return make_returning_move(ship, has_moved, command_queue)
 
+def interim_exploring_dest(position, path):
+    to_go = get_step(path)
+    next_pos = game_map.normalize(position.directional_offset(to_go))
+    while game_map[next_pos].is_occupied:
+        if time_left() < 0.3:
+            logging.info("STANDING STILL")
+            return position
+        if not path:
+            return next_pos
+        to_go = get_step(path)
+        next_pos = game_map.normalize(next_pos.directional_offset(to_go))
+    return next_pos
+
 
 def exploring(ship, destination):
     # next direction occupied, recalculate
@@ -323,14 +338,22 @@ def exploring(ship, destination):
     else:
         direction = ship_path[ship.id][0][0]
         if game_map[ship.position.directional_offset(direction)].is_occupied and not direction == Direction.Still:
-            ship_path[ship.id] = game_map.explore(ship, destination)
-    # move in calculated direction
-    ship_path[ship.id][0][1] -= 1  # take that direction
-    direction = ship_path[ship.id][0][0]
-    if ship_path[ship.id][0][1] == 0:  # if no more left that direction remove it
-        del ship_path[ship.id][0]
-    return direction
+            if game_map.calculate_distance(destination, ship.position) > 10:
+                new_dest = interim_exploring_dest(ship.position, ship_path[ship.id])
+                # use intermediate unoccpied position instead of actual destination
+                ship_path[ship.id] = game_map.explore(ship, new_dest) + ship_path[ship.id]
+            else:
+                ship_path[ship.id] = game_map.explore(ship, destination)
 
+    # move in calculated direction
+    return get_step(ship_path[ship.id])
+
+def get_step(path):
+    path[0][1] -= 1  # take that direction
+    direction = path[0][0]
+    if path[0][1] == 0:  # if no more left that direction remove it
+        del path[0]
+    return direction
 
 def harakiri(ship, destination):
     shipyard = shipyard_pos[ship_shipyards[ship.id]]
@@ -605,13 +628,14 @@ def too_close(centers, position):
     for d in centers:
         _, other = d
         distance = game_map.calculate_distance(position, other)
-        if distance < CLUSTER_TOO_CLOSE * game_map.width:
+        shipyard_distance = game_map.calculate_distance(me.shipyard.position, other)
+        if distance < CLUSTER_TOO_CLOSE * game_map.width or shipyard_distance < 0.33 * game_map.width:
             to_remove.append(d)
     return to_remove
 
 
 def time_left():
-    return 2 - (TURN_START - time.time())
+    return 2 - (time.time() - TURN_START)
 
 clusters_determined = False
 INITIAL_HALITE_STOP = HALITE_STOP
