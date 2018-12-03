@@ -127,10 +127,8 @@ def ship_priority_q(me, game_map):
     return ships, has_moved
 
 
-# selects turn when to crash
-
-
 def select_crash_turn():
+    '''selects turn when to crash'''
     distance = 0
     for ship in me.get_ships():
         shipyard = shipyard_pos[ship_shipyards[
@@ -175,7 +173,10 @@ def get_dijkstra_move(current_position):
     cell = game_map[current_position].parent
     new_pos = cell.position
     dirs = game_map.get_target_direction(ship.position, new_pos)
-    new_dir = dirs[0] if dirs[0] is not None else dirs[1]
+    new_dir = dirs[0] if dirs[0] is not None else dirs[
+        1] if dirs[1] is not None else Direction.Still
+
+    logging.info(new_dir)
     return new_pos, new_dir
 
 
@@ -219,8 +220,10 @@ def make_returning_move(ship, has_moved, command_queue):
 
 def a_star_move(ship):
     cell = game_map[ship.position]
-    d_to_dijkstra_dest = game_map.calculate_distance(cell.position, cell.dijkstra_dest)
-    dest = interim_djikstra_dest(cell).position if d_to_dijkstra_dest > 10 else cell.dijkstra_dest
+    d_to_dijkstra_dest = game_map.calculate_distance(
+        cell.position, cell.dijkstra_dest)
+    dest = interim_djikstra_dest(
+        cell).position if d_to_dijkstra_dest > 10 else cell.dijkstra_dest
     return exploring(ship, dest)
 
 
@@ -292,6 +295,8 @@ def state_switch(ship_id, new_state):
 def produce_move(ship):
     state = ship_state[ship.id]
     destination = ship_dest[ship.id]
+    logging.info("SHIP {}, STATE {}, DESTINATION {}".format(
+        ship.id, state, destination))
     ''' produces move for ship '''
 
     if ship.halite_amount < game_map[ship.position].halite_amount / 10:
@@ -317,6 +322,7 @@ def collecting(ship, destination):
 def returning(ship, destination):
     return make_returning_move(ship, has_moved, command_queue)
 
+
 def interim_exploring_dest(position, path):
     to_go = get_step(path)
     next_pos = game_map.normalize(position.directional_offset(to_go))
@@ -339,14 +345,18 @@ def exploring(ship, destination):
         direction = ship_path[ship.id][0][0]
         if game_map[ship.position.directional_offset(direction)].is_occupied and not direction == Direction.Still:
             if game_map.calculate_distance(destination, ship.position) > 10:
-                new_dest = interim_exploring_dest(ship.position, ship_path[ship.id])
-                # use intermediate unoccpied position instead of actual destination
-                ship_path[ship.id] = game_map.explore(ship, new_dest) + ship_path[ship.id]
+                new_dest = interim_exploring_dest(
+                    ship.position, ship_path[ship.id])
+                # use intermediate unoccpied position instead of actual
+                # destination
+                ship_path[ship.id] = game_map.explore(
+                    ship, new_dest) + ship_path[ship.id]
             else:
                 ship_path[ship.id] = game_map.explore(ship, destination)
 
     # move in calculated direction
     return get_step(ship_path[ship.id])
+
 
 def get_step(path):
     path[0][1] -= 1  # take that direction
@@ -355,8 +365,10 @@ def get_step(path):
         del path[0]
     return direction
 
+
 def harakiri(ship, destination):
     shipyard = shipyard_pos[ship_shipyards[ship.id]]
+    ship_pos = game_map.normalize(ship.position)
     if ship.position == shipyard:  # if at shipyard
         return Direction.Still  # let other ships crash in to you
     else:  # otherwise move to the shipyard
@@ -379,9 +391,9 @@ def state_transition(ship):
     # transition
     new_state = None
     shipyard_id = ship_shipyards[ship.id]
-    if ship_state[ship.id] == "returning" and game.turn_number >= CRASH_TURN and game_map.calculate_distance(
-            ship.position, shipyard_pos[shipyard_id]) < 2:
-        # if returning after crash turn, suicide
+    if game.turn_number >= CRASH_TURN and game_map.calculate_distance(
+            ship.position, shipyard_pos[ship_shipyards[ship.id]]) < 2:
+        # if next to shipyard after crash turn, suicide
         new_state = "harakiri"
 
     elif (ship_state[ship.id] == "collecting" or ship_state[
@@ -423,7 +435,6 @@ def state_transition(ship):
         new_state = "exploring"
     elif ship_state[ship.id] == "fleet" and ship_dest[ship.id] == ship.position:
         new_state = "collecting"
-
     if new_state is not None:
         state_switch(ship.id, new_state)
 
@@ -628,7 +639,8 @@ def too_close(centers, position):
     for d in centers:
         _, other = d
         distance = game_map.calculate_distance(position, other)
-        shipyard_distance = game_map.calculate_distance(me.shipyard.position, other)
+        shipyard_distance = game_map.calculate_distance(
+            me.shipyard.position, other)
         if distance < CLUSTER_TOO_CLOSE * game_map.width or shipyard_distance < 0.33 * game_map.width:
             to_remove.append(d)
     return to_remove
@@ -747,7 +759,6 @@ while True:
             move = produce_move(ship)
             command_queue.append(ship.move(move))
             previous_position[ship.id] = ship.position
-
             game_map[ship.position.directional_offset(move)].mark_unsafe(ship)
             if move != Direction.Still and game_map[ship.position].ship == ship:
                 game_map[ship.position].ship = None
