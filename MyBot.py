@@ -65,7 +65,7 @@ C = float(VARIABLES[11])
 D = float(VARIABLES[12])
 E = float(VARIABLES[13])
 F = float(VARIABLES[14])
-CRASH_TURN = constants.MAX_TURNS  #
+CRASH_TURN = constants.MAX_TURNS
 CRASH_PERCENTAGE_TURN = float(VARIABLES[15])
 CRASH_SELECTION_TURN = int(float(CRASH_PERCENTAGE_TURN) * constants.MAX_TURNS)
 SHIPYARD_VICINITY = 2
@@ -76,7 +76,7 @@ DETERMINE_CLUSTER_TURN = int(float(VARIABLES[17]) * constants.MAX_TURNS)
 CLUSTER_TOO_CLOSE = float(VARIABLES[18])  # distance two clusters can be within
 MAX_CLUSTERS = int(VARIABLES[19])  # max amount of clusters
 FLEET_SIZE = int(VARIABLES[20])  # fleet size to send for new dropoff
-
+TURN_START = 0  # for timing
 game.ready("MLP")
 NR_OF_PLAYERS = len(game.players.keys())
 
@@ -218,8 +218,18 @@ def make_returning_move(ship, has_moved, command_queue):
 
 
 def a_star_move(ship):
-    dest = game_map[ship.position].dijkstra_dest
+    dest = interim_djikstra_dest(game_map[ship.position]).position
     return exploring(ship, dest)
+
+
+def interim_djikstra_dest(source_cell):
+    cell = source_cell.parent
+    while not cell.is_occupied:
+        cell = cell.parent
+        if time_left() < 0.5:
+            logging.info("STANDING STILL TOO SLOW")
+            return source_cell
+    return cell
 
 
 def move_ship_to_position(ship, destination):
@@ -485,7 +495,6 @@ def should_build():
 def send_ships(pos, ship_amount):
     '''sends a fleet of size ship_amount to explore around pos'''
     fleet = get_fleet(game_map.normalize(pos), ship_amount)
-    logging.info(fleet)
     # for rest of the fleet to explore
     h, h_pos = halite_priority_q(pos)
     for fleet_ship in fleet:  # for other fleet members
@@ -548,9 +557,12 @@ def clusters_with_classifier():
     y_size = game_map.height if NR_OF_PLAYERS == 2 else int(
         game_map.height / 2)
     cluster_centers = []
+    conservative = 0
+    if NR_OF_PLAYERS == 4:
+        conservative = 2
     # with 5 node jumps since model trained on 5x5 areas
-    for x in range(cntr.x - int(x_size / 2), cntr.x + int(x_size / 2) + 1, 5):
-        for y in range(cntr.y - int(y_size / 2), cntr.y + int(y_size / 2) + 1, 5):
+    for x in range(cntr.x - int(x_size / 2), cntr.x + int(x_size / 2) - conservative, 5):
+        for y in range(cntr.y - int(y_size / 2), cntr.y + int(y_size / 2) - conservative, 5):
             p_data, total_halite, p_center = get_patch_data(
                 x, y, cntr)  # get the data
             prediction = dropoff_clf.predict(p_data)[0]  # predict on it
@@ -598,20 +610,22 @@ def too_close(centers, position):
     return to_remove
 
 
+def time_left():
+    return 2 - (TURN_START - time.time())
+
 clusters_determined = False
 INITIAL_HALITE_STOP = HALITE_STOP
 while True:
-
     game.update_frame()
     me = game.me
     game_map = game.game_map
+    TURN_START = time.time()
     game_map.set_total_halite()
 
     if game.turn_number == 1:
         TOTAL_MAP_HALITE = game_map.total_halite
 
     prcntg_halite_left = game_map.total_halite / TOTAL_MAP_HALITE
-    logging.info(prcntg_halite_left)
     HALITE_STOP = prcntg_halite_left * prcntg_halite_left * INITIAL_HALITE_STOP
 
     # Dijkstra the graph based on all dropoffs
@@ -663,11 +677,15 @@ while True:
 
     while ships:  # go through all ships
         ship = heappop(ships)[1]
+        if time_left() < 0.3:
+            logging.info("STANDING STILL TOO SLOW")
+            command_queue.append(ship.stay_still())
+            ship_state[ship.id] = "collecting"
+            continue
         if has_moved[ship.id]:
             continue
         if ship.id not in previous_position:  # if new ship the
             previous_position[ship.id] = me.shipyard.position
-
         # set the closest shipyard
         ship_shipyards[ship.id] = closest_shipyard_id(ship.position)
         shipyard_id = ship_shipyards[ship.id]
@@ -715,10 +733,10 @@ while True:
         has_moved[ship.id] = True
 
     surrounded_shipyard = game_map.is_surrounded(me.shipyard.position)
-
-    if not dropoff_built and game.turn_number <= SPAWN_TURN and me.halite_amount >= constants.SHIP_COST \
+    logging.info(time_left())
+    if not dropoff_built and len(me.get_ships()) < 70 and game.turn_number <= SPAWN_TURN and me.halite_amount >= constants.SHIP_COST \
             and prcntg_halite_left > (1 - 0.65) and not (game_map[me.shipyard].is_occupied or surrounded_shipyard or "waiting" in ship_state.values()
-                                                  or "build" in ship_state.values()):
+                                                         or "build" in ship_state.values()):
         command_queue.append(me.shipyard.spawn())
     # Send your moves back to the game environment, ending this turn.
     game.end_turn(command_queue)
