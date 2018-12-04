@@ -176,7 +176,6 @@ def get_dijkstra_move(current_position):
     new_dir = dirs[0] if dirs[0] is not None else dirs[
         1] if dirs[1] is not None else Direction.Still
 
-    logging.info(new_dir)
     return new_pos, new_dir
 
 
@@ -185,7 +184,9 @@ def make_returning_move(ship, has_moved, command_queue):
     Makes a returning move based on Dijkstras and other ship positions.
     """
     if ship_path[ship.id]:
-        return get_step(ship_path[ship.id])
+        direction = get_step(ship_path[ship.id])
+        if not (game_map[ship.position.directional_offset(direction)].is_occupied or direction == Direction.Still):
+            return direction
 
     # Get the cell and direction we want to go to from dijkstra
     target_pos, move = get_dijkstra_move(ship.position)
@@ -297,8 +298,6 @@ def state_switch(ship_id, new_state):
 def produce_move(ship):
     state = ship_state[ship.id]
     destination = ship_dest[ship.id]
-    logging.info("SHIP {}, STATE {}, DESTINATION {}".format(
-        ship.id, state, destination))
     ''' produces move for ship '''
 
     if ship.halite_amount < game_map[ship.position].halite_amount / 10:
