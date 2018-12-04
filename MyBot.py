@@ -42,7 +42,7 @@ shipyard_halite = {}  # shipyard.id -> halite priority queue
 shipyard_pos = {}  # shipyard.id -> shipyard position
 shipyard_halite_pos = {}  # shipyard.id -> halite pos dictionary
 
-VARIABLES = ["YEEHAW", 1285, 50, 0.3, 0.94, 0.85, 290, 50, 0.65,
+VARIABLES = ["YEEHAW", 1285, 50, 0.3, 0.94, 0.85, 350, 50, 0.65,
              0, 1, 0, 0.01, 0.98, 1.05, 0.9, 500, 0.15, 0.5, 4, 8]
 VERSION = VARIABLES[1]
 # search area for halite relative to shipyard
@@ -113,7 +113,7 @@ def ship_priority_q(me, game_map):
                 ship.id]]  # its shipyard position
             # importance, the lower the number, bigger importance
             if ship_state[s.id] in ["returning", "harikiri"]:
-                importance = game_map[
+                importance = -1 * game_map[
                     ship.position].dijkstra_distance / (game_map.width * 2)
             elif ship_state[s.id] in ["exploring", "fleet", "build"]:
                 importance = game_map.calculate_distance(
@@ -122,7 +122,7 @@ def ship_priority_q(me, game_map):
                 importance = game_map.calculate_distance(s.position,
                                                          shipyard) * game_map.width * 2  # normal distance * X since processing last
         else:
-            importance = 0  # newly spawned ships max importance
+            importance = -100  # newly spawned ships max importance
         heappush(ships, (importance, s))
     return ships, has_moved
 
@@ -183,8 +183,10 @@ def get_dijkstra_move(current_position):
 def make_returning_move(ship, has_moved, command_queue):
     """
     Makes a returning move based on Dijkstras and other ship positions.
-    :return: has_moved, command_queue
     """
+    if ship_path[ship.id]:
+        return get_step(ship_path[ship.id])
+
     # Get the cell and direction we want to go to from dijkstra
     target_pos, move = get_dijkstra_move(ship.position)
 
@@ -285,7 +287,7 @@ def check_shipyard_blockade(enemies, ship_position):
 def state_switch(ship_id, new_state):
     if ship_id not in previous_state:
         previous_state[ship_id] = "exploring"
-    if new_state == "returning":  # reset path to empty list
+    if not new_state == "exploring":  # reset path to empty list
         ship_path[ship_id] = []
 
     previous_state[ship_id] = ship_state[ship_id]
@@ -339,7 +341,7 @@ def interim_exploring_dest(position, path):
 
 def exploring(ship, destination):
     # next direction occupied, recalculate
-    if ship.id not in ship_path or len(ship_path[ship.id]) == 0:
+    if ship.id not in ship_path or not ship_path[ship.id]:
         ship_path[ship.id] = game_map.explore(ship, destination)
     else:
         direction = ship_path[ship.id][0][0]
@@ -394,20 +396,24 @@ def state_transition(ship):
     if game.turn_number >= CRASH_TURN and game_map.calculate_distance(
             ship.position, shipyard_pos[ship_shipyards[ship.id]]) < 2:
         # if next to shipyard after crash turn, suicide
+        ship_path[ship.id] = []
         new_state = "harakiri"
 
     elif (ship_state[ship.id] == "collecting" or ship_state[
             ship.id] == "exploring") and game.turn_number >= CRASH_TURN:
         # return if at crash turn
+        ship_path[ship.id] = []
         new_state = "returning"
 
     elif ship_state[ship.id] == "exploring" and (ship.position == ship_dest[ship.id]
                                                  or game_map[ship.position].halite_amount > MEDIUM_HALITE):
         # collect if reached destination or on medium sized patch
+        ship_path[ship.id] = []
         new_state = "collecting"
 
     elif ship_state[ship.id] == "exploring" and ship.halite_amount >= constants.MAX_HALITE * return_percentage:
         # return if ship is 70+% full
+        ship_path[ship.id] = []
         new_state = "returning"
 
     elif ship_state[ship.id] == "collecting" and game_map[ship.position].halite_amount < HALITE_STOP:
@@ -432,8 +438,10 @@ def state_transition(ship):
         # explore
         ship_h, ship_h_positions = halite_priority_q(ship.position)
         find_new_destination(ship_h, ship.id, ship_h_positions)
+        ship_path[ship.id] = []
         new_state = "exploring"
     elif ship_state[ship.id] == "fleet" and ship_dest[ship.id] == ship.position:
+        ship_path[ship.id] = []
         new_state = "collecting"
     if new_state is not None:
         state_switch(ship.id, new_state)
@@ -521,9 +529,8 @@ def fleet_availability():
 def should_build():
     # if clusters determined, more than 13 ships, we have clusters and nobody
     # is building at this turn (in order to not build too many)
-    return clusters_determined and len(me.get_ships()) > FLEET_SIZE and len(
-        cluster_centers) > 0 and fleet_availability() > FLEET_SIZE / 2 and \
-        not any_builders()
+    return clusters_determined and len(me.get_ships()) > FLEET_SIZE and cluster_centers \
+     and fleet_availability() > FLEET_SIZE / 2 and not any_builders()
 
 
 def send_ships(pos, ship_amount):
@@ -537,7 +544,6 @@ def send_ships(pos, ship_amount):
             has_moved[fleet_ship.id] = False
         # explore in area of the new dropoff
 
-        ship_path[fleet_ship.id] = []
         state_switch(fleet_ship.id, "fleet")
         find_new_destination(h, fleet_ship.id, h_pos)
 
@@ -662,7 +668,7 @@ while True:
         TOTAL_MAP_HALITE = game_map.total_halite
 
     prcntg_halite_left = game_map.total_halite / TOTAL_MAP_HALITE
-    HALITE_STOP = prcntg_halite_left * prcntg_halite_left * INITIAL_HALITE_STOP
+    HALITE_STOP = prcntg_halite_left * INITIAL_HALITE_STOP
 
     # Dijkstra the graph based on all dropoffs
     game_map.create_graph(get_dropoff_positions())
@@ -685,7 +691,7 @@ while True:
         dropoff_pos = game_map.normalize(dropoff_pos)
         fleet = get_fleet(dropoff_pos, 1)
 
-        if len(fleet) > 0:
+        if fleet:
             closest_ship = fleet.pop(0)  # remove and get closest ship
 
             state_switch(closest_ship.id, "build")  # will build dropoff
@@ -695,7 +701,6 @@ while True:
                 # bfs for closer valid unoccupied position
                 dropoff_pos = bfs_unoccupied(dropoff_pos)
             ship_dest[closest_ship.id] = dropoff_pos  # go to the dropoff
-            ship_path[closest_ship.id] = []
 
         else:  # if builder not available
             cluster_centers.insert(0, (_, dropoff_pos))

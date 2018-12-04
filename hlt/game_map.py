@@ -263,7 +263,7 @@ class GameMap:
                 continue
             for neighbour in self.get_neighbours(cell):
                 new_dist = dist + neighbour.halite_amount + \
-                    50  # Maybe divide halite amount by 10 here
+                    70  # Maybe divide halite amount by 10 here
                 if new_dist < neighbour.weight_to_shipyard:
                     neighbour.weight_to_shipyard = new_dist
                     neighbour.parent = cell
