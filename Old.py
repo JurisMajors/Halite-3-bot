@@ -592,8 +592,8 @@ def clusters_with_classifier():
     ''' uses classifier to determine clusters '''
     cntr = me.shipyard.position
     # get area around our shipyard
-    x_size = int(game_map.width / 2)
-    y_size = game_map.height if NR_OF_PLAYERS == 2 else int(
+    x_size = int(game_map.width / 2) if NR_OF_PLAYERS in [2, 4] else game_map.width
+    y_size = game_map.height if NR_OF_PLAYERS in [2, 1] else int(
         game_map.height / 2)
     cluster_centers = []
     conservative = 0

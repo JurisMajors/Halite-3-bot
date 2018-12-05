@@ -621,8 +621,6 @@ def filter_clusters(centers, max_centers):
     centers.sort(key=lambda x: x[0], reverse=True)  # sort by halite amount
     if len(centers) > max_centers:  # if more than max centres specified
         centers = centers[:max_centers]  # get everything until that index
-    if len(centers) > 1:
-        merge_clusters(centers)
     logging.info(centers)
     centers_copy = centers[:]  # copy to remove stuff from original
     indices_to_remove = []
@@ -633,7 +631,11 @@ def filter_clusters(centers, max_centers):
         if halite < 7000:  # if 5x5 area contains less than 5k then remove it
             if d in centers:  # if not removed arldy
                 centers.remove(d)
-
+    if len(centers) > 1:
+        merge_clusters(centers)
+    centers_copy = centers[:]
+    for i, d in enumerate(centers_copy, start=0):
+        halite, pos = d
         if i < len(centers_copy) - 1:  # if not out of bounds
             # get list of centers too close
             r = too_close(centers_copy[i + 1:], pos)
@@ -705,7 +707,7 @@ def too_close(centers, position):
         distance = game_map.calculate_distance(position, other)
         shipyard_distance = game_map.calculate_distance(
             me.shipyard.position, other)
-        if distance < CLUSTER_TOO_CLOSE * game_map.width or shipyard_distance < 0.35 * game_map.width:
+        if distance < CLUSTER_TOO_CLOSE * game_map.width or shipyard_distance < 0.4 * game_map.width:
             to_remove.append(d)
     return to_remove
 
