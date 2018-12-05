@@ -43,7 +43,7 @@ shipyard_pos = {}  # shipyard.id -> shipyard position
 shipyard_halite_pos = {}  # shipyard.id -> halite pos dictionary
 
 VARIABLES = ["YEEHAW", 1285, 50, 0.3, 0.94, 0.85, 350, 50, 0.65,
-             0, 1, 0, 0.01, 0.98, 1.05, 0.9, 500, 0.15, 0.5, 6, 8]
+             0, 1, 0, 0.01, 0.98, 1.05, 0.9, 500, 0.15, 0.5, 4, 8]
 VERSION = VARIABLES[1]
 # search area for halite relative to shipyard
 SCAN_AREA = int(VARIABLES[2])
@@ -77,7 +77,7 @@ CLUSTER_TOO_CLOSE = float(VARIABLES[18])  # distance two clusters can be within
 MAX_CLUSTERS = int(VARIABLES[19])  # max amount of clusters
 FLEET_SIZE = int(VARIABLES[20])  # fleet size to send for new dropoff
 TURN_START = 0  # for timing
-game.ready("MLP")
+game.ready("Old")
 NR_OF_PLAYERS = len(game.players.keys())
 
 
@@ -592,8 +592,8 @@ def clusters_with_classifier():
     ''' uses classifier to determine clusters '''
     cntr = me.shipyard.position
     # get area around our shipyard
-    x_size = int(game_map.width / 2) if NR_OF_PLAYERS in [2, 4] else game_map.width
-    y_size = game_map.height if NR_OF_PLAYERS in [2, 1] else int(
+    x_size = int(game_map.width / 2)
+    y_size = game_map.height if NR_OF_PLAYERS == 2 else int(
         game_map.height / 2)
     cluster_centers = []
     conservative = 0
@@ -609,28 +609,23 @@ def clusters_with_classifier():
                 # add node with most halite to centers
                 cluster_centers.append((total_halite, p_center))
     # do filtering
-    logging.info(cluster_centers)
     cluster_centers = filter_clusters(cluster_centers, MAX_CLUSTERS)
-    logging.info("Finally")
-    logging.info(cluster_centers)
     return cluster_centers
 
 
 def filter_clusters(centers, max_centers):
     '''filters cluster centres on some human logic '''
     centers.sort(key=lambda x: x[0], reverse=True)  # sort by halite amount
+    indices_to_remove = []
+
     if len(centers) > max_centers:  # if more than max centres specified
         centers = centers[:max_centers]  # get everything until that index
-    if len(centers) > 1:
-        merge_clusters(centers)
-    logging.info(centers)
     centers_copy = centers[:]  # copy to remove stuff from original
-    indices_to_remove = []
-    logging.info("additional filtering")
+
     for i, d in enumerate(centers_copy):
         halite, pos = d
 
-        if halite < 7000:  # if 5x5 area contains less than 5k then remove it
+        if halite < 7200:  # if 5x5 area contains less than 5k then remove it
             if d in centers:  # if not removed arldy
                 centers.remove(d)
 
@@ -640,62 +635,7 @@ def filter_clusters(centers, max_centers):
             for t in r:
                 if t in centers:
                     centers.remove(t)  # remove those centers
-
     return centers
-
-def merge_clusters(centers):
-    to_remove = []
-    to_add = []
-    logging.info("Merging clusters")
-    for halite_out, position_out in centers:
-        for halite_in, position_in in centers:
-            if not position_out == position_in and halite_in > 8000 and halite_out > 8000: # if not same dropoff
-                # check if distance is really close
-                distance = game_map.calculate_distance(position_in, position_out)
-                if distance < 0.33 * game_map.width:
-                    # merge by linear interpolation
-                    if halite_in >= halite_out:
-                        center = merge_two_centers(position_in, halite_in,
-                         position_out, halite_out)
-                    else:
-                        center = merge_two_centers(position_out, halite_out,
-                             position_in, halite_in)
-                    # get halite amount in that area
-                    center_halite = get_surrounding_halite(center, 5, 5)
-                    to_add.append((center_halite, center))
-                    to_remove.append((halite_in, position_in))
-                    to_remove.append((halite_out, position_out))
-    logging.info("Merging finished, cleaning up")
-    for c in to_remove:
-        if c in centers: # if not removed before
-            centers.remove(c)
-    logging.info("Adding new clusters")
-    for c in to_add:
-        if c not in centers:
-            centers.append(c)
-    logging.info("Sorting new clusters")
-    #centers = [(list(v)[0], list(v)[1]) for v in dict(centers).items()]
-    #logging.info(dict.fromkeys(centers))
-    centers.sort(key=lambda x: x[0], reverse=True)
-
-
-def merge_two_centers(big_center, big_halite, small_center, small_halite):
-    ''' calculates linear interpolation between two centers '''
-    alpha = round(big_halite / (small_halite + big_halite), 2) # percent of total halite
-    x1 = Position(int(alpha * big_center.x), int(alpha * big_center.y))
-    x2 = Position(int((1-alpha) * small_center.x), int((1-alpha) * small_center.y))
-    return game_map.normalize(x1 + x2)
-
-def get_surrounding_halite(position, areax, areay):
-    x_range = int(areax / 2)
-    y_range = int(areay / 2)
-    halite = 0
-    for diff_x in range(-1 * x_range, x_range + 1):
-        for diff_y in range(-1 * y_range, y_range + 1):
-            new_pos = position + Position(diff_x, diff_y)
-            halite += game_map[new_pos].halite_amount
-    
-    return halite
 
 def too_close(centers, position):
     ''' removes clusters that are too close to each other '''
@@ -705,7 +645,7 @@ def too_close(centers, position):
         distance = game_map.calculate_distance(position, other)
         shipyard_distance = game_map.calculate_distance(
             me.shipyard.position, other)
-        if distance < CLUSTER_TOO_CLOSE * game_map.width or shipyard_distance < 0.35 * game_map.width:
+        if distance < CLUSTER_TOO_CLOSE * game_map.width or shipyard_distance < 0.33 * game_map.width:
             to_remove.append(d)
     return to_remove
 
