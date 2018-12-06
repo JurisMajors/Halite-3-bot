@@ -77,6 +77,7 @@ CLUSTER_TOO_CLOSE = float(VARIABLES[18])  # distance two clusters can be within
 MAX_CLUSTERS = int(VARIABLES[19])  # max amount of clusters
 FLEET_SIZE = int(VARIABLES[20])  # fleet size to send for new dropoff
 TURN_START = 0  # for timing
+CLOSE_TO_SHIPYARD = 0.4
 game.ready("MLP")
 NR_OF_PLAYERS = len(game.players.keys())
 
@@ -597,12 +598,12 @@ def clusters_with_classifier():
     y_size = game_map.height if NR_OF_PLAYERS in [2, 1] else int(
         game_map.height / 2)
     cluster_centers = []
-    conservative = 0
-    if NR_OF_PLAYERS == 4:
-        conservative = 2
+    # conservative = 0
+    # if NR_OF_PLAYERS == 4:
+    #     conservative = 2
     # with 5 node jumps since model trained on 5x5 areas
-    for x in range(cntr.x - int(x_size / 2), cntr.x + int(x_size / 2) - conservative, 5):
-        for y in range(cntr.y - int(y_size / 2), cntr.y + int(y_size / 2) - conservative, 5):
+    for x in range(cntr.x - int(x_size / 2) + 3, cntr.x + int(x_size / 2) - 2, 5):
+        for y in range(cntr.y - int(y_size / 2) + 3, cntr.y + int(y_size / 2) - 2, 5):
             p_data, total_halite, p_center = get_patch_data(
                 x, y, cntr)  # get the data
             prediction = dropoff_clf.predict(p_data)[0]  # predict on it
@@ -642,7 +643,7 @@ def filter_clusters(centers, max_centers):
         halite, pos = d
         if i < len(centers_copy) - 1:  # if not out of bounds
             # get list of centers too close
-            if game_map.calculate_distance(me.shipyard.position, pos) < 0.3 * game_map.width:
+            if game_map.calculate_distance(me.shipyard.position, pos) < CLOSE_TO_SHIPYARD * game_map.width:
                 if d in centers:
                     centers.remove(d)
             else:
@@ -662,14 +663,16 @@ def merge_clusters(centers):
 
         closest_h, closest_pos = find_closest_center(position, centers)
         # if close enough
-        if game_map.calculate_distance(closest_pos, position) < 0.3 * game_map.width:
+        if game_map.calculate_distance(closest_pos, position) < 0.25 * game_map.width:
             # then merge
+            logging.info("MERGING {} WITH {}".format(position, closest_pos))
             cntr_h, center_pos = merge_two_centers(
-                position, halite, closest_pos, closest_h)
-            #cntr_h = halite + closest_h
-            to_add.append((cntr_h, center_pos))
-            to_remove.append((halite, position))
-            to_remove.append((closest_h, closest_pos))
+                position, closest_pos)
+            logging.info("MERGED TO {}".format(center_pos))
+            if game_map.calculate_distance(me.shipyard.position, center_pos) >= CLOSE_TO_SHIPYARD * game_map.width:
+                to_add.append((cntr_h, center_pos))
+            # to_remove.append((halite, position))
+            # to_remove.append((closest_h, closest_pos))
 
     logging.info("Merging finished, cleaning up")
     for c in to_remove:
@@ -688,12 +691,12 @@ def find_closest_center(pos, cntrs):
     closest = pos
     closest_h = 0
     for h, p in cntrs:
-        if not p == pos:  # if not same
-            # if smaller than current smallest
-            dist = game_map.calculate_distance(p, pos)
+        if not p == pos:  # if not same cntr
+            dist = f(game_map.calculate_distance(p, pos), h)
             x_card, y_card = abs(p.x - pos.x), abs(p.y - pos.y)
             diff = max(min(x_card, game_map.width - x_card), min(y_card, game_map.width - y_card))
-            if dist <= min_dist and diff > 3:
+            # if smaller distance
+            if dist <= min_dist:
                 # get it
                 min_dist = dist
                 closest = p
@@ -701,15 +704,16 @@ def find_closest_center(pos, cntrs):
     return closest_h, closest
 
 
-def merge_two_centers(big_center, big_halite, small_center, small_halite):
+def merge_two_centers(big_center, small_center):
     ''' calculates linear interpolation between two centers '''
-    # if game_map.calculate_distance(big_center, small_center) <= 5:
-    #     return big_center
+    big_halite = get_surrounding_halite(big_center, 7, 7)
+    small_halite = get_surrounding_halite(small_center, 7, 7)
     alpha = round(big_halite / (small_halite + big_halite),
                   2)  # percent of total halite
     x1 = Position(int(alpha * big_center.x), int(alpha * big_center.y))
     x2 = Position(int((1 - alpha) * small_center.x),
                   int((1 - alpha) * small_center.y))
+    # also interpolate the halite amount
     h = int(alpha * big_halite) + int((1 - alpha) * small_halite)
     return h, game_map.normalize(x1 + x2)
 
@@ -735,7 +739,7 @@ def too_close(centers, position):
         shipyard_distance = game_map.calculate_distance(
             me.shipyard.position, other)
         logging.info(shipyard_distance)
-        if distance < CLUSTER_TOO_CLOSE * game_map.width or shipyard_distance < 0.4 * game_map.width:
+        if distance < CLUSTER_TOO_CLOSE * game_map.width or shipyard_distance < CLOSE_TO_SHIPYARD * game_map.width:
             to_remove.append(d)
     return to_remove
 
