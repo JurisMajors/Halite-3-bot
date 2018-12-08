@@ -2,8 +2,8 @@ import os
 from random import randint, choice, seed
 import json
 
-seed(2)
-map_sizes = [32, 40, 48, 56, 64]  # possible map sizes
+seed(9)
+map_sizes = [32, 48, 40, 56, 64]  # possible map sizes
 # run iteration of bots with variables
 def run_iteration(bot_name, map_size, seed):
     cmd = f'halite.exe --replay-directory replays/ --results-as-json\
@@ -30,4 +30,4 @@ def benchmark(bot1, bot2, iterations):
         print(f"{bot2} scored {result2}")
 
 
-benchmark("MyBot", "Old", 5)
+benchmark("MyBot", "Old", 1000)
