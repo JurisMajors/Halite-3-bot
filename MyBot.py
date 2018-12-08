@@ -21,9 +21,10 @@ import logging
 import time
 import sys
 import os
-
-stderr = sys.stderr
-sys.stderr = open(os.devnull, 'w')
+from sklearn.cluster import KMeans
+import numpy as np
+# stderr = sys.stderr
+# sys.stderr = open(os.devnull, 'w')
 
 """ <<<Game Begin>>> """
 dropoff_clf = pickle.load(open('mlp.sav', 'rb'))
@@ -42,8 +43,8 @@ shipyard_halite = {}  # shipyard.id -> halite priority queue
 shipyard_pos = {}  # shipyard.id -> shipyard position
 shipyard_halite_pos = {}  # shipyard.id -> halite pos dictionary
 
-VARIABLES = ["YEEHAW", 1285, 50, 0.3, 0.94, 0.85, 350, 50, 0.65,
-             0, 1, 0, 0.01, 0.98, 1.05, 0.9, 500, 0.15, 0.5, 6, 8]
+VARIABLES = ["YEEHAW", 1285, 50, 0.3, 0.94, 0.85, 350, 100, 0.65,
+             0, 0.85, 0, 0.01, 0.98, 1.05, 0.9, 500, 0.15, 0.5, 6, 8]
 VERSION = VARIABLES[1]
 # search area for halite relative to shipyard
 SCAN_AREA = int(VARIABLES[2])
@@ -77,7 +78,7 @@ CLUSTER_TOO_CLOSE = float(VARIABLES[18])  # distance two clusters can be within
 MAX_CLUSTERS = int(VARIABLES[19])  # max amount of clusters
 FLEET_SIZE = int(VARIABLES[20])  # fleet size to send for new dropoff
 TURN_START = 0  # for timing
-CLOSE_TO_SHIPYARD = 0.4
+CLOSE_TO_SHIPYARD = 0.2
 game.ready("MLP")
 NR_OF_PLAYERS = len(game.players.keys())
 
@@ -289,6 +290,8 @@ def check_shipyard_blockade(enemies, ship_position):
 def state_switch(ship_id, new_state):
     if ship_id not in previous_state:
         previous_state[ship_id] = "exploring"
+    if ship_id not in ship_state:
+        ship_state[ship_id] = previous_state[ship_id]
     if not new_state == "exploring":  # reset path to empty list
         ship_path[ship_id] = []
 
@@ -509,7 +512,7 @@ def bfs_unoccupied(position):
 def is_fleet(ship):
     ''' returns if a ship is good for adding it to a fleet '''
     return closest_shipyard_id(ship.position) == me.shipyard.id and me.has_ship(ship.id) and (
-        ship.id not in ship_state or not (ship_state[ship.id] in ["fleet", "waiting", "returning"]))
+        ship.id not in ship_state or not (ship_state[ship.id] in ["fleet", "waiting", "returning", "build"]))
 
 
 def is_builder(ship):
@@ -523,14 +526,16 @@ def fleet_availability():
     for s in me.get_ships():
         if is_fleet(s):
             amount += 1
-    return amount
+    if amount >= len(list(me.get_ships()))*0.75:
+        amount /= 2
+    return int(amount)
 
 
 def should_build():
     # if clusters determined, more than 13 ships, we have clusters and nobody
     # is building at this turn (in order to not build too many)
     return clusters_determined and len(me.get_ships()) > FLEET_SIZE and cluster_centers \
-        and fleet_availability() > FLEET_SIZE / 2 and not any_builders()
+        and fleet_availability() > 0.75*FLEET_SIZE and not any_builders()
 
 
 def send_ships(pos, ship_amount):
@@ -589,21 +594,53 @@ def get_patch_data(x, y, center):
     return [area_d], total_halite, biggest_cell
 
 
+def find_center():
+    travel = int(game_map.width / NR_OF_PLAYERS)
+    if NR_OF_PLAYERS == 4:
+        cntrs = [Position(travel, travel), Position(travel * 3, travel),
+                 Position(travel * 3, travel * 3), Position(travel, travel * 3)]
+    elif NR_OF_PLAYERS == 2:
+        cntrs = [Position(int(travel / 2), travel),
+                 Position(travel + int(travel / 2), travel)]
+    else:
+        cntrs = [me.shipyard.position]
+
+    min_dist = 1000
+    for pos in cntrs:
+        dist = game_map.calculate_distance(pos, me.shipyard.position)
+        if dist < min_dist:
+            cntr = pos
+            min_dist = dist
+    return cntr
+
+
 def clusters_with_classifier():
     ''' uses classifier to determine clusters '''
-    cntr = me.shipyard.position
+    cntr = find_center()
+
     # get area around our shipyard
     x_size = int(game_map.width /
                  2) if NR_OF_PLAYERS in [2, 4] else game_map.width
     y_size = game_map.height if NR_OF_PLAYERS in [2, 1] else int(
         game_map.height / 2)
+    diff1, diff2, diff3, diff4 = (0, 0, 0, 0)
+
+    if NR_OF_PLAYERS == 4:
+        if cntr.x > x_size:  # if right side of map
+            diff1 = 2
+            diff2 = 3
+        else:
+            diff2 = -2
+
+        if cntr.y > y_size:
+            diff3 = 2
+
     cluster_centers = []
-    # conservative = 0
-    # if NR_OF_PLAYERS == 4:
-    #     conservative = 2
     # with 5 node jumps since model trained on 5x5 areas
-    for x in range(cntr.x - int(x_size / 2) + 3, cntr.x + int(x_size / 2) - 2, 5):
-        for y in range(cntr.y - int(y_size / 2) + 3, cntr.y + int(y_size / 2) - 2, 5):
+    for x in range(cntr.x - int(x_size / 2) + diff1,
+                   cntr.x + int(x_size / 2) + diff2, 4):
+        for y in range(cntr.y - int(y_size / 2) + diff3,
+                       cntr.y + int(y_size / 2) + diff4, 4):
             p_data, total_halite, p_center = get_patch_data(
                 x, y, cntr)  # get the data
             prediction = dropoff_clf.predict(p_data)[0]  # predict on it
@@ -623,34 +660,36 @@ def filter_clusters(centers, max_centers):
     centers.sort(key=lambda x: x[0], reverse=True)  # sort by halite amount
     if len(centers) > max_centers:  # if more than max centres specified
         centers = centers[:max_centers]  # get everything until that index
-    logging.info(centers)
     centers_copy = centers[:]  # copy to remove stuff from original
     indices_to_remove = []
     logging.info("additional filtering")
     for i, d in enumerate(centers_copy):
         halite, pos = d
 
-        if halite < 7000:  # if 5x5 area contains less than 5k then remove it
+        if halite < 8000:  # if 5x5 area contains less than 8k then remove it
             if d in centers:  # if not removed arldy
                 centers.remove(d)
 
-    if len(centers) > 1:
-        merge_clusters(centers)
+    logging.info(centers)
+    if len(centers) > 1 and game_map.width >= 56:
+       centers = merge_clusters(centers)
 
     centers_copy = centers[:]
     logging.info(centers_copy)
     for i, d in enumerate(centers_copy, start=0):
         halite, pos = d
+        diff = me.shipyard.position - pos
+        if max(abs(diff.x), abs(diff.y)) < CLOSE_TO_SHIPYARD * game_map.width:
+            if d in centers:
+                centers.remove(d)
+            continue
+
         if i < len(centers_copy) - 1:  # if not out of bounds
             # get list of centers too close
-            if game_map.calculate_distance(me.shipyard.position, pos) < CLOSE_TO_SHIPYARD * game_map.width:
-                if d in centers:
-                    centers.remove(d)
-            else:
-                r = too_close(centers_copy[i + 1:], pos)
-                for t in r:
-                    if t in centers:
-                        centers.remove(t)  # remove those centers
+            r = too_close(centers_copy[i + 1:], pos)
+            for t in r:
+                if t in centers:
+                    centers.remove(t)  # remove those centers
 
     return centers
 
@@ -659,31 +698,24 @@ def merge_clusters(centers):
     to_remove = []
     to_add = []
     logging.info("Merging clusters")
-    for halite, position in centers:
-
-        closest_h, closest_pos = find_closest_center(position, centers)
-        # if close enough
-        if game_map.calculate_distance(closest_pos, position) < 0.25 * game_map.width:
-            # then merge
-            logging.info("MERGING {} WITH {}".format(position, closest_pos))
-            cntr_h, center_pos = merge_two_centers(
-                position, closest_pos)
-            logging.info("MERGED TO {}".format(center_pos))
-            if game_map.calculate_distance(me.shipyard.position, center_pos) >= CLOSE_TO_SHIPYARD * game_map.width:
-                to_add.append((cntr_h, center_pos))
-            # to_remove.append((halite, position))
-            # to_remove.append((closest_h, closest_pos))
-
-    logging.info("Merging finished, cleaning up")
-    for c in to_remove:
-        if c in centers:  # if not removed before
-            centers.remove(c)
-    logging.info("Adding new clusters")
-    for c in to_add:
-        if c not in centers:
-            centers.append(c)
-    logging.info("Sorting new clusters")
+    area = int(CLOSE_TO_SHIPYARD*game_map.width)
+    X = []
+    tmp_centers = []
+    for c1 in centers:
+        X.append([c1[1].x, c1[1].y])
+        for c2 in centers:
+            if [c2[1].x, c2[1].y] not in X:
+                dist = game_map.calculate_distance(c1[1], c2[1])
+                if dist <= area:
+                    X.append([c2[1].x, c2[1].y])
+        X = np.array(X)
+        center_amount = int(len(X) / 3) if not int(len(X)/3) == 0 else 1
+        kmeans = KMeans(n_clusters=center_amount, max_iter=100).fit(X)
+        tmp_centers += [(get_surrounding_halite(Position(int(x[0]), int(x[1])), area, area), Position(int(x[0]), int(x[1]))) for x in kmeans.cluster_centers_]
+        X = []
+    centers = tmp_centers
     centers.sort(key=lambda x: x[0], reverse=True)
+    return centers
 
 
 def find_closest_center(pos, cntrs):
@@ -694,7 +726,8 @@ def find_closest_center(pos, cntrs):
         if not p == pos:  # if not same cntr
             dist = f(game_map.calculate_distance(p, pos), h)
             x_card, y_card = abs(p.x - pos.x), abs(p.y - pos.y)
-            diff = max(min(x_card, game_map.width - x_card), min(y_card, game_map.width - y_card))
+            diff = max(min(x_card, game_map.width - x_card),
+                       min(y_card, game_map.width - y_card))
             # if smaller distance
             if dist <= min_dist:
                 # get it
@@ -706,8 +739,8 @@ def find_closest_center(pos, cntrs):
 
 def merge_two_centers(big_center, small_center):
     ''' calculates linear interpolation between two centers '''
-    big_halite = get_surrounding_halite(big_center, 7, 7)
-    small_halite = get_surrounding_halite(small_center, 7, 7)
+    big_halite = get_surrounding_halite(big_center, 5, 5)
+    small_halite = get_surrounding_halite(small_center, 5, 5)
     alpha = round(big_halite / (small_halite + big_halite),
                   2)  # percent of total halite
     x1 = Position(int(alpha * big_center.x), int(alpha * big_center.y))
@@ -793,6 +826,7 @@ while True:
                 # bfs for closer valid unoccupied position
                 dropoff_pos = bfs_unoccupied(dropoff_pos)
             ship_dest[closest_ship.id] = dropoff_pos  # go to the dropoff
+            send_ships(dropoff_pos, int(FLEET_SIZE / 3))
 
         else:  # if builder not available
             cluster_centers.insert(0, (_, dropoff_pos))
@@ -868,8 +902,8 @@ while True:
     logging.info(time_left())
 
     if not dropoff_built and len(me.get_ships()) < 70 and game.turn_number <= SPAWN_TURN and me.halite_amount >= constants.SHIP_COST \
-            and prcntg_halite_left > (1 - 0.65) and not (game_map[me.shipyard].is_occupied or surrounded_shipyard or "waiting" in ship_state.values()
-                                                         or "build" in ship_state.values()):
-        command_queue.append(me.shipyard.spawn())
+            and prcntg_halite_left > (1 - 0.65) and not (game_map[me.shipyard].is_occupied or surrounded_shipyard or "waiting" in ship_state.values()):
+        if not ("build" in ship_state.values() and  me.halite_amount <= (constants.SHIP_COST + constants.DROPOFF_COST)):
+            command_queue.append(me.shipyard.spawn())
     # Send your moves back to the game environment, ending this turn.
     game.end_turn(command_queue)
