@@ -1,9 +1,21 @@
 appdirs==1.4.3
 certifi==2018.10.15
 chardet==3.0.4
+Click==7.0
+cycler==0.10.0
+docopt==0.6.2
+hlt-client==1.1.0
 idna==2.7
+kiwisolver==1.0.1
+matplotlib==3.0.2
 numpy==1.15.4
+Pillow==5.3.0
+pipreqs==0.4.9
 pscript==0.5.5
+pur==5.2.1
+pyclustering==0.8.2
+pyparsing==2.3.0
+python-dateutil==2.7.5
 requests==2.20.1
 scikit-learn==0.20.1
 scipy==1.1.0
@@ -12,4 +24,5 @@ sklearn==0.0
 tflearn==0.3.2
 trueskill==0.4.5
 urllib3==1.24.1
+yarg==0.1.9
 zstd==1.3.5.1

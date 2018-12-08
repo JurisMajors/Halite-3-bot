@@ -25,6 +25,7 @@ from pyclustering.cluster.kmedians import kmedians
 from pyclustering.cluster.center_initializer import kmeans_plusplus_initializer
 from pyclustering.utils.metric import distance_metric, type_metric
 import numpy as np
+
 # stderr = sys.stderr
 # sys.stderr = open(os.devnull, 'w')
 
@@ -152,7 +153,8 @@ def find_new_destination(h, ship, halite_pos):
     ship_id = ship.id
     biggest_halite = heappop(h)  # get biggest halite
     destination = game_map.normalize(halite_pos[biggest_halite])
-    while not dest_viable(destination, ship):  # get biggest halite while its a position no other ship goes to
+    # get biggest halite while its a position no other ship goes to
+    while not dest_viable(destination, ship):
         biggest_halite = heappop(h)
         destination = game_map.normalize(halite_pos[biggest_halite])
 
@@ -160,7 +162,7 @@ def find_new_destination(h, ship, halite_pos):
 
     # if another ship had the same destination
     s = get_ship_w_destination(destination, ship_id)
-    if s is not None: # find a new destination for it
+    if s is not None:  # find a new destination for it
         prio, h_pos = halite_priority_q(s.position, 10)
         find_new_destination(prio, s, h_pos)
 
@@ -173,17 +175,19 @@ def dest_viable(position, ship):
             return True
 
         my_dest = game_map.calculate_distance(position, ship.position)
-        their_dest = game_map.calculate_distance(position, inspectable_ship.position)
+        their_dest = game_map.calculate_distance(
+            position, inspectable_ship.position)
 
-        if my_dest < their_dest: # if im closer give it to me
+        if my_dest < their_dest:  # if im closer give it to me
             return True
-        return False # if not then recalculate
+        return False  # if not then recalculate
     else:
-        return True # nobody has the best patch, all good
+        return True  # nobody has the best patch, all good
+
 
 def get_ship_w_destination(dest, this_id):
     if dest in ship_dest.values():
-        for s in ship_dest.keys(): # get ship with the same destination
+        for s in ship_dest.keys():  # get ship with the same destination
             if not s == this_id and ship_dest[s] == dest and me.has_ship(s):
                 for the_s in me.get_ships():
                     if the_s.id == s:
@@ -458,7 +462,8 @@ def state_transition(ship):
 
     elif ship_state[ship.id] == "collecting" and game_map[ship.position].halite_amount < HALITE_STOP:
         # Keep exploring if current halite patch is empty
-        ship_h, ship_h_positions = halite_priority_q(ship.position, SHIP_SCAN_AREA)
+        ship_h, ship_h_positions = halite_priority_q(
+            ship.position, SHIP_SCAN_AREA)
         find_new_destination(ship_h, ship, ship_h_positions)
         new_state = "exploring"
 
@@ -476,7 +481,8 @@ def state_transition(ship):
     # if someone already build dropoff there before us
     elif ship_state[ship.id] == "build" and game_map[ship_dest[ship.id]].has_structure:
         # explore
-        ship_h, ship_h_positions = halite_priority_q(ship.position, SHIP_SCAN_AREA)
+        ship_h, ship_h_positions = halite_priority_q(
+            ship.position, SHIP_SCAN_AREA)
         find_new_destination(ship_h, ship, ship_h_positions)
         ship_path[ship.id] = []
         new_state = "exploring"
@@ -563,7 +569,7 @@ def fleet_availability():
     for s in me.get_ships():
         if is_fleet(s):
             amount += 1
-    if amount >= len(list(me.get_ships()))*0.75:
+    if amount >= len(list(me.get_ships())) * 0.75:
         amount /= 2
     return int(amount)
 
@@ -572,7 +578,7 @@ def should_build():
     # if clusters determined, more than 13 ships, we have clusters and nobody
     # is building at this turn (in order to not build too many)
     return clusters_determined and len(me.get_ships()) > FLEET_SIZE and cluster_centers \
-        and fleet_availability() > 0.75*FLEET_SIZE and not any_builders()
+        and fleet_availability() > 0.75 * FLEET_SIZE and not any_builders()
 
 
 def send_ships(pos, ship_amount):
@@ -708,7 +714,7 @@ def filter_clusters(centers, max_centers):
 
     logging.info(centers)
     if len(centers) > 1:
-       centers = merge_clusters(centers)
+        centers = merge_clusters(centers)
 
     centers_copy = centers[:]
     logging.info(centers_copy)
@@ -735,27 +741,28 @@ def merge_clusters(centers):
     to_remove = []
     to_add = []
     logging.info("Merging clusters")
-    area = int(CLOSE_TO_SHIPYARD*game_map.width)
+    area = int(CLOSE_TO_SHIPYARD * game_map.width)
     metric = distance_metric(type_metric.USER_DEFINED, func=custom_dist)
     X = []
     tmp_centers = []
     halite_sum = 0
     history = []
     for c1 in centers:
-        X.append([c1[1].x, c1[1].y, c1[0]/8000])
+        X.append([c1[1].x, c1[1].y, c1[0] / 8000])
         halite_sum += c1[0]
         for c2 in centers:
-            if [c2[1].x, c2[1].y, c2[0]/8000] not in history:
+            if [c2[1].x, c2[1].y, c2[0] / 8000] not in history:
                 dist = game_map.calculate_distance(c1[1], c2[1])
                 if dist <= area:
                     halite_sum += c2[0]
-                    X.append([c2[1].x, c2[1].y, c2[0]/8000])
+                    X.append([c2[1].x, c2[1].y, c2[0] / 8000])
 
         init_centers = kmeans_plusplus_initializer(X, 1).initialize()
         logging.info(init_centers)
         median = kmedians(X, init_centers, metric=metric)
         median.process()
-        tmp_centers += [(x[2], game_map.normalize(Position(int(x[0]), int(x[1])))) for x in median.get_medians()]
+        tmp_centers += [(x[2], game_map.normalize(Position(int(x[0]), int(x[1]))))
+                        for x in median.get_medians()]
         history += X
         X = []
         halite_sum = 0
@@ -764,12 +771,15 @@ def merge_clusters(centers):
     centers.sort(key=lambda x: x[0], reverse=True)
     return centers
 
+
 def custom_dist(p1, p2):
     if len(p1) < 3:
         p1 = p1[0]
         p2 = p2[0]
-    manh_dist = game_map.calculate_distance(Position(p1[0], p1[1]), Position(p2[0], p2[1]))
+    manh_dist = game_map.calculate_distance(
+        Position(p1[0], p1[1]), Position(p2[0], p2[1]))
     return manh_dist + abs(p1[2] - p2[2])
+
 
 def find_closest_center(pos, cntrs):
     min_dist = game_map.width**2
@@ -955,7 +965,7 @@ while True:
 
     if not dropoff_built and len(me.get_ships()) < 70 and game.turn_number <= SPAWN_TURN and me.halite_amount >= constants.SHIP_COST \
             and prcntg_halite_left > (1 - 0.65) and not (game_map[me.shipyard].is_occupied or surrounded_shipyard or "waiting" in ship_state.values()):
-        if not ("build" in ship_state.values() and  me.halite_amount <= (constants.SHIP_COST + constants.DROPOFF_COST)):
+        if not ("build" in ship_state.values() and me.halite_amount <= (constants.SHIP_COST + constants.DROPOFF_COST)):
             command_queue.append(me.shipyard.spawn())
     # Send your moves back to the game environment, ending this turn.
     game.end_turn(command_queue)
