@@ -562,8 +562,7 @@ def state_transition(ship):
 		# for inspiring
 		ship_dest[ship.id] = get_best_neighbour(ship.position).position
 
-	elif ship_state[ship.id] == "exploring" and exists_better_in_area(ship.position, ship_dest[ship.id], 6):
-		logging.info("REEEEEEEEEEEEEE")
+	elif ship_state[ship.id] == "exploring" and exists_better_in_area(ship.position, ship_dest[ship.id], SHIP_SCAN_AREA):
 		ship_h, ship_h_positions = halite_priority_q(
 		ship.position, SHIP_SCAN_AREA)
 		find_new_destination(ship_h, ship, ship_h_positions)
@@ -998,9 +997,6 @@ while True:
 	me = game.me
 	game_map = game.game_map
 	TURN_START = time.time()
-	for s in me.get_ships():
-		if game.turn_number <= CRASH_TURN and s.halite_amount > 700 and ship_state[s.id] in ["returning"]:
-			mark_around_enemies(enemies_nearby(3, s.position))
 
 	game_map.set_total_halite()
 
@@ -1052,7 +1048,7 @@ while True:
 	# whether a dropoff has been built this turn so that wouldnt use too much
 	# halite
 	dropoff_built = False
-	if NR_OF_PLAYERS == 2:
+	if NR_OF_PLAYERS == 0:
 		enemies_all_dropoffs = [enemies_nearby(SHIPYARD_VICINITY, p) for p in get_dropoff_positions()]
 		nearby_enemy_ships = [result for positions in enemies_all_dropoffs for result in positions]
 
@@ -1078,7 +1074,7 @@ while True:
 			previous_state[ship.id] = "exploring"
 			ship_state[ship.id] = "exploring"  # explore
 
-		if NR_OF_PLAYERS == 2:
+		if NR_OF_PLAYERS == 0:
 			enemy_position = check_shipyard_blockade(
 				nearby_enemy_ships, ship.position)
 			if enemy_position is not None:
