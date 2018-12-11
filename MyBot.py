@@ -107,14 +107,30 @@ def halite_priority_q(pos, area):
 		for x in range(area):
 			p = Position((top_left.x + x) % game_map.width,
 						 (top_left.y + y) % game_map.height)  # position of patch
-			# f(negative halite amount,  distance from shipyard to patch)
-			if game_map[p].halite_amount >= HALITE_STOP:
-				factor = f(game_map[p].halite_amount * -1,
-						   game_map.calculate_distance(p, pos))
-				h_pos[factor] = p
-				# add negative halite amounts so that would act as maxheap
-				heappush(h, factor)
+			factor = cell_factor(pos, game_map[p])
+			h_pos[factor] = p
+			# add negative halite amounts so that would act as maxheap
+			heappush(h, factor)
 	return h, h_pos
+
+def cell_factor(cntr, cell):
+	if cell.position in get_dropoff_positions():
+		return 10000000
+
+	neighbours = game_map.get_cells_in_area(cell, 2)
+	n_factor_sum = 0
+	# get rid of dropoffs
+	for neighbour in neighbours[:]:
+		if neighbour.position in get_dropoff_positions():
+			neighbours.remove(neighbour)
+		elif neighbour.halite_amount <= HALITE_STOP:
+			n_factor_sum -= f(neighbour.halite_amount * -1, game_map.calculate_distance(neighbour.position, cntr))
+		else:
+			n_factor_sum += f(neighbour.halite_amount * -1, game_map.calculate_distance(neighbour.position, cntr))
+
+	multiplier = -1 if cell.halite_amount > HALITE_STOP else 1
+
+	return len(neighbours) * f(cell.halite_amount * multiplier, game_map.calculate_distance(cell.position, cntr)) + n_factor_sum
 
 
 def ship_priority_q(me, game_map):
@@ -163,7 +179,7 @@ def find_new_destination(h, ship, halite_pos):
 	biggest_halite = heappop(h)  # get biggest halite
 	destination = game_map.normalize(halite_pos[biggest_halite])
 	# get biggest halite while its a position no other ship goes to
-	while not dest_viable(destination, ship) or amount_of_enemies(destination, 5) >= 4:
+	while not dest_viable(destination, ship) or amount_of_enemies(destination, 4) >= 4:
 		if len(h) == 0:
 			return
 		biggest_halite = heappop(h)
@@ -519,23 +535,26 @@ def get_best_neighbour(position):
 			max_halite = n.halite_amount
 	return best
 
-def exists_better_in_area(pos, current, area):
+def exists_better_in_area(cntr, current, area):
 	top_left = Position(int(-1 * area / 2),
-				int(-1 * area / 2)) + pos  # top left of scan area
-	current_factor = f(game_map[current].halite_amount, game_map.calculate_distance(pos, current))
+				int(-1 * area / 2)) + cntr  # top left of scan area
+	current_factor = cell_factor(cntr, game_map[current])
 	for y in range(area):
 		for x in range(area):
 			p = Position((top_left.x + x) % game_map.width,
 						 (top_left.y + y) % game_map.height)  # position of patch	
-			other_factor = f(game_map[p].halite_amount, game_map.calculate_distance(p, pos))		
-			if not game_map[p].is_occupied and other_factor < current_factor:
-				return True
+			cell = game_map[p]
+			if cell.halite_amount >= HALITE_STOP:
+				other_factor = cell_factor(cntr, cell)
+				if not cell.is_occupied and other_factor < current_factor:
+					return True
 	return False
 
 def state_transition(ship):
 	# transition
 	new_state = None
 	shipyard_id = ship_shipyards[ship.id]
+	logging.info(ship.id)
 
 	if game.turn_number >= CRASH_TURN and game_map.calculate_distance(
 			ship.position, shipyard_pos[shipyard_id]) < 2:
@@ -562,7 +581,7 @@ def state_transition(ship):
 		# for inspiring
 		ship_dest[ship.id] = get_best_neighbour(ship.position).position
 
-	elif ship_state[ship.id] == "exploring" and exists_better_in_area(ship.position, ship_dest[ship.id], SHIP_SCAN_AREA):
+	elif ship_state[ship.id] == "exploring" and exists_better_in_area(ship.position, ship_dest[ship.id], 4):
 		ship_h, ship_h_positions = halite_priority_q(
 		ship.position, SHIP_SCAN_AREA)
 		find_new_destination(ship_h, ship, ship_h_positions)
@@ -606,7 +625,7 @@ def state_transition(ship):
 	elif ship_state[ship.id] == "build" and game_map[ship_dest[ship.id]].has_structure:
 		# explore
 		ship_h, ship_h_positions = halite_priority_q(
-			ship.position, SHIP_SCAN_AREA)
+			ship.position, SHIP_SCAN_AREA * 2)
 		find_new_destination(ship_h, ship, ship_h_positions)
 		ship_path[ship.id] = []
 		new_state = "exploring"

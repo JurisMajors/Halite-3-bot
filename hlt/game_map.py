@@ -419,6 +419,18 @@ class GameMap:
 			for x in range(self.width):
 				self.total_halite += self[Position(x, y)].halite_amount
 
+	def get_cells_in_area(self, cell, area):
+		top_left = Position(int(-1 * area / 2),
+					int(-1 * area / 2)) + cell.position  # top left of scan area
+		cells = []
+		for y in range(area):
+			for x in range(area):
+				pos = Position((top_left.x + x) % self.width,
+							 (top_left.y + y) % self.height)  # position of patch
+				if not pos == cell.position:
+					cells.append(self[pos])
+		return cells
+
 
 	@staticmethod
 	def _generate():
