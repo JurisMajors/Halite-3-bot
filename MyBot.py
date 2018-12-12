@@ -98,6 +98,7 @@ def f(h_amount, h_distance):  # function for determining patch priority
 
 
 def halite_priority_q(pos, area):
+
 	# h_amount <= 0 to run minheap as maxheap
 	h = []  # stores halite amount * -1 with its position in a minheap
 	h_pos = {}
@@ -265,65 +266,73 @@ def get_dijkstra_move(current_position):
 
 
 def make_returning_move(ship, has_moved, command_queue):
-	"""
-	Makes a returning move based on Dijkstras and other ship positions.
-	"""
-	if ship_path[ship.id]:
-		direction = get_step(ship_path[ship.id])
-		to_go = ship.position.directional_offset(direction)
-		if direction == Direction.Still or not game_map[to_go].is_occupied:
-			return direction
+    """
+    Makes a returning move based on Dijkstras and other ship positions.
+    """
+    if ship_path[ship.id]:
+        direction = get_step(ship_path[ship.id])
+        to_go = ship.position.directional_offset(direction)
+        if direction == Direction.Still or not game_map[to_go].is_occupied:
+            return direction
 
-	# Get the cell and direction we want to go to from dijkstra
-	target_pos, move = get_dijkstra_move(ship.position)
+    if game.turn_number >= CRASH_TURN:
+	    if should_better_dropoff(ship):
+	        other_dropoff = better_dropoff_pos(ship)
+	        # if not the same distance
+	        if not other_dropoff == game_map[ship.position].dijkstra_dest:
+	            logging.info(ship.id)
+	            return a_star_move(ship)
+    # Get the cell and direction we want to go to from dijkstra
+    target_pos, move = get_dijkstra_move(ship.position)
+    # Target is occupied
+    if game_map[target_pos].is_occupied:
+        other_ship = game_map[target_pos].ship
+        # target position occupied by own ship
+        if me.has_ship(other_ship.id):
 
-	# Target is occupied
-	if game_map[target_pos].is_occupied:
-		other_ship = game_map[target_pos].ship
-		# target position occupied by own ship
-		if me.has_ship(other_ship.id):
+            if other_ship.id not in ship_state or ship_state[other_ship.id] in ["exploring", "build", "fleet"]:
+                # if other ship has enough halite and hasnt made a move yet:
+                if not has_moved[other_ship.id] and \
+                    (other_ship.halite_amount > game_map[
+                        other_ship.position].halite_amount / 10 or other_ship.position in get_dropoff_positions()):
+                    # move stays the same target move
+                    # move other_ship to ship.destination
+                    # hence swapping ships
+                    move_ship_to_position(other_ship, ship.position)
+                else:
+                    move = a_star_move(ship)
 
-			if other_ship.id not in ship_state or ship_state[other_ship.id] in ["exploring", "build", "fleet"]:
-				# if other ship has enough halite and hasnt made a move yet:
-				if not has_moved[other_ship.id] and \
-						(other_ship.halite_amount > game_map[
-							other_ship.position].halite_amount / 10 or other_ship.position in get_dropoff_positions()):
-					# move stays the same target move
-					# move other_ship to ship.destination
-					# hence swapping ships
-					move_ship_to_position(other_ship, ship.position)
-				else:
-					move = a_star_move(ship)
+            elif ship_state[other_ship.id] in ["returning", "harakiri"]:
+                move = Direction.Still
+            elif ship_state[other_ship.id] in ["collecting", "waiting"]:
+                move = a_star_move(ship)
 
-			elif ship_state[other_ship.id] in ["returning", "harakiri"]:
-				move = Direction.Still
-			elif ship_state[other_ship.id] in ["collecting", "waiting"]:
-				move = a_star_move(ship)
+        else:  # target position occupied by enemy ship
+            move = a_star_move(ship)
 
-		else:  # target position occupied by enemy ship
-			move = a_star_move(ship)
-
-	return move
+    return move
 
 
 def should_better_dropoff(ship):
-	''' determines whether there are too many ships going to the same dropoff as ship'''
-	current = game_map[ship.position]
-	if len(me.get_dropoffs()) >= 1:  # if there are multiple dropoffs then check for other options
-		my_dest = current.dijkstra_dest
-		amount = 0  # ship amount going to the same dropoff
-		for other in me.get_ships():
-			other_cell = game_map[other.position]
-			other_dest = other_cell.dijkstra_dest
-			# count other ships that are returning, with the same destinationa
-			# and are within 80% of ships dijkstra distance
-			if ship_state[other.id] == "returning" and\
-					other_cell.dijkstra_dest == my_dest and other_cell.dijkstra_distance < 0.6 * current.dijkstra_distance:
-				amount += 1
-		# if more than 30 percent of the ships are very close to the shipyard
-		if amount > 0.3 * len(me.get_ships()):
-			return True
-	return False
+    ''' determines whether there are too many ships going to the same dropoff as ship'''
+    current = game_map[ship.position]
+    ratio = 1 / len(get_dropoff_positions())
+    if len(me.get_dropoffs()) >= 1:  # if there are multiple dropoffs then check for other options
+        my_dest = current.dijkstra_dest
+        amount = 0  # ship amount going to the same dropoff
+        for other in me.get_ships():
+            other_cell = game_map[other.position]
+            other_dest = other_cell.dijkstra_dest
+            # count other ships that are returning, with the same destinationa
+            # and are within 80% of ships dijkstra distance
+            if other.id in ship_state and ship_state[other.id] == "returning" and\
+                    other_cell.dijkstra_dest == my_dest and other_cell.dijkstra_distance < 0.6 * current.dijkstra_distance:
+                amount += 1
+            # if more than 30 percent of the ships are very close to the
+            # shipyard
+            if amount > ratio * len(me.get_ships()):
+                return True
+    return False
 
 
 def better_dropoff_pos(ship):
@@ -649,6 +658,7 @@ def state_transition(ship):
 		state_switch(ship.id, new_state)
 
 
+
 def do_halite_priorities():
 	''' determines halite priority queues
 	and positions for all dropoffs, shipyards '''
@@ -693,6 +703,7 @@ def is_fleet(ship):
 
 
 def get_fleet(position, fleet_size, condition=is_fleet):
+
 	''' returns list of fleet_size amount
 					of ships closest to the position'''
 	distances = []
