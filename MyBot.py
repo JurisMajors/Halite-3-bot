@@ -123,16 +123,18 @@ def cell_factor(cntr, cell):
     n_factor_sum = 0
     # get rid of dropoffs
     for neighbour in neighbours[:]:
+        neighbourhalite = neighbour.halite_amount * 2 if neighbour.inspired else neighbour.halite_amount
+
         if neighbour.position in get_dropoff_positions():
             neighbours.remove(neighbour)
         elif neighbour.halite_amount <= HALITE_STOP:
-            n_factor_sum += f(neighbour.halite_amount * -1,
+            n_factor_sum += f(neighbourhalite * -1,
                               game_map.calculate_distance(neighbour.position, cntr))
         else:
-            n_factor_sum += f(neighbour.halite_amount * -1,
+            n_factor_sum = f(neighbourhalite * -1,
                               game_map.calculate_distance(neighbour.position, cntr))
 
-    multiplier = -1 if cell.halite_amount > HALITE_STOP else 1
+    multiplier = -2 if cell.inspired else -1
 
     return len(neighbours) * f(cell.halite_amount * multiplier, game_map.calculate_distance(cell.position, cntr)) + n_factor_sum
 
@@ -1028,7 +1030,7 @@ while True:
     TURN_START = time.time()
     SCAN_AREA = game_map.width
 
-    game_map.set_total_halite()
+    game_map.init_map(me)
 
     if len(crashed_ships) > 0 and not game.turn_number >= CRASH_TURN and ENABLE_COMBAT:
         to_remove = []

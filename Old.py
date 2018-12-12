@@ -1005,7 +1005,7 @@ while True:
     game_map = game.game_map
     TURN_START = time.time()
 
-    game_map.set_total_halite()
+    game_map.init_map(me)
 
     if len(crashed_ships) > 0 and not game.turn_number >= CRASH_TURN and ENABLE_COMBAT:
         to_remove = []

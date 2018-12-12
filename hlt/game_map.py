@@ -20,6 +20,7 @@ class MapCell:
 		self.halite_amount = halite_amount
 		self.ship = None
 		self.structure = None
+		self.inspired = False
 
 		# Parameters for Dijkstra (to nearest dropoff/shipyard)
 		self.weight_to_shipyard = 0
@@ -413,11 +414,15 @@ class GameMap:
 				return False
 		return True
 
-	def set_total_halite(self):
+	def init_map(self, me):
 		self.total_halite = 0
 		for y in range(self.height):
 			for x in range(self.width):
-				self.total_halite += self[Position(x, y)].halite_amount
+				cell = self[Position(x, y)]
+				self.total_halite += cell.halite_amount
+				cell.inspired = self.is_cell_inspired(cell, me)
+
+
 
 	def get_cells_in_area(self, cell, area):
 		top_left = Position(int(-1 * area / 2),
@@ -430,6 +435,16 @@ class GameMap:
 				if not pos == cell.position:
 					cells.append(self[pos])
 		return cells
+
+	# Boolean function returning whether a cell is inspired for a player
+	def is_cell_inspired(self, cell, me):
+		counter = 0
+		for neighbour in self.get_cells_in_area(cell, 8):
+			if neighbour.ship not in me.get_ships():
+				counter += 1		
+			if counter >= 2:
+				return True
+		return False
 
 
 	@staticmethod
