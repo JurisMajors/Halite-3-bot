@@ -438,12 +438,18 @@ class GameMap:
 
 	# Boolean function returning whether a cell is inspired for a player
 	def is_cell_inspired(self, cell, me):
+		area = constants.INSPIRATION_RADIUS
+		top_left = Position(int(-1 * area),
+			int(-1 * area)) + cell.position  # top left of scan area
 		counter = 0
-		for neighbour in self.get_cells_in_area(cell, 8):
-			if neighbour.ship not in me.get_ships():
-				counter += 1		
-			if counter >= 2:
-				return True
+		for y in range(area):
+			for x in range(area):
+				other_cell = self[Position(x, y)]
+				if self.calculate_distance(cell.position, other_cell.position) <= constants.INSPIRATION_RADIUS:
+					if other_cell.is_occupied and not me.has_ship(other_cell.ship.id):
+						counter += 1
+				if counter >= 2:
+					return True
 		return False
 
 
