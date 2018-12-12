@@ -87,11 +87,15 @@ CLUSTER_TOO_CLOSE = float(VARIABLES[18])  # distance two clusters can be within
 MAX_CLUSTERS = int(VARIABLES[19])  # max amount of clusters
 FLEET_SIZE = int(VARIABLES[20])  # fleet size to send for new dropoff
 TURN_START = 0  # for timing
-CLOSE_TO_SHIPYARD = 0.35
+CLOSE_TO_SHIPYARD = 0.25
 SHIP_SCAN_AREA = 8
 game.ready("MLP")
 NR_OF_PLAYERS = len(game.players.keys())
-SAVIOR_FLEET_SIZE = 0.07 if NR_OF_PLAYERS == 2 else 0.035
+if game.game_map.width <= 40:
+    SAVIOR_FLEET_SIZE = 0.1 if NR_OF_PLAYERS == 2 else 0.05
+else:
+    SAVIOR_FLEET_SIZE = 0.07 if NR_OF_PLAYERS == 2 else 0.035
+    
 ENABLE_COMBAT = True
 
 
@@ -125,7 +129,7 @@ def cell_factor(cntr, cell):
     n_factor_sum = 0
     # get rid of dropoffs
     for neighbour in neighbours[:]:
-        inspire_multiplier = -3 if neighbour.inspired else -1
+        inspire_multiplier = -(1 + constants.INSPIRED_BONUS_MULTIPLIER) if neighbour.inspired else -1
         if neighbour.position in get_dropoff_positions():
             neighbours.remove(neighbour)
         elif neighbour.halite_amount <= HALITE_STOP:
@@ -135,7 +139,7 @@ def cell_factor(cntr, cell):
             n_factor_sum += f(neighbour.halite_amount * inspire_multiplier,
                               game_map.calculate_distance(neighbour.position, cntr))
 
-    multiplier = -3 if cell.inspired else -1
+    multiplier = -(1 + constants.INSPIRED_BONUS_MULTIPLIER) if cell.inspired else -1
 
     return len(neighbours) * f(cell.halite_amount * multiplier, game_map.calculate_distance(cell.position, cntr)) + n_factor_sum
 
