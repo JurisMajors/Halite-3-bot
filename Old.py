@@ -572,7 +572,6 @@ def state_transition(ship):
         ship_dest[ship.id] = get_best_neighbour(ship.position).position
 
     elif ship_state[ship.id] == "exploring" and exists_better_in_area(ship.position, ship_dest[ship.id], 6):
-        logging.info("REEEEEEEEEEEEEE")
         ship_h, ship_h_positions = halite_priority_q(
             ship.position, SHIP_SCAN_AREA)
         find_new_destination(ship_h, ship, ship_h_positions)

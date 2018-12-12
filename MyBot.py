@@ -10,7 +10,7 @@ from hlt import constants
 # This library contains direction metadata to better interface with the game.
 from hlt.positionals import Direction, Position
 # heap
-from heapq import heappush, heappop
+from heapq import heappush, heappop, merge
 # This library allows you to generate random numbers.
 import random
 from collections import deque
@@ -43,15 +43,17 @@ ship_dest = {}  # ship.id -> destination
 previous_position = {}  # ship.id-> previous pos
 previous_state = {}  # ship.id -> previous state
 ship_shipyards = {}  # ship.id -> shipyard.id
-shipyard_halite = {}  # shipyard.id -> halite priority queue
+#shipyard_halite = {}  # shipyard.id -> halite priority queue
+# heap for halite positions with their factors for all shipyards in one
+shipyard_halite = []
 shipyard_pos = {}  # shipyard.id -> shipyard position
-shipyard_halite_pos = {}  # shipyard.id -> halite pos dictionary]
+shipyard_halite_pos = {}  # halite factor -> halite pos for shipyards
 ship_obj = {}  # ship.id to ship obj for processing crashed ship stuff
 crashed_positions = []  # heap of (-1 * halite, crashed position )
 crashed_ships = []
 
 VARIABLES = ["YEEHAW", 1285, 50, 0.3, 0.94, 0.85, 300, 50, 0.65,
-             0, 0.8, 0, 0.01, 0.98, 1.05, 0.9, 500, 0.15, 0.5, 6, 8]
+             0, 0.8, 0, 0.01, 0.98, 1.05, 0.9, 500, 0.15, 0.2, 6, 8]
 VERSION = VARIABLES[1]
 # search area for halite relative to shipyard
 SCAN_AREA = int(VARIABLES[2])
@@ -85,11 +87,11 @@ CLUSTER_TOO_CLOSE = float(VARIABLES[18])  # distance two clusters can be within
 MAX_CLUSTERS = int(VARIABLES[19])  # max amount of clusters
 FLEET_SIZE = int(VARIABLES[20])  # fleet size to send for new dropoff
 TURN_START = 0  # for timing
-CLOSE_TO_SHIPYARD = 0.2
+CLOSE_TO_SHIPYARD = 0.35
 SHIP_SCAN_AREA = 8
 game.ready("MLP")
 NR_OF_PLAYERS = len(game.players.keys())
-SAVIOR_FLEET_SIZE = 0.05 if NR_OF_PLAYERS == 2 else 0.025
+SAVIOR_FLEET_SIZE = 0.07 if NR_OF_PLAYERS == 2 else 0.035
 ENABLE_COMBAT = True
 
 
@@ -195,8 +197,7 @@ def find_new_destination(h, ship, halite_pos):
     # if another ship had the same destination
     s = get_ship_w_destination(destination, ship_id)
     if s is not None:  # find a new destination for it
-        prio, h_pos = halite_priority_q(s.position, SHIP_SCAN_AREA)
-        find_new_destination(prio, s, h_pos)
+        process_new_destination(s)
 
 
 def dest_viable(position, ship):
@@ -325,7 +326,7 @@ def should_better_dropoff(ship):
             # count other ships that are returning, with the same destinationa
             # and are within 80% of ships dijkstra distance
             if other.id in ship_state and ship_state[other.id] == "returning" and\
-                    other_cell.dijkstra_dest == my_dest and other_cell.dijkstra_distance < 0.6 * current.dijkstra_distance:
+                    other_cell.dijkstra_dest == my_dest and other_cell.dijkstra_distance < 0.7 * current.dijkstra_distance:
                 amount += 1
             # if more than 30 percent of the ships are very close to the
             # shipyard
@@ -571,6 +572,7 @@ def process_new_destination(ship):
     find_new_destination(ship_h, ship, ship_h_positions)
     ship_path[ship.id] = []
 
+
 def exploring_transition(ship):
     new_state = None
     if ship.position == ship_dest[ship.id]:
@@ -586,6 +588,7 @@ def exploring_transition(ship):
         process_new_destination(ship)
 
     return new_state
+
 
 def collecting_transition(ship):
     new_state = None
@@ -615,14 +618,16 @@ def collecting_transition(ship):
 
     return new_state
 
+
 def returning_transition(ship):
     new_state = None
     if ship.position in get_dropoff_positions():
         # explore again when back in shipyard
         new_state = "exploring"
         find_new_destination(
-            shipyard_halite[shipyard_id], ship, shipyard_halite_pos[shipyard_id])
+            shipyard_halite, ship, shipyard_halite_pos)
     return new_state
+
 
 def fleet_transition(ship):
     new_state = None
@@ -636,11 +641,13 @@ def fleet_transition(ship):
             ship_dest[ship.id] = get_best_neighbour(destination).position
     return new_state
 
+
 def builder_transition(ship):
     new_state = None
     # if someone already built dropoff there before us
     future_dropoff_cell = game_map[ship_dest[ship.id]]
-    distance_to_dest = game_map.calculate_distance(ship.position, ship_dest[ship.id])
+    distance_to_dest = game_map.calculate_distance(
+        ship.position, ship_dest[ship.id])
     if future_dropoff_cell.has_structure:
         if distance_to_dest <= CLOSE_TO_SHIPYARD * game_map.width:
             ship_dest[ship.id] = bfs_unoccupied(future_dropoff_cell.position)
@@ -659,6 +666,7 @@ def builder_transition(ship):
                 break
     return new_state
 
+
 def waiting_transition(ship):
     new_state = None
     neighbours = game_map.get_neighbours(game_map[ship.position])
@@ -668,6 +676,7 @@ def waiting_transition(ship):
             ship_dest[ship.id] = get_best_neighbour(ship.position).position
             break
     return new_state
+
 
 def state_transition(ship):
     # transition
@@ -713,13 +722,15 @@ def state_transition(ship):
 def do_halite_priorities():
     ''' determines halite priority queues
     and positions for all dropoffs, shipyards '''
-    shipyard_halite[me.shipyard.id], shipyard_halite_pos[
-        me.shipyard.id] = halite_priority_q(me.shipyard.position, SCAN_AREA)
+    shipyard_halite, shipyard_halite_pos = halite_priority_q(
+        me.shipyard.position, SCAN_AREA)
     shipyard_pos[me.shipyard.id] = me.shipyard.position
     for dropoff in me.get_dropoffs():
-        shipyard_halite[dropoff.id], shipyard_halite_pos[
-            dropoff.id] = halite_priority_q(dropoff.position, SCAN_AREA)
+        tmp_heap, tmp_dict = halite_priority_q(dropoff.position, SCAN_AREA)
+        shipyard_halite = list(merge(shipyard_halite, tmp_heap))
+        shipyard_halite_pos.update(tmp_dict)
         shipyard_pos[dropoff.id] = dropoff.position
+    return shipyard_halite, shipyard_halite_pos
 
 
 def closest_shipyard_id(ship_pos):
@@ -881,8 +892,7 @@ def find_center():
     return cntr
 
 
-def clusters_with_classifier():
-    ''' uses classifier to determine clusters for dropoff '''
+def predict_centers():
     cntr = find_center()
 
     # get area around our cntr
@@ -916,6 +926,12 @@ def clusters_with_classifier():
             if prediction == 1:  # if should be dropoff
                 # add node with most halite to centers
                 cluster_centers.append((total_halite, p_center))
+    return cluster_centers
+
+
+def clusters_with_classifier():
+    ''' uses classifier to determine clusters for dropoff '''
+    cluster_centers = predict_centers()
     # do filtering
     cluster_centers = filter_clusters(cluster_centers, MAX_CLUSTERS)
     logging.info("Finally")
@@ -967,13 +983,14 @@ def filter_clusters(centers, max_centers):
 
 
 def merge_clusters(centers):
-    ''' merges clusters using clustering in 3D where 
+    ''' merges clusters using clustering in 3D where
     x: x
     y: y
     z: halite amount / 8000 '''
 
     logging.info("Merging clusters")
-    area = int(CLOSE_TO_SHIPYARD * game_map.width)
+    normalizer = 1
+    area = CLUSTER_TOO_CLOSE * game_map.width
     metric = distance_metric(type_metric.USER_DEFINED, func=custom_dist)
     X = []  # center coordinates that are merged in an iteration
     tmp_centers = []  # to not modify the list looping through
@@ -981,22 +998,25 @@ def merge_clusters(centers):
     # for each center
     for c1 in centers:
         # add the center itself
-        X.append([c1[1].x, c1[1].y, c1[0] / 8000])
+        X.append([c1[1].x, c1[1].y, c1[0] / normalizer])
         for c2 in centers:  # for other centers
             # if not merged already
-            if [c2[1].x, c2[1].y, c2[0] / 8000] not in history:
+            if not c2 == c1:
                 dist = game_map.calculate_distance(c1[1], c2[1])
                 # if close enough for merging
                 if dist <= area:
-                    X.append([c2[1].x, c2[1].y, c2[0] / 8000])
+                    X.append([c2[1].x, c2[1].y, c2[0] / normalizer])
+
         # get initialized centers for the algorithm
+        logging.info(X)
         init_centers = kmeans_plusplus_initializer(X, 1).initialize()
         median = kmedians(X, init_centers, metric=metric)
         median.process()  # do clustering
         # get clustered centers
         tmp_centers += [(x[2], game_map.normalize(Position(int(x[0]), int(x[1]))))
                         for x in median.get_medians()]
-        history += X
+        if len(X) > 1:
+            history += X[1:]
         X = []
 
     centers = tmp_centers
@@ -1005,7 +1025,7 @@ def merge_clusters(centers):
 
 
 def custom_dist(p1, p2):
-    ''' distance function for a clustering algorithm, 
+    ''' distance function for a clustering algorithm,
     manh dist + the absolute difference in halite amount '''
     if len(p1) < 3:
         p1 = p1[0]
@@ -1045,6 +1065,18 @@ def amount_of_enemies(pos, area):
     return amount
 
 
+def amount_of_halite(pos, area):
+    top_left = Position(int(-1 * area / 2),
+                int(-1 * area / 2)) + pos  # top left of scan area
+    amount = 0
+    for y in range(area):
+        for x in range(area):
+            p = Position((top_left.x + x) % game_map.width,
+                         (top_left.y + y) % game_map.height)  # position of patch
+            amount += game_map[p].halite_amount
+    return amount
+
+
 def have_less_ships(ratio):
     for player in game.players.values():
         if len(me.get_ships()) < ratio * len(player.get_ships()):
@@ -1070,7 +1102,6 @@ def process_building(cluster_centers):
         ship_dest[closest_ship.id] = dropoff_pos  # go to the dropoff
         if game_map.width >= 56:
             send_ships(dropoff_pos, int(FLEET_SIZE / 2))
-
     else:  # if builder not available
         cluster_centers.insert(0, (_, dropoff_pos))
 
@@ -1130,7 +1161,8 @@ while True:
     command_queue = []
     # priority Q of patch function values of function f(halite, distance)
     if game.turn_number < CRASH_TURN and len(me.get_ships()) > 0:
-        do_halite_priorities()
+        shipyard_halite, shipyard_halite_pos = do_halite_priorities()
+
     if should_build():
         process_building(cluster_centers)
 
@@ -1166,8 +1198,7 @@ while True:
         # setup state
         # if ship hasnt received a destination yet
         if ship.id not in ship_dest and not (ship.id in ship_state and ship_state[ship.id] == "returning"):
-            find_new_destination(
-                shipyard_halite[shipyard_id], ship, shipyard_halite_pos[shipyard_id])
+            find_new_destination(shipyard_halite, ship, shipyard_halite_pos)
             previous_state[ship.id] = "exploring"
             ship_state[ship.id] = "exploring"  # explore
 
