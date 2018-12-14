@@ -59,3 +59,9 @@ DropoffClassifier/hlt_client/setup.py
 *.xml
 *.json
 *.pyc
+HeuristicVisualization/Data/GameMap1.npy
+*.npy
+HeuristicVisualization/Visualizer.py
+illegalBot.py
+*.iml
+.idea/modules.xml

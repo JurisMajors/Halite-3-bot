@@ -2,7 +2,7 @@ import os
 from random import randint, choice, seed
 import json
 
-seed(9)
+seed(2310)
 map_sizes = [32, 48, 40, 56, 64]  # possible map sizes
 # run iteration of bots with variables
 def run_iteration(bot_name, map_size, seed):
@@ -18,16 +18,16 @@ def get_result():
     return data['stats']['0']['score']
 
 def benchmark(bot1, bot2, iterations):
-    for _ in range(iterations):
-        s = randint(1, 5000)
-        map_choice = choice(map_sizes)
-        run_iteration(bot1, map_choice, s)
-        result1 = get_result()
-        run_iteration(bot2, map_choice, s)
-        result2 = get_result()
+    for map_choice in map_sizes:
+        for _ in range(iterations):
+                s = randint(1, 5000)
+                run_iteration(bot1, map_choice, s)
+                result1 = get_result()
+                run_iteration(bot2, map_choice, s)
+                result2 = get_result()
 
-        print(f"{bot1} scored {result1}")
-        print(f"{bot2} scored {result2}")
+                print(f"{bot1} scored {result1}")
+                print(f"{bot2} scored {result2}")
 
 
-benchmark("MyBot", "Old", 1000)
+benchmark("MyBot", "Old", 3)
