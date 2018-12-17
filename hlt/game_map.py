@@ -73,6 +73,9 @@ class MapCell:
     def __eq__(self, other):
         return self.position == other.position
 
+    def __hash__(self):
+        return hash(self.position)
+
     def __ne__(self, other):
         return not self.__eq__(other)
 
@@ -438,9 +441,16 @@ class GameMap:
                 cell = self[Position(x, y)]
                 closest_d = self.get_closest(cell.position, my_dropoff_pos)
                 self.total_halite += cell.halite_amount
-                cell.inspired = self.is_cell_inspired(cell, me)
-                factor = self.cell_factor(closest_d, cell, my_dropoff_pos, me)
-                heappush(self.halite_priority, (factor, cell.position))
+                if cell.inspired is None:
+                    cell.inspired = self.is_cell_inspired(cell, me)
+
+                if 0 < cell.halite_amount <= self.HALITE_STOP:
+                    ratio = cell.halite_amount / (2 * self.calculate_distance(cell.position, closest_d))
+                    heappush(self.halite_priority, (-1 * ratio, cell.position))
+
+                elif cell.halite_amount > 0:
+                    factor = self.cell_factor(closest_d, cell, my_dropoff_pos, me)
+                    heappush(self.halite_priority, (factor, cell.position))
 
     def is_cell_inspired(self, cell, me):
         area = constants.INSPIRATION_RADIUS
@@ -549,3 +559,4 @@ class GameMap:
         for _ in range(int(read_input())):
             cell_x, cell_y, cell_energy = map(int, read_input().split())
             self[Position(cell_x, cell_y)].halite_amount = cell_energy
+            self[Position(cell_x, cell_y)].inspired = None
