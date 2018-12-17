@@ -449,7 +449,7 @@ class GameMap:
                     heappush(self.halite_priority, (-1 * ratio, cell.position))
 
                 elif cell.halite_amount > 0:
-                    factor = self.cell_factor(closest_d, cell, my_dropoff_pos, me)
+                    factor = self.cell_factor(closest_d, cell, me)
                     heappush(self.halite_priority, (factor, cell.position))
 
     def is_cell_inspired(self, cell, me):
@@ -474,7 +474,8 @@ class GameMap:
     def cell_heuristic(self, halite, distance):
         return (self.c[0] * halite * halite + self.c[1] * halite + self.c[2]) / (self.c[3] * distance * distance + self.c[4] * distance + self.c[5])
 
-    def cell_factor(self, cntr, cell, dropoff_positions, me):
+    def cell_factor(self, cntr, cell, me):
+        dropoff_positions=self.get_dropoff_positions(me)
         if cell.position in dropoff_positions:
             return 1000
 

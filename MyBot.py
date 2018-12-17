@@ -27,8 +27,8 @@ from pyclustering.utils.metric import distance_metric, type_metric
 import numpy as np
 from math import ceil
 
-stderr = sys.stderr
-sys.stderr = open(os.devnull, 'w')
+# stderr = sys.stderr
+# sys.stderr = open(os.devnull, 'w')
 
 """ <<<Game Begin>>> """
 dropoff_clf = pickle.load(open('mlp.sav', 'rb'))
@@ -119,7 +119,7 @@ def halite_priority_q(pos, area):
                             (2 * game_map.calculate_distance(p, pos))
                     heappush(h, (-1 * ratio, p))
                 elif cell.halite_amount > 0:
-                    factor = game_map.cell_factor(pos, cell, get_dropoff_positions(), me)
+                    factor = game_map.cell_factor(pos, cell, me)
                     # add negative halite amounts so that would act as maxheap
                     heappush(h, (factor, p))
     return h
@@ -592,14 +592,14 @@ def get_best_neighbour(position):
 def exists_better_in_area(cntr, current, area):
     top_left = Position(int(-1 * area / 2),
                         int(-1 * area / 2)) + cntr  # top left of scan area
-    current_factor = game_map.cell_factor(cntr, game_map[current], get_dropoff_positions(), me)
+    current_factor = game_map.cell_factor(cntr, game_map[current], me)
     for y in range(area):
         for x in range(area):
             p = Position((top_left.x + x) % game_map.width,
                          (top_left.y + y) % game_map.height)  # position of patch
             cell = game_map[p]
             if cell.halite_amount >= game_map.HALITE_STOP:
-                other_factor = game_map.cell_factor(cntr, cell, get_dropoff_positions(), me)
+                other_factor = game_map.cell_factor(cntr, cell, me)
                 if not cell.is_occupied and other_factor < current_factor:
                     return True
     return False
