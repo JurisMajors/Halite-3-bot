@@ -53,7 +53,7 @@ crashed_positions = []  # heap of (-1 * halite, crashed position )
 crashed_ships = []
 
 VARIABLES = ["YEEHAW", 1285, 50, 0.45, 1, 0.85, 500, 50, 0.55,
-            0, 0.8, 0, 0.01, 0.98, 1.05, 0.9, 500, 0.15, 0.25, 6, 8]
+            0, 0.8, 0, 0.01, 0.98, 1.05, 0.9, 500, 0.15, 0.25, 4, 8]
 VERSION = VARIABLES[1]
 # search area for halite relative to shipyard
 SCAN_AREA = int(VARIABLES[2])
@@ -312,11 +312,14 @@ def make_returning_move(ship, has_moved, command_queue):
             return direction
 
     if game.turn_number >= CRASH_TURN:
+        ''' THIS DOESNT WORK FOR SOME REASON,
+        NO BOTS GET IN THIS STAGE TO CHANGE SUICIDE DROPOFFS
+        THE IDEA IS TO BALANCE OUT THE ENDING SO THAT TOO MANY DONT GO TO SAME
+        DROPOFF '''
         if should_better_dropoff(ship):
             other_dropoff = better_dropoff_pos(ship)
             # if not the same distance
             if not other_dropoff == game_map[ship.position].dijkstra_dest:
-                logging.info(ship.id)
                 return a_star_move(ship)
     # Get the cell and direction we want to go to from dijkstra
     target_pos, move = get_dijkstra_move(ship.position)
@@ -636,23 +639,6 @@ def process_new_destination(ship):
     find_new_destination(ship_h, ship)
 
 
-def bfs_new_viable_dest(ship):
-    visited = set()
-    destination = ship_dest[ship.id]
-    logging.info("INITIAL {}".format(destination))
-    Q = deque([])
-    Q.append(destination)
-    while Q:
-        cur = Q.popleft()
-        visited.add(cur)
-        if dest_viable(cur, ship) and not cur == destination:
-            return cur
-        for neighbour in game_map.get_neighbours(game_map[cur]):
-            if not neighbour.position in visited:
-                Q.append(neighbour.position)
-                visited.add(neighbour.position)
-
-
 def get_enemy_dropoff_positions():
     ''' returns a list of enemy dropoffs, including shipyards '''
     positions = []
@@ -865,7 +851,6 @@ def state_transition(ship):
         ship_path[ship.id] = []
         find_new_destination(
             game_map.halite_priority, ship)
-        logging.info(f"NEW DESTINATION {ship_dest[ship.id]} FOR SHIP {ship.id}")
         new_state = "exploring"
 
     elif ship_state[ship.id] == "exploring":
@@ -980,7 +965,10 @@ def send_ships(pos, ship_amount, new_state, condition=is_fleet, leader=None):
     fleet = get_fleet(game_map.normalize(pos), ship_amount, condition)
     # for rest of the fleet to explore
     h = halite_priority_q(pos, SHIP_SCAN_AREA)
+
     for fleet_ship in fleet:  # for other fleet members
+        if len(h) == 0:
+            break
         if fleet_ship.id not in previous_state.keys():  # if new ship
             previous_state[fleet_ship.id] = "exploring"
             has_moved[fleet_ship.id] = False
@@ -1132,7 +1120,6 @@ def filter_clusters(centers, max_centers):
         diff = game_map.euclidean_distance(pos, me.shipyard.position)
         if diff < CLOSE_TO_SHIPYARD * game_map.width or dist_to_enemy_doff(pos) < CLOSE_TO_SHIPYARD * game_map.width:
             if d in centers:
-                logging.info(d)
                 centers.remove(d)
             continue
 
@@ -1141,7 +1128,6 @@ def filter_clusters(centers, max_centers):
             r = too_close(centers_copy[i + 1:], pos)
             for t in r:
                 if t in centers:
-                    logging.info
                     centers.remove(t)  # remove those centers
 
     return centers
@@ -1173,7 +1159,6 @@ def merge_clusters(centers):
                     X.append([c2[1].x, c2[1].y, c2[0] / normalizer])
 
         # get initialized centers for the algorithm
-        logging.info(X)
         init_centers = kmeans_plusplus_initializer(X, 1).initialize()
         median = kmedians(X, init_centers, metric=metric)
         median.process()  # do clustering
@@ -1265,7 +1250,7 @@ def process_building(cluster_centers):
             dropoff_pos = bfs_unoccupied(dropoff_pos)
         ship_dest[closest_ship.id] = dropoff_pos  # go to the dropoff
         if game_map.width >= EXTRA_FLEET_MAP_SIZE:
-            send_ships(dropoff_pos, FLEET_SIZE, "fleet", leader=closest_ship)
+            send_ships(dropoff_pos, int(FLEET_SIZE / 2), "fleet", leader=closest_ship)
     else:  # if builder not available
         cluster_centers.insert(0, (dropoff_val, dropoff_pos))
 
@@ -1316,21 +1301,8 @@ while True:
     prcntg_halite_left = game_map.total_halite / TOTAL_MAP_HALITE
     game_map.HALITE_STOP = prcntg_halite_left * INITIAL_HALITE_STOP
 
-
-    if len(me.get_dropoffs()) >= 1 and NR_OF_PLAYERS >= 2:  # if we have dropoffs
-        enemy_dropoffs = get_enemy_dropoff_positions()
-        for mine in get_dropoff_positions():
-            if mine not in backuped_dropoffs:
-                distance = min([(game_map.euclidean_distance(mine, d), d)
-                                for d in enemy_dropoffs], key=lambda x: x[0])
-                if distance[0] < 6:
-                    backuped_dropoffs.append(mine)
-                    send_ships(distance[1], int(ceil(SAVIOR_FLEET_SIZE * len(me.get_ships()))),
-                               "backup", is_savior)
-
     if len(crashed_ships) > 0 and not game.turn_number >= CRASH_TURN and ENABLE_COMBAT:
         to_remove = []
-        logging.info("SHIPS THAT CRASHED: {}".format(crashed_ships))
         for pos in crashed_ships:
             add_crashed_position(pos)
             to_remove.append(pos)
@@ -1342,7 +1314,6 @@ while True:
             hal, crashed_pos = heappop(crashed_positions)
             nr_enemies = amount_of_enemies(crashed_pos, 4)
             if 6 >= nr_enemies and not have_less_ships(0.8):
-                logging.info("sending ships to {}".format(crashed_pos))
                 send_ships(crashed_pos, int(
                     ceil(SAVIOR_FLEET_SIZE * len(me.get_ships()))), "backup", is_savior)
 
@@ -1390,13 +1361,13 @@ while True:
 
         # setup state
         # if ship hasnt received a destination yet
-        if ship.id not in ship_dest and not (ship.id in ship_state and ship_state[ship.id] == "returning"):
+        if ship.id not in ship_dest or not ship.id in ship_state:
             find_new_destination(game_map.halite_priority, ship)
             previous_state[ship.id] = "exploring"
             ship_state[ship.id] = "exploring"  # explore
 
-        logging.info("SHIP {}, STATE {}, DESTINATION {}".format(
-            ship.id, ship_state[ship.id], ship_dest[ship.id]))
+        # logging.info("SHIP {}, STATE {}, DESTINATION {}".format(
+        #     ship.id, ship_state[ship.id], ship_dest[ship.id]))
 
         # transition
         state_transition(ship)
