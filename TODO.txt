@@ -20,3 +20,8 @@ with a lot of halite.
 Examples: https://halite.io/play/?game_id=3258078&replay_class=1&replay_name=replay-20181217-191418%2B0000-1545073985-32-32-3258078
 Whos working on it: Joris
 Solution Description: Keep track of percentage of occupied cells, add this factor to the returning transition thingy.
+
+
+
+# General TODOs
+rename get_shipyard function to get_closest_dropoff everywhere
