@@ -15,11 +15,6 @@ Solution Description:
 Examples: https://halite.io/play/?game_id=3258138&replay_class=1&replay_name=replay-20181217-191540%2B0000-1545074047-56-56-3258138
 Whos working on it:
 Solution Description: Change ship making
-4. In 4P games when the map gets really crowded late game have ships return earlier to prevent them crashing
-with a lot of halite.
-Examples: https://halite.io/play/?game_id=3258078&replay_class=1&replay_name=replay-20181217-191418%2B0000-1545073985-32-32-3258078
-Whos working on it: Joris
-Solution Description: Keep track of percentage of occupied cells, add this factor to the returning transition thingy.
 
 
 
