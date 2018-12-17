@@ -25,3 +25,4 @@ Solution Description: Keep track of percentage of occupied cells, add this facto
 
 # General TODOs
 rename get_shipyard function to get_closest_dropoff everywhere
+check out the issues with last two ships in seed 2998 64 64 1 person

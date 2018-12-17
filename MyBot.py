@@ -27,8 +27,8 @@ from pyclustering.utils.metric import distance_metric, type_metric
 import numpy as np
 from math import ceil
 
-# stderr = sys.stderr
-# sys.stderr = open(os.devnull, 'w')
+stderr = sys.stderr
+sys.stderr = open(os.devnull, 'w')
 
 """ <<<Game Begin>>> """
 dropoff_clf = pickle.load(open('mlp.sav', 'rb'))
@@ -92,8 +92,13 @@ ENEMY_SHIPYARD_CLOSE = 0.15
 SHIP_SCAN_AREA = 10
 EXTRA_FLEET_MAP_SIZE = 32
 CHANGE_HEURISTIC_TURN = int(0.3 * constants.MAX_TURNS)
+# % of patches that have a ship on them for ships to return earlier
+# BUSY_PERCENTAGE = 0.4
+# BUSY_RETURN_AMOUNT = 500
 game.ready("MLP")
 NR_OF_PLAYERS = len(game.players.keys())
+
+
 
 SAVIOR_FLEET_SIZE = 0.1 if NR_OF_PLAYERS == 2 else 0.05
 ENABLE_COMBAT = True
@@ -666,6 +671,8 @@ def collecting_transition(ship):
     cell_halite = game_map[ship.position].halite_amount * inspire_multiplier
     if ship.is_full:
         new_state = "returning"
+    # elif game_map.percentage_occupied >= BUSY_PERCENTAGE and ship.halite_amount >= BUSY_RETURN_AMOUNT:
+    #     new_state = "returning"
     elif ship.halite_amount >= constants.MAX_HALITE * (return_percentage * 0.8) \
             and better_patch_neighbouring(ship, MEDIUM_HALITE):
         # if collecting and ship is half full but next to it there is a really
@@ -1377,8 +1384,8 @@ while True:
 
     surrounded_shipyard = game_map.is_surrounded(me.shipyard.position)
     logging.info(time_left())
-
-    if not dropoff_built and 2.5 * max_enemy_ships() > len(me.get_ships()) and game.turn_number <= SPAWN_TURN \
+    logging.info(2.5 * max_enemy_ships() > len(me.get_ships()))
+    if not dropoff_built and 2.5 * (max_enemy_ships() + 1) > len(me.get_ships()) and game.turn_number <= SPAWN_TURN \
             and me.halite_amount >= constants.SHIP_COST and prcntg_halite_left > (1 - 0.65) and \
             not (game_map[me.shipyard].is_occupied or surrounded_shipyard or "waiting" in ship_state.values()):
         if not ("build" in ship_state.values() and me.halite_amount <= (constants.SHIP_COST + constants.DROPOFF_COST)):
