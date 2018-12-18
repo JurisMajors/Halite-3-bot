@@ -21,8 +21,10 @@ class MapCell:
         self.halite_amount = halite_amount
         self.ship = None
         self.structure = None
-        self.inspired = None
         self.percentage_occupied = None
+        self.enemy_amount = 0 # in inspired radius
+        self.inspired = None
+
 
         # Parameters for Dijkstra (to nearest dropoff/shipyard)
         self.weight_to_shipyard = 0
@@ -433,9 +435,33 @@ class GameMap:
                 return False
         return True
 
-    def init_map(self, me):
+
+    def bfs_around_enemy(self, position, distance):
+        
+        Q = deque([])
+        Q.append(position)
+        visited = set()
+        while Q:
+            cur = Q.popleft()
+            visited.add(cur)
+            self[cur].enemy_amount += 1
+            for neighbour in self.get_neighbours(self[cur]):
+                if neighbour.position not in visited\
+                and self.calculate_distance(position, neighbour.position) <= distance:
+                    Q.append(neighbour.position)
+                    visited.add(neighbour.position)
+
+    def mark_inspired_cells(self, me, players):
+        for p in players:
+            if not p.id == me.id:
+                # bfs around the ships
+                for their in p.get_ships():
+                    self.bfs_around_enemy(their.position, constants.INSPIRATION_RADIUS)
+
+    def init_map(self, me, all_players):
         self.total_halite = 0
         my_dropoff_pos = self.get_dropoff_positions(me)
+        self.mark_inspired_cells(me, all_players)
         self.halite_priority = []
         num_occupied = 0
         for y in range(self.height):
@@ -444,7 +470,7 @@ class GameMap:
                 closest_d = self.get_closest(cell.position, my_dropoff_pos)
                 self.total_halite += cell.halite_amount
                 if cell.inspired is None:
-                    cell.inspired = self.is_cell_inspired(cell, me)
+                    cell.inspired = cell.enemy_amount >= 2
 
                 if 0 < cell.halite_amount <= self.HALITE_STOP:
                     ratio = cell.halite_amount / (2 * self.calculate_distance(cell.position, closest_d))
@@ -460,20 +486,6 @@ class GameMap:
 
         self.percentage_occupied = num_occupied / (self.height * self.width)
 
-    def is_cell_inspired(self, cell, me):
-        area = constants.INSPIRATION_RADIUS
-        top_left = Position(int(-1 * area),
-                            int(-1 * area)) + cell.position  # top left of scan area
-        counter = 0
-        for y in range(area):
-            for x in range(area):
-                other_cell = self[Position(x, y) + top_left]
-                if self.calculate_distance(cell.position, other_cell.position) <= constants.INSPIRATION_RADIUS:
-                    if other_cell.is_occupied and not me.has_ship(other_cell.ship.id):
-                        counter += 1
-                if counter >= 2:
-                    return True
-        return False
 
     def get_dropoff_positions(self, player):
         # returns a players dropoff positions including shipyard
@@ -512,9 +524,10 @@ class GameMap:
 
     def get_inspire_multiplier(self, cntr, cell, me):
         if cell.inspired is None:
-            cell.inspired = self.is_cell_inspired(cell, me)
-        if cell.inspired and self.width <= 48 and self.calculate_distance(cntr, cell.position) <= constants.INSPIRATION_RADIUS:
-            return 1
+            cell.inspired = cell.enemy_amount >= 2
+                    
+        if cell.inspired and self.calculate_distance(cntr, cell.position) <= constants.INSPIRATION_RADIUS:
+            return 3
         else:
             return 1
 
