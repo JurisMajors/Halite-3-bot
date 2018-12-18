@@ -27,8 +27,8 @@ from pyclustering.utils.metric import distance_metric, type_metric
 import numpy as np
 from math import ceil
 
-stderr = sys.stderr
-sys.stderr = open(os.devnull, 'w')
+# stderr = sys.stderr
+# sys.stderr = open(os.devnull, 'w')
 
 """ <<<Game Begin>>> """
 dropoff_clf = pickle.load(open('mlp.sav', 'rb'))
@@ -53,7 +53,7 @@ crashed_positions = []  # heap of (-1 * halite, crashed position )
 crashed_ships = []
 
 VARIABLES = ["YEEHAW", 1285, 50, 0.45, 1, 0.85, 500, 50, 0.55,
-             0, 0.8, 0, 0.01, 0.98, 1.05, 0.9, 500, 0.15, 0.25, 4, 8]
+             0, 1.5, 0, 0.01, 0.98, 1.05, 0.9, 500, 0.15, 0.25, 4, 8]
 VERSION = VARIABLES[1]
 # search area for halite relative to shipyard
 SCAN_AREA = int(VARIABLES[2])
@@ -99,8 +99,6 @@ BUSY_RETURN_AMOUNT = 400
 game.ready("MLP")
 NR_OF_PLAYERS = len(game.players.keys())
 
-
-
 SAVIOR_FLEET_SIZE = 0.1 if NR_OF_PLAYERS == 2 else 0.05
 ENABLE_COMBAT = True # this gets changed in the loop, initally true though
 
@@ -134,41 +132,11 @@ def halite_priority_q(pos, area):
     return h
 
 
-
-def cell_factor(cntr, cell):
-    if cell.position in get_dropoff_positions(): # shouldnt happen but for safety.
-        return 1000
-
-    neighbours = game_map.get_cells_in_area(cell, 2) # get a 3x3 area a
-    n_factor_sum = 0
-    # get rid of dropoffs
-    for neighbour in neighbours[:]:
-        inspire_multiplier = get_inspire_multiplier(cntr, neighbour)
-        if neighbour.position in get_dropoff_positions():
-            neighbours.remove(neighbour)
-        elif neighbour.halite_amount <= game_map.HALITE_STOP:
-            n_factor_sum += f(neighbour.halite_amount * inspire_multiplier,
-                              game_map.calculate_distance(neighbour.position, cntr))
-        else:
-            n_factor_sum += f(neighbour.halite_amount * inspire_multiplier,
-                              game_map.calculate_distance(neighbour.position, cntr))
-
-    multiplier = get_inspire_multiplier(cntr, cell)
-
-    return len(neighbours) * f(cell.halite_amount * multiplier, game_map.calculate_distance(cell.position, cntr)) + n_factor_sum
-
-
 def should_inspire():
     """ conditions when to consider a cell inspired """
     return ((NR_OF_PLAYERS == 2 and game_map.width in [32, 40, 48] and ENABLE_COMBAT) or\
         (NR_OF_PLAYERS == 4 and prcntg_halite_left < 0.3 and not have_less_ships(0.8)))
 
-
-def get_inspire_multiplier(cntr, cell):
-    if cell.inspired and (should_inspire() or game_map.calculate_distance(cntr, cell.position) < 6):
-        return -3
-    else:
-        return -1
 
 
 def ship_priority_q(me, game_map):
@@ -199,6 +167,7 @@ def ship_priority_q(me, game_map):
 def get_shipyard(position):
     """ gives shipyard that the ship would return to """
     return game_map[position].dijkstra_dest
+    #return min([(game_map.euclidean_distance(position, d), d) for d in get_dropoff_positions()], key=lambda x:x[0])[1]
 
 
 def select_crash_turn():
@@ -493,9 +462,10 @@ def state_switch(ship_id, new_state):
 def prcntg_ships_returning_to_doff(d_pos):
     amount = 0
     for s in me.get_ships():
-        if get_shipyard(s.position) == d_pos:
+        eval_pos = s.position if s.id not in ship_dest else ship_dest[s.id]
+        if get_shipyard(eval_pos) == d_pos:
             amount += 1
-    return amount / len(me.get_ships())
+    return amount / (len(me.get_ships()) + 1)
 
 
 def produce_move(ship):
@@ -1330,7 +1300,8 @@ while True:
     if len(crashed_ships) > 0 and not game.turn_number >= CRASH_TURN and ENABLE_COMBAT:
         to_remove = []
         for pos in crashed_ships:
-            add_crashed_position(pos)
+            if dist_to_enemy_doff(pos) < 4:
+                add_crashed_position(pos)
             to_remove.append(pos)
         for s in to_remove:
             if s in crashed_ships:

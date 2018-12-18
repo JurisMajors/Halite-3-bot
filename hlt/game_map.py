@@ -508,15 +508,15 @@ class GameMap:
         # cells factor
         c_factor = len(neighbours) * self.cell_heuristic(cell.halite_amount * multiplier,
                                                          self.calculate_distance(cell.position, cntr))
-        return c_factor + n_factor_sum
+        return -1 * (c_factor + n_factor_sum)
 
     def get_inspire_multiplier(self, cntr, cell, me):
         if cell.inspired is None:
             cell.inspired = self.is_cell_inspired(cell, me)
-        if cell.inspired and self.width <= 48 and self.calculate_distance(cntr, cell.position):
-            return -3
+        if cell.inspired and self.width <= 48 and self.calculate_distance(cntr, cell.position) <= constants.INSPIRATION_RADIUS:
+            return 1
         else:
-            return -1
+            return 1
 
     def get_closest(self, point, other_points):
         dist, closest = (None, None)
