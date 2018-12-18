@@ -22,6 +22,7 @@ class MapCell:
         self.ship = None
         self.structure = None
         self.inspired = None
+        self.percentage_occupied = None
 
         # Parameters for Dijkstra (to nearest dropoff/shipyard)
         self.weight_to_shipyard = 0
@@ -126,7 +127,7 @@ class GameMap:
         target = self.normalize(target)
         resulting_position = abs(source - target)
         return min(resulting_position.x, self.width - resulting_position.x) + \
-            min(resulting_position.y, self.height - resulting_position.y)
+               min(resulting_position.y, self.height - resulting_position.y)
 
     def euclidean_distance(self, source, target):
         ''' Computes euclidean distance on torus map '''
@@ -136,9 +137,9 @@ class GameMap:
         target = self.normalize(target)
         resulting_position = abs(source - target)
         x_distance = min(resulting_position.x, self.width -
-                         resulting_position.x)**2
+                         resulting_position.x) ** 2
         y_distance = min(resulting_position.y, self.height -
-                         resulting_position.y)**2
+                         resulting_position.y) ** 2
         return sqrt(x_distance + y_distance)
 
     def normalize(self, position):
@@ -234,7 +235,7 @@ class GameMap:
         for direction in Direction.get_all_cardinals():  # for 4 directions
             next_position = ship.position.directional_offset(direction)
             if not (self[next_position].is_occupied or self[prev_position] == self[
-                    next_position]):  # check if the position is valid
+                next_position]):  # check if the position is valid
                 # that is.. if its not occupied and not previous position (so
                 # the ship doesnt wiggle back and forth)
                 possible_moves.append(
@@ -283,7 +284,7 @@ class GameMap:
                 continue
             for neighbour in self.get_neighbours(cell):
                 new_dist = dist + neighbour.halite_amount + \
-                    70  # Maybe divide halite amount by 10 here
+                           70  # Maybe divide halite amount by 10 here
                 if new_dist < neighbour.weight_to_shipyard:
                     neighbour.weight_to_shipyard = new_dist
                     neighbour.parent = cell
@@ -351,7 +352,7 @@ class GameMap:
                     neighbour.cost = new_cost
                     # distance is the heuristic
                     priority = new_cost + \
-                        self.calculate_distance(neighbour.position, target)
+                               self.calculate_distance(neighbour.position, target)
                     neighbour.a_star_parent = current
                     visited.append(neighbour)
                     heappush(PQ, (priority, neighbour))
@@ -385,7 +386,7 @@ class GameMap:
             t_direction = self.get_target_direction(
                 next_cell.position, end.position)
             direction = t_direction[0] if t_direction[
-                0] is not None else t_direction[1]
+                                              0] is not None else t_direction[1]
             direction = direction if direction is not None else Direction.Still
 
             if path:  # if not length zero check last element
@@ -436,6 +437,7 @@ class GameMap:
         self.total_halite = 0
         my_dropoff_pos = self.get_dropoff_positions(me)
         self.halite_priority = []
+        num_occupied = 0
         for y in range(self.height):
             for x in range(self.width):
                 cell = self[Position(x, y)]
@@ -449,14 +451,19 @@ class GameMap:
                     heappush(self.halite_priority, (-1 * ratio, cell.position))
 
                 elif cell.halite_amount > 0:
-                    factor = self.cell_factor(closest_d, cell, my_dropoff_pos, me)
+                    factor = self.cell_factor(closest_d, cell, me)
                     heappush(self.halite_priority, (factor, cell.position))
                     
+
+                if cell.is_occupied:
+                   num_occupied += 1
+
+        self.percentage_occupied = num_occupied / (self.height * self.width)
 
     def is_cell_inspired(self, cell, me):
         area = constants.INSPIRATION_RADIUS
         top_left = Position(int(-1 * area),
-            int(-1 * area)) + cell.position  # top left of scan area
+                            int(-1 * area)) + cell.position  # top left of scan area
         counter = 0
         for y in range(area):
             for x in range(area):
@@ -473,9 +480,11 @@ class GameMap:
         return [player.shipyard.position] + [dropoff.position for dropoff in player.get_dropoffs()]
 
     def cell_heuristic(self, halite, distance):
-        return (self.c[0] * halite * halite + self.c[1] * halite + self.c[2]) / (self.c[3] * distance * distance + self.c[4] * distance + self.c[5])
+        return (self.c[0] * halite * halite + self.c[1] * halite + self.c[2]) / (
+                self.c[3] * distance * distance + self.c[4] * distance + self.c[5])
 
-    def cell_factor(self, cntr, cell, dropoff_positions, me):
+    def cell_factor(self, cntr, cell, me):
+        dropoff_positions = self.get_dropoff_positions(me)
         if cell.position in dropoff_positions:
             return 1000
 
