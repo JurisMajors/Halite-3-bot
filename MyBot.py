@@ -87,6 +87,7 @@ CLUSTER_TOO_CLOSE = float(VARIABLES[18])  # distance two clusters can be within
 MAX_CLUSTERS = int(VARIABLES[19])  # max amount of clusters
 FLEET_SIZE = int(VARIABLES[20])  # fleet size to send for new dropoff
 TURN_START = 0  # for timing
+
 CLOSE_TO_SHIPYARD = 0.25
 ENEMY_SHIPYARD_CLOSE = 0.15
 SHIP_SCAN_AREA = 10
@@ -101,10 +102,11 @@ NR_OF_PLAYERS = len(game.players.keys())
 
 
 SAVIOR_FLEET_SIZE = 0.1 if NR_OF_PLAYERS == 2 else 0.05
-ENABLE_COMBAT = True
+ENABLE_COMBAT = True # this gets changed in the loop, initally true though
 
 
-def f(h_amount, h_distance):  # function for determining patch priority
+def f(h_amount, h_distance):
+    """ HEURISTIC FOR DETERMINING HALITE PRIORITIES """
     return (A * h_amount * h_amount + B * h_amount + C) / (D * h_distance * h_distance + E * h_distance + F)
 
 
@@ -117,8 +119,10 @@ def halite_priority_q(pos, area):
         for x in range(area):
             p = Position((top_left.x + x) % game_map.width,
                          (top_left.y + y) % game_map.height)  # position of patch
-            if not (p == pos or p in get_dropoff_positions()):
+            if not (p == pos or p in get_dropoff_positions()): # we dont consider the position of the centre or dropoffs
                 cell = game_map[p]
+                # we ignore cells who have 0 halite.
+                # if that cell has small amount of halite, just take a ratio with 2x distance to lesser the priority
                 if 0 < cell.halite_amount <= game_map.HALITE_STOP:
                     ratio = cell.halite_amount / \
                             (2 * game_map.calculate_distance(p, pos))
@@ -130,9 +134,34 @@ def halite_priority_q(pos, area):
     return h
 
 
+
+def cell_factor(cntr, cell):
+    if cell.position in get_dropoff_positions(): # shouldnt happen but for safety.
+        return 1000
+
+    neighbours = game_map.get_cells_in_area(cell, 2) # get a 3x3 area a
+    n_factor_sum = 0
+    # get rid of dropoffs
+    for neighbour in neighbours[:]:
+        inspire_multiplier = get_inspire_multiplier(cntr, neighbour)
+        if neighbour.position in get_dropoff_positions():
+            neighbours.remove(neighbour)
+        elif neighbour.halite_amount <= game_map.HALITE_STOP:
+            n_factor_sum += f(neighbour.halite_amount * inspire_multiplier,
+                              game_map.calculate_distance(neighbour.position, cntr))
+        else:
+            n_factor_sum += f(neighbour.halite_amount * inspire_multiplier,
+                              game_map.calculate_distance(neighbour.position, cntr))
+
+    multiplier = get_inspire_multiplier(cntr, cell)
+
+    return len(neighbours) * f(cell.halite_amount * multiplier, game_map.calculate_distance(cell.position, cntr)) + n_factor_sum
+
+
 def should_inspire():
-    return (NR_OF_PLAYERS == 2 and game_map.width in [32, 40, 48]) or \
-           (NR_OF_PLAYERS == 4 and game_map.width in [32, 40])
+    """ conditions when to consider a cell inspired """
+    return ((NR_OF_PLAYERS == 2 and game_map.width in [32, 40, 48] and ENABLE_COMBAT) or\
+        (NR_OF_PLAYERS == 4 and prcntg_halite_left < 0.3 and not have_less_ships(0.8)))
 
 
 def get_inspire_multiplier(cntr, cell):
@@ -168,6 +197,7 @@ def ship_priority_q(me, game_map):
 
 
 def get_shipyard(position):
+    """ gives shipyard that the ship would return to """
     return game_map[position].dijkstra_dest
 
 
@@ -185,6 +215,7 @@ def select_crash_turn():
 
 
 def dist_to_enemy_doff(pos):
+    ''' determines how close to an enemy dropoff is the position'''
     if NR_OF_PLAYERS < 2:
         return 1000
     return min([game_map.euclidean_distance(pos, d) for d in get_enemy_dropoff_positions()])
@@ -197,10 +228,14 @@ def find_new_destination(h, ship):
     biggest_halite, position = heappop(h)  # get biggest halite
     destination = game_map.normalize(position)
     not_first_dest = ship_id in ship_dest
-    # get biggest halite while its a position no other ship goes to
-    while not dest_viable(destination, ship) or amount_of_enemies(destination, 4) >= 4 \
-            or too_many_near_dropoff(ship, destination) \
+
+    # repeat while not a viable destination, or enemies around the position or 
+    # too many ships going to that dropoff area
+    # or the same destination as before
+    while not dest_viable(destination, ship) or amount_of_enemies(destination, 4) >= 4\
+            or too_many_near_dropoff(ship, destination)\
             or (not_first_dest and destination == ship_dest[ship_id]):
+        # if no more options, use the same destination
         if len(h) == 0:
             logging.info("ran out of options")
             return
@@ -215,6 +250,7 @@ def find_new_destination(h, ship):
 
 
 def too_many_near_dropoff(ship, destination):
+    ''' checks if ship distribution over dropoffs is balanced '''
     if get_shipyard(ship.position) == get_shipyard(destination):
         return False
     else:
@@ -222,9 +258,11 @@ def too_many_near_dropoff(ship, destination):
 
 
 def dest_viable(position, ship):
+    """ is a destination viable for ship """
     if position in ship_dest.values():
+        # get another ship with same destination
         inspectable_ship = get_ship_w_destination(position, ship.id)
-        if inspectable_ship is None:
+        if inspectable_ship is None: # shouldnt happen but for safety
             # if this ship doesnt exist for some reason
             return True
 
@@ -232,12 +270,13 @@ def dest_viable(position, ship):
         their_dist = game_map.calculate_distance(
             position, inspectable_ship.position)
 
-        return my_dist < their_dist
+        return my_dist < their_dist # if im closer to destination, assign it to me.
     else:
         return True  # nobody has the best patch, all good
 
 
 def get_ship_w_destination(dest, this_id):
+    """ gets a ship with dest, s.t. that ship is not this_id """
     if dest in ship_dest.values():
         for s in ship_dest.keys():  # get ship with the same destination
             if not s == this_id and ship_state[s] == "exploring" and ship_dest[s] == dest and me.has_ship(s):
@@ -259,6 +298,7 @@ def clear_dictionaries():
 
 
 def add_crashed_position(pos):
+    """ adds a carshed position ot the crashed positions list '"""
     neighbours = game_map.get_neighbours(game_map[pos])
     h_amount = -1
     distance_to_enemy_dropoff = dist_to_enemy_doff(pos)
@@ -645,7 +685,7 @@ def exploring_transition(ship):
         # for inspiring
         ship_dest[ship.id] = get_best_neighbour(ship.position).position
 
-    elif euclid_to_dest <= 5 and exists_better_in_area(ship.position, ship_dest[ship.id], 4):
+    elif (NR_OF_PLAYERS == 4 or euclid_to_dest <= 5) and exists_better_in_area(ship.position, ship_dest[ship.id], 4):
         ship_h = halite_priority_q(
             ship.position, SHIP_SCAN_AREA)
         find_new_destination(ship_h, ship)

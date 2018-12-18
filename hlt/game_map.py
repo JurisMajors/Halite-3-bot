@@ -453,6 +453,7 @@ class GameMap:
                 elif cell.halite_amount > 0:
                     factor = self.cell_factor(closest_d, cell, me)
                     heappush(self.halite_priority, (factor, cell.position))
+                    
 
                 if cell.is_occupied:
                    num_occupied += 1
@@ -466,7 +467,7 @@ class GameMap:
         counter = 0
         for y in range(area):
             for x in range(area):
-                other_cell = self[Position(x, y)]
+                other_cell = self[Position(x, y) + top_left]
                 if self.calculate_distance(cell.position, other_cell.position) <= constants.INSPIRATION_RADIUS:
                     if other_cell.is_occupied and not me.has_ship(other_cell.ship.id):
                         counter += 1
