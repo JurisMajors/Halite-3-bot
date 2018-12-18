@@ -198,7 +198,7 @@ class GF():
     @staticmethod
     def find_new_destination(h, ship):
         ''' h: priority queue of halite factors,
-                                        halite_pos: dictionary of halite factor -> patch position '''
+        halite_pos: dictionary of halite factor -> patch position '''
         ship_id = ship.id
         biggest_halite, position = heappop(h)  # get biggest halite
         destination = game_map.normalize(position)
@@ -1333,6 +1333,107 @@ class GF():
                 ships = max(ships, GF.get_ship_amount(player_id))
         return ships
 
+class EnemySpy:
+    """ Provides information about enemies
+    like enemy ship count, enemy dropoff positions
+    """
+    pass
+
+class DestinationProcesser:
+    """ Returns a destination for a ship
+    given the game_map and the ship"""
+    
+    def produce_priority_q(source, area):
+        """ returns a minheap of cells
+        and their priorities """
+        h = []  # stores halite amount * -1 with its position in a minheap
+        top_left = Position(int(-1 * area / 2),
+                            int(-1 * area / 2)) + pos  # top left of scan area
+        for y in range(area):
+            for x in range(area):
+                p = Position((top_left.x + x) % game_map.width,
+                             (top_left.y + y) % game_map.height)  # position of patch
+                if not (p == pos or p in GF.get_dropoff_positions()):
+                    cell = game_map[p]
+                    
+                    if 0 < cell.halite_amount <= game_map.HALITE_STOP:
+                        ratio = cell.halite_amount / \
+                                (2 * game_map.calculate_distance(p, pos))
+                        heappush(h, (-1 * ratio, p))
+
+                    elif cell.halite_amount > 0:
+                        factor = game_map.cell_factor(pos, cell, me)
+                        # add negative halite amounts so that would act as maxheap
+                        heappush(h, (factor, p))
+        return h
+
+    def find_new_destination(halite_priority, ship):
+        """ using the halite priority queue, finds a new 
+        destination with biggest priority and so that it qualifies
+        destination viable """
+        biggest_halite, position = heappop(h)  # get biggest halite
+        destination = game_map.normalize(position)
+        not_first_dest = ship.id in ship_dest
+        # get biggest halite while its a position no other ship goes to
+        while not self.destination_viable(destination, ship) or game_map.amount_of_enemies(destination, 4) >= 4 \
+                or self.too_many_near_dropoff(destination, ship):
+            if len(h) == 0:
+                logging.info("ran out of options")
+                return
+            biggest_halite, position = heappop(h)
+            destination = game_map.normalize(position)
+
+        ship_dest[ship.id] = destination  # set the destination
+        # if another ship had the same destination
+        other = self.diff_ship_same_dest(destination, ship_id)
+        if other is not None:  # find a new destination for it
+            self.calc_new_destination(other)
+
+
+    def calc_new_destination(ship):
+        pass
+
+    def destination_viable(destination, ship):
+        if position in ship_dest.values():
+            inspectable_ship = self.diff_ship_same_dest(position, ship.id)
+            if inspectable_ship is None:
+                # if this ship doesnt exist for some reason
+                return True
+
+            my_dist = game_map.calculate_distance(position, ship.position)
+            their_dist = game_map.calculate_distance(
+                position, inspectable_ship.position)
+
+            return my_dist < their_dist
+        else:
+            return True  # nobody has the best patch, all good
+
+
+    def too_many_near_dropoff(destination, ship):
+        pass
+
+    def diff_ship_same_dest(destination, ship_id):
+        if destination in ship_dest.values():
+            for s in ship_dest.keys():  # get ship with the same destination
+                if not s == ship_id and ship_state[s] == "exploring" and\
+                ship_dest[s] == destination and me.has_ship(s):
+                    return me.get_ship(s)
+        return None
+
+
+class StateMachine:
+    """ Processes state transitions for a ship 
+    by updating ship_state dictionary"""
+    pass
+
+class MapProcessor:
+    pass
+
+class MoveProcessor:
+    """ Produces an optimal move given a ship """
+    pass
+
+
 clusters_determined = False
 INITIAL_HALITE_STOP = HALITE_STOP
 backuped_dropoffs = []
@@ -1398,11 +1499,6 @@ while True:
     # whether a dropoff has been built this turn so that wouldnt use too much
     # halite
     dropoff_built = False
-    if NR_OF_PLAYERS == 0:
-        enemies_all_dropoffs = [GF.enemies_nearby(
-            SHIPYARD_VICINITY, p) for p in GF.get_dropoff_positions()]
-        nearby_enemy_ships = [
-            result for positions in enemies_all_dropoffs for result in positions]
 
     while ships:  # go through all ships
         ship = heappop(ships)[1]

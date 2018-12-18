@@ -538,6 +538,18 @@ class GameMap:
                     cells.append(self[pos])
         return cells
 
+    def amount_of_enemies(pos, area, me):
+        top_left = Position(int(-1 * area / 2),
+                    int(-1 * area / 2)) + pos  # top left of scan area
+        amount = 0
+        for y in range(area):
+            for x in range(area):
+                p = Position((top_left.x + x) % self.width,
+                             (top_left.y + y) % self.height)  # position of patch
+                if self[p].is_occupied and not me.has_ship(self[p].ship.id):
+                    amount += 1
+        return amount
+
     @staticmethod
     def _generate():
         """
