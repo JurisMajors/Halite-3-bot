@@ -437,7 +437,6 @@ class GameMap:
 
 
     def bfs_around_enemy(self, position, distance):
-        
         Q = deque([])
         Q.append(position)
         visited = set()
