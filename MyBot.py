@@ -229,7 +229,6 @@ def bad_destination(ship, destination):
         return not dest_viable(destination, ship) or game_map[destination].enemy_amount >= UNSAFE_AREA\
             or too_many_near_dropoff(ship, destination)
     else:
-        logging.info(game_map[destination].enemy_amount)
         return not dest_viable(destination, ship) or game_map[destination].enemy_amount >= UNSAFE_AREA
 
 
@@ -531,6 +530,18 @@ def exists_better_in_area(cntr, current, area):
     return False
 
 
+def better_patch_neighbouring(ship, big_diff):
+    ''' returns true if there is a lot better patch right next to it'''
+    current = game_map[ship.position]
+    neighbours = game_map.get_neighbours(current)
+    current_h = current.halite_amount * game_map.get_inspire_multiplier(ship.position, game_map[ship.position], me)
+
+    for n in neighbours:
+        neighbour_h = n.halite_amount * game_map.get_inspire_multiplier(ship.position, game_map[n.position], me)
+        if not n.is_occupied and neighbour_h >= current_h + big_diff:
+            return True
+
+    return False
 
 
 def get_enemy_dropoff_positions():
@@ -582,6 +593,23 @@ def collecting_transition(ship):
 
     elif game_map.percentage_occupied >= BUSY_PERCENTAGE and ship.halite_amount >= BUSY_RETURN_AMOUNT:
         new_state = "returning"
+
+    elif ship.halite_amount >= constants.MAX_HALITE * (return_percentage * 0.8)\
+            and better_patch_neighbouring(ship, MEDIUM_HALITE):
+            # if collecting and ship is half full but next to it there is a really
+            # good patch, explore to that patch
+        neighbour = get_best_neighbour(ship.position)
+        if neighbour.position == ship.position:
+            new_state = "returning"
+        else:
+            ship_dest[ship.id] = neighbour.position
+
+            for sh in me.get_ships():
+                    # if somebody else going there recalc the destination
+                if not sh.id == ship.id and sh.id in ship_dest and ship_dest[sh.id] == neighbour.position:
+                    process_new_destination(sh)
+
+            new_state = "exploring"
 
     elif ship.halite_amount >= constants.MAX_HALITE * return_percentage and \
             not (cell_halite > MEDIUM_HALITE and not ship.is_full):
@@ -1191,9 +1219,10 @@ while True:
         TOTAL_MAP_HALITE = game_map.total_halite
 
     prcntg_halite_left = game_map.total_halite / TOTAL_MAP_HALITE
-    game_map.HALITE_STOP = prcntg_halite_left * INITIAL_HALITE_STOP
+    if clusters_determined and not cluster_centers:
+        game_map.HALITE_STOP = prcntg_halite_left * INITIAL_HALITE_STOP
 
-    if len(crashed_ship_positions) > 0 and game.turn_number < CRASH_TURN and ENABLE_COMBAT:
+    if crashed_ship_positions and game.turn_number < CRASH_TURN and ENABLE_COMBAT:
         process_backup_sending()
 
     # Dijkstra the graph based on all dropoffs
@@ -1254,7 +1283,6 @@ while True:
             if (ship.halite_amount + me.halite_amount + game_map[ship.position].halite_amount) >= constants.DROPOFF_COST and not dropoff_built:
                 command_queue.append(ship.make_dropoff())
                 dropoff_last_built = game.turn_number
-                game_map.HALITE_STOP = INITIAL_HALITE_STOP
                 SPAWN_TURN += 10
                 dropoff_built = True
             else:  # cant build

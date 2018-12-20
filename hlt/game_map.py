@@ -525,7 +525,7 @@ class GameMap:
             cell.inspired = cell.enemy_amount >= constants.INSPIRATION_SHIP_COUNT
                     
         if cell.inspired and self.calculate_distance(cntr, cell.position) <= constants.INSPIRATION_RADIUS:
-            return constants.INSPIRED_BONUS_MULTIPLIER * 0.5
+            return constants.INSPIRED_BONUS_MULTIPLIER
         else:
             return 1
 
