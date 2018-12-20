@@ -478,7 +478,6 @@ class GameMap:
                 elif cell.halite_amount > 0:
                     factor = self.cell_factor(closest_d, cell, me)
                     heappush(self.halite_priority, (factor, cell.position))
-                    
 
                 if cell.is_occupied:
                    num_occupied += 1
@@ -519,14 +518,14 @@ class GameMap:
         # cells factor
         c_factor = len(neighbours) * self.cell_heuristic(cell.halite_amount * multiplier,
                                                          self.calculate_distance(cell.position, cntr))
-        return -1 * (c_factor + n_factor_sum)
+        return round(-1 * (c_factor + n_factor_sum), 2)
 
     def get_inspire_multiplier(self, cntr, cell, me):
         if cell.inspired is None:
             cell.inspired = cell.enemy_amount >= constants.INSPIRATION_SHIP_COUNT
                     
         if cell.inspired and self.calculate_distance(cntr, cell.position) <= constants.INSPIRATION_RADIUS:
-            return constants.INSPIRED_BONUS_MULTIPLIER
+            return constants.INSPIRED_BONUS_MULTIPLIER * 0.5
         else:
             return 1
 
@@ -577,6 +576,8 @@ class GameMap:
         for y in range(self.height):
             for x in range(self.width):
                 self[Position(x, y)].ship = None
+                self[Position(x, y)].inspired = None
+                self[Position(x, y)].enemy_amount = 0
 
         for _ in range(int(read_input())):
             cell_x, cell_y, cell_energy = map(int, read_input().split())
