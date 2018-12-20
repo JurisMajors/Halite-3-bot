@@ -523,10 +523,10 @@ class GameMap:
 
     def get_inspire_multiplier(self, cntr, cell, me):
         if cell.inspired is None:
-            cell.inspired = cell.enemy_amount >= 2
+            cell.inspired = cell.enemy_amount >= constants.INSPIRATION_SHIP_COUNT
                     
         if cell.inspired and self.calculate_distance(cntr, cell.position) <= constants.INSPIRATION_RADIUS:
-            return 3
+            return constants.INSPIRED_BONUS_MULTIPLIER
         else:
             return 1
 
