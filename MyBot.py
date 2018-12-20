@@ -155,7 +155,7 @@ class GF():
     @staticmethod
     def find_new_destination(h, ship):
         ''' h: priority queue of halite factors,
-        halite_pos: dictionary of halite factor -> patch position '''
+                                        halite_pos: dictionary of halite factor -> patch position '''
         ship_id = ship.id
         biggest_halite, position = heappop(h)  # get biggest halite
         destination = game_map.normalize(position)
@@ -357,9 +357,8 @@ class GF():
             d_to_dijkstra_dest = game_map.calculate_distance(
                 cell.position, cell.dijkstra_dest)
             dest = GF.interim_djikstra_dest(
-                cell).position if d_to_dijkstra_dest > 10 else cell.dijkstra_dest
-
-        return GF.exploring(ship, dest)
+                cell).position if d_to_dijkstra_dest > 10 else cell.dijkstra_dest  
+        return MoveProcessor(game, ship_obj, ship_dest, previous_state, ship_path).exploring(ship, dest)
 
 
     @staticmethod
@@ -438,42 +437,6 @@ class GF():
 
 
     @staticmethod
-    def produce_move(ship):
-        if ship.id not in ship_obj:
-            ship_obj[ship.id] = ship
-        state = ship_state[ship.id]
-        destination = ship_dest[ship.id]
-        ''' produces move for ship '''
-
-        if ship.halite_amount < game_map[ship.position].halite_amount / 10:
-            return Direction.Still
-
-
-        mover = {
-            "collecting": GF.collecting,
-            "returning": GF.returning,
-            "harakiri": GF.harakiri,
-            "assassinate": GF.assassinate,
-            "exploring": GF.exploring,
-            "build": GF.exploring,
-            "fleet": GF.exploring,
-            "backup": GF.exploring,
-        }
-
-        return mover[state](ship, destination)
-
-
-    @staticmethod
-    def collecting(ship, destination):
-        return Direction.Still
-
-
-    @staticmethod
-    def returning(ship, destination):
-        return GF.make_returning_move(ship, has_moved, command_queue)
-
-
-    @staticmethod
     def interim_exploring_dest(position, path):
         ''' finds intermediate destination from a direction path that is not occupied '''
         to_go = GF.get_step(path)
@@ -490,56 +453,12 @@ class GF():
 
 
     @staticmethod
-    def exploring(ship, destination):
-        # next direction occupied, recalculate
-        if ship.id not in ship_path or not ship_path[ship.id]:
-            ship_path[ship.id] = game_map.explore(ship, destination)
-        else:
-            direction = ship_path[ship.id][0][0]
-            if game_map[ship.position.directional_offset(direction)].is_occupied and not direction == Direction.Still:
-                if game_map.calculate_distance(destination, ship.position) > 10:
-                    new_dest = GF.interim_exploring_dest(
-                        ship.position, ship_path[ship.id])
-                    # use intermediate unoccpied position instead of actual
-                    # destination
-                    ship_path[ship.id] = game_map.explore(
-                        ship, new_dest) + ship_path[ship.id]
-                else:
-                    ship_path[ship.id] = game_map.explore(ship, destination)
-        # move in calculated direction
-        return GF.get_step(ship_path[ship.id])
-
-
-    @staticmethod
     def get_step(path):
         path[0][1] -= 1  # take that direction
         direction = path[0][0]
         if path[0][1] == 0:  # if no more left that direction remove it
             del path[0]
         return direction
-
-
-    @staticmethod
-    def harakiri(ship, destination):
-        shipyard = GF.get_shipyard(ship.position)
-        ship_pos = game_map.normalize(ship.position)
-        if ship.position == shipyard:  # if at shipyard
-            return Direction.Still  # let other ships crash in to you
-        else:  # otherwise move to the shipyard
-            target_dir = game_map.get_target_direction(
-                ship.position, shipyard)
-            return target_dir[0] if target_dir[0] is not None else target_dir[1]
-
-
-    @staticmethod
-    def assassinate(ship, destination):
-        GF.state_switch(ship.id, previous_state[ship.id])
-        if game_map.calculate_distance(ship.position, destination) == 1:
-            target_direction = game_map.get_target_direction(
-                ship.position, destination)
-            return target_direction[0] if target_direction[0] is not None else target_direction[1]
-        else:
-            return GF.exploring(ship, destination)
 
 
     @staticmethod
@@ -1053,236 +972,135 @@ class GF():
                 ships = max(ships, GF.get_ship_amount(player_id))
         return ships
 
-class EnemySpy:
-    """ Provides information about enemies
-    like enemy ship count, enemy dropoff positions
+class DestinationProcessor():
     """
-    pass
+    Contains functions:
+        find_new_destination
+        process_new_destination
+        dest_viable
+        too_many_near_dropoff
+        diff_ship_same_dest
 
-class DestinationProcesser:
-    """ Returns a destination for a ship
-    given the game_map and the ship"""
-    
-    def produce_priority_q(source, area):
-        """ returns a minheap of cells
-        and their priorities """
-        h = []  # stores halite amount * -1 with its position in a minheap
-        top_left = Position(int(-1 * area / 2),
-                            int(-1 * area / 2)) + pos  # top left of scan area
-        for y in range(area):
-            for x in range(area):
-                p = Position((top_left.x + x) % game_map.width,
-                             (top_left.y + y) % game_map.height)  # position of patch
-                if not (p == pos or p in GF.get_dropoff_positions()):
-                    cell = game_map[p]
-                    
-                    if 0 < cell.halite_amount <= game_map.HALITE_STOP:
-                        ratio = cell.halite_amount / \
-                                (2 * game_map.calculate_distance(p, pos))
-                        heappush(h, (-1 * ratio, p))
+    Needs access to dicts:
 
-                    elif cell.halite_amount > 0:
-                        factor = game_map.cell_factor(pos, cell, me)
-                        # add negative halite amounts so that would act as maxheap
-                        heappush(h, (factor, p))
-        return h
+    Needs access to functions:
 
-    def find_new_destination(halite_priority, ship):
-        """ using the halite priority queue, finds a new 
-        destination with biggest priority and so that it qualifies
-        destination viable """
-        biggest_halite, position = heappop(h)  # get biggest halite
-        destination = game_map.normalize(position)
-        not_first_dest = ship.id in ship_dest
-        # get biggest halite while its a position no other ship goes to
-        while not self.destination_viable(destination, ship) or game_map.amount_of_enemies(destination, 4) >= 4 \
-                or self.too_many_near_dropoff(destination, ship):
-            if len(h) == 0:
-                logging.info("ran out of options")
-                return
-            biggest_halite, position = heappop(h)
-            destination = game_map.normalize(position)
-
-        ship_dest[ship.id] = destination  # set the destination
-        # if another ship had the same destination
-        other = self.diff_ship_same_dest(destination, ship_id)
-        if other is not None:  # find a new destination for it
-            self.calc_new_destination(other)
-
-
-    def calc_new_destination(ship):
+    """
+    def __init__(self):
         pass
 
-    def destination_viable(destination, ship):
-        if position in ship_dest.values():
-            inspectable_ship = self.diff_ship_same_dest(position, ship.id)
-            if inspectable_ship is None:
-                # if this ship doesnt exist for some reason
-                return True
+class MoveProcessor():
+    """
+    needs functions:
+        make_returning_move()
+        state_switch()
+        interim_exploring_dest()
+        get_step()
+        get_shipyard()
 
-            my_dist = game_map.calculate_distance(position, ship.position)
-            their_dist = game_map.calculate_distance(
-                position, inspectable_ship.position)
+    Needs variables:
+        has_moved
+        command_queue
+    """
+    def __init__(self, game, ship_obj, ship_dest, previous_state, ship_path):
+        self.game = game
+        self.game_map = game.game_map
+        self.me = game.me
+        self.ship_obj = ship_obj
+        self.ship_dest = ship_dest
+        self.previous_state = previous_state
+        self.ship_path = ship_path
 
-            return my_dist < their_dist
+
+
+    def produce_move(self, ship):
+        if ship.id not in ship_obj:
+            self.ship_obj[ship.id] = ship
+        state = ship_state[ship.id]
+        destination = self.ship_dest[ship.id]
+        ''' produces move for ship '''
+
+        if ship.halite_amount < self.game_map[ship.position].halite_amount / 10:
+            return Direction.Still
+
+
+        mover = {
+            "collecting": self.collecting,
+            "returning": self.returning,
+            "harakiri": self.harakiri,
+            "assassinate": self.assassinate,
+            "exploring": self.exploring,
+            "build": self.exploring,
+            "fleet": self.exploring,
+            "backup": self.exploring,
+        }
+
+        return mover[state](ship, destination)
+
+
+    def collecting(self, ship, destination):
+        return Direction.Still
+
+
+    def returning(self, ship, destination):
+        return GF.make_returning_move(ship, has_moved, command_queue)
+
+
+    def harakiri(self, ship, destination):
+        shipyard = GF.get_shipyard(ship.position)
+        ship_pos = self.game_map.normalize(ship.position)
+        if ship.position == shipyard:  # if at shipyard
+            return Direction.Still  # let other ships crash in to you
+        else:  # otherwise move to the shipyard
+            target_dir = self.game_map.get_target_direction(
+                ship.position, shipyard)
+            return target_dir[0] if target_dir[0] is not None else target_dir[1]
+
+
+    def assassinate(self, ship, destination):
+        GF.state_switch(ship.id, self.previous_state[ship.id])
+        if self.game_map.calculate_distance(ship.position, destination) == 1:
+            target_direction = self.game_map.get_target_direction(
+                ship.position, destination)
+            return target_direction[0] if target_direction[0] is not None else target_direction[1]
         else:
-            return True  # nobody has the best patch, all good
+            return self.exploring(ship, destination)
 
 
-    def too_many_near_dropoff(destination, ship):
-        pass
-
-    def diff_ship_same_dest(destination, ship_id):
-        if destination in ship_dest.values():
-            for s in ship_dest.keys():  # get ship with the same destination
-                if not s == ship_id and ship_state[s] == "exploring" and\
-                ship_dest[s] == destination and me.has_ship(s):
-                    return me.get_ship(s)
-        return None
-
-
-class StateMachine:
-    """ Processes state transitions for a ship 
-    by updating ship_state dictionary"""
-    pass
-
-class MapProcessor:
-    pass
-
-class MoveProcessor:
-    """ Produces an optimal move given a ship """
-    pass
-
-
-clusters_determined = False
-backuped_dropoffs = []
-while True:
-    game.update_frame()
-    me = game.me
-    game_map = game.game_map
-    if game.turn_number == 1:
-        game_map.HALITE_STOP = GC.INITIAL_HALITE_STOP
-        game_map.c = [GC.A, GC.B, GC.C, GC.D, GC.E, GC.F]  # set the heuristic constants
-    for s in me.get_ships():
-        if s.id not in ship_state:
-            ship_state[s.id] = "exploring"
-
-    ENABLE_COMBAT = not GF.have_less_ships(0.8) and NR_OF_PLAYERS == 2
-
-    turn_start = time.time()
-    # initialize shipyard halite, inspiring stuff and other
-    game_map.init_map(me)
-    if game.turn_number == 1:
-        TOTAL_MAP_HALITE = game_map.total_halite
-
-    prcntg_halite_left = game_map.total_halite / TOTAL_MAP_HALITE
-    game_map.HALITE_STOP = prcntg_halite_left * GC.INITIAL_HALITE_STOP
-
-    if len(crashed_ships) > 0 and not game.turn_number >= GC.CRASH_TURN and ENABLE_COMBAT:
-        to_remove = []
-        for pos in crashed_ships:
-            GF.add_crashed_position(pos)
-            to_remove.append(pos)
-        for s in to_remove:
-            if s in crashed_ships:
-                crashed_ships.remove(s)
-
-        if len(crashed_positions) > 0:
-            hal, crashed_pos = heappop(crashed_positions)
-            nr_enemies = GF.amount_of_enemies(crashed_pos, 4)
-            if 6 >= nr_enemies and not GF.have_less_ships(0.8):
-                GF.send_ships(crashed_pos, int(
-                    ceil(SAVIOR_FLEET_SIZE * len(me.get_ships()))), "backup", GF.is_savior)
-
-    # Dijkstra the graph based on all dropoffs
-    game_map.create_graph(GF.get_dropoff_positions())
-
-    if game.turn_number == GC.DETERMINE_CLUSTER_TURN:
-        clusters_determined = True
-        cluster_centers = GF.clusters_with_classifier()
-
-    if game.turn_number == GC.CRASH_SELECTION_TURN:
-        GC.CRASH_TURN = GF.select_crash_turn()
-
-    return_percentage = GC.BIG_PERCENTAGE if game.turn_number < GC.PERCENTAGE_SWITCH else GC.SMALL_PERCENTAGE
-    command_queue = []
-
-    if GF.should_build():
-        GF.process_building(cluster_centers)
-
-    # has_moved ID->True/False, moved or not
-    # ships priority queue of (importance, ship)
-    ships, has_moved = GF.ship_priority_q(me, game_map)
-    # True if a ship moves into the shipyard this turn
-    move_into_shipyard = False
-    # whether a dropoff has been built this turn so that wouldnt use too much
-    # halite
-    dropoff_built = False
-
-    while ships:  # go through all ships
-        ship = heappop(ships)[1]
-        if has_moved[ship.id]:
-            continue
-        if GF.time_left() < 0.3:
-            logging.info("STANDING STILL TOO SLOW")
-            command_queue.append(ship.stay_still())
-            ship_state[ship.id] = "collecting"
-            continue
-        if ship.id not in previous_position:  # if new ship the
-            previous_position[ship.id] = me.shipyard.position
-
-        # setup state
-        # if ship hasnt received a destination yet
-        if ship.id not in ship_dest or not ship.id in ship_state:
-            GF.find_new_destination(game_map.halite_priority, ship)
-            previous_state[ship.id] = "exploring"
-            ship_state[ship.id] = "exploring"  # explore
-
-        # logging.info("SHIP {}, STATE {}, DESTINATION {}".format(
-        #     ship.id, ship_state[ship.id], ship_dest[ship.id]))
-
-        # transition
-        SM = StateMachine(game, ship, ship_path, ship_state, ship_dest, fleet_leader)
-        SM.state_transition()
-
-
-        # if ship is dropoff builder
-        if GF.is_builder(ship):
-            # if enough halite and havent built a dropoff this turn
-            if (ship.halite_amount + me.halite_amount) >= constants.DROPOFF_COST and not dropoff_built:
-                command_queue.append(ship.make_dropoff())
-                game_map.HALITE_STOP = GC.INITIAL_HALITE_STOP
-                dropoff_built = True
-            else:  # cant build
-                ship_state[ship.id] = "waiting"  # wait in the position
-                game_map[ship.position].mark_unsafe(ship)
-                command_queue.append(ship.move(Direction.Still))
-        else:  # not associated with building a dropoff, so move regularly
-            move = GF.produce_move(ship)
-            command_queue.append(ship.move(move))
-            previous_position[ship.id] = ship.position
-            game_map[ship.position.directional_offset(move)].mark_unsafe(ship)
-            if move != Direction.Still and game_map[ship.position].ship == ship:
-                game_map[ship.position].ship = None
-
-        GF.clear_dictionaries()  # of crashed or transformed ships
-
-
-        # This ship has made a move
-        has_moved[ship.id] = True
-
-    surrounded_shipyard = game_map.is_surrounded(me.shipyard.position)
-    logging.info(GF.time_left())
-    if not dropoff_built and 2.5 * (GF.max_enemy_ships() + 1) > len(me.get_ships()) and game.turn_number <= GC.SPAWN_TURN \
-            and me.halite_amount >= constants.SHIP_COST and prcntg_halite_left > (1 - 0.65) and \
-            not (game_map[me.shipyard].is_occupied or surrounded_shipyard or "waiting" in ship_state.values()):
-        if not ("build" in ship_state.values() and me.halite_amount <= (constants.SHIP_COST + constants.DROPOFF_COST)):
-            command_queue.append(me.shipyard.spawn())
-    # Send your moves back to the game environment, ending this turn.
-    game.end_turn(command_queue)
+    def exploring(self, ship, destination):
+        # next direction occupied, recalculate
+        if ship.id not in self.ship_path or not self.ship_path[ship.id]:
+            self.ship_path[ship.id] = self.game_map.explore(ship, destination)
+        else:
+            direction = self.ship_path[ship.id][0][0]
+            if self.game_map[ship.position.directional_offset(direction)].is_occupied and not direction == Direction.Still:
+                if self.game_map.calculate_distance(destination, ship.position) > 10:
+                    new_dest = GF.interim_exploring_dest(
+                        ship.position, self.ship_path[ship.id])
+                    # use intermediate unoccpied position instead of actual
+                    # destination
+                    self.ship_path[ship.id] = self.game_map.explore(
+                        ship, new_dest) + self.ship_path[ship.id]
+                else:
+                    self.ship_path[ship.id] = self.game_map.explore(ship, destination)
+        # move in calculated direction
+        return GF.get_step(self.ship_path[ship.id])
 
 
 class StateMachine():
+
+    '''
+    Needs acces to:
+      functions currently in GF:
+        state_switch
+        get_shipyard
+        halite_priority_q
+        amount_of_enemies
+        get_best_neighbour
+        better_patch_neighbouring
+        process_new_destination
+        find_new_destination
+    '''
 
     def __init__(self, game, ship, ship_path, ship_state, ship_dest, fleet_leader):
         self.game = game
@@ -1299,6 +1117,16 @@ class StateMachine():
         # transition
         new_state = None
         shipyard = GF.get_shipyard(self.ship.position)
+
+        new_state_switch = {
+            "exploring": self.exploring_transition(),
+            "collecting": self.collecting_transition(),
+            "returning": self.returning_transition(),
+            "fleet": self.fleet_transition(),
+            "builder": self.builder_transition(),
+            "waiting": self.waiting_transition(),
+            "backup": self.backup_transition(),
+        }
 
         if self.game.turn_number >= GC.CRASH_TURN and self.game_map.calculate_distance(
                 self.ship.position, shipyard) < 2:
@@ -1318,16 +1146,6 @@ class StateMachine():
             new_state = "exploring"
 
         else: new_state = new_state_switch.get(self.ship_state[self.ship.id], None)
-
-        new_state_switch = {
-            "exploring": self.exploring_transition(self.ship),
-            "collecting": self.collecting_transition(self.ship),
-            "returning": self.returning_transition(self.ship),
-            "fleet": self.fleet_transition(self.ship),
-            "builder": self.builder_transition(self.ship),
-            "waiting": self.waiting_transition(self.ship),
-            "backup": self.backup_transition(self.ship),
-        }
 
         if new_state is not None:
             GF.state_switch(self.ship.id, new_state)
@@ -1365,6 +1183,7 @@ class StateMachine():
 
 
     def collecting_transition(self):
+        new_state = None
         inspire_multiplier = 3 if self.game_map[self.ship.position].inspired else 1
         cell_halite = self.game_map[self.ship.position].halite_amount * inspire_multiplier
         if ship.is_full:
@@ -1508,3 +1327,130 @@ class StateMachine():
                         self.ship_dest[self.ship.id] = n.position
                         return "assassinate"
         return None
+
+
+clusters_determined = False
+backuped_dropoffs = []
+while True:
+    game.update_frame()
+    me = game.me
+    game_map = game.game_map
+    if game.turn_number == 1:
+        game_map.HALITE_STOP = GC.INITIAL_HALITE_STOP
+        game_map.c = [GC.A, GC.B, GC.C, GC.D, GC.E, GC.F]  # set the heuristic constants
+    for s in me.get_ships():
+        if s.id not in ship_state:
+            ship_state[s.id] = "exploring"
+
+    ENABLE_COMBAT = not GF.have_less_ships(0.8) and NR_OF_PLAYERS == 2
+
+    turn_start = time.time()
+    logging.info(turn_start)
+    # initialize shipyard halite, inspiring stuff and other
+    game_map.init_map(me)
+    if game.turn_number == 1:
+        TOTAL_MAP_HALITE = game_map.total_halite
+
+    prcntg_halite_left = game_map.total_halite / TOTAL_MAP_HALITE
+    game_map.HALITE_STOP = prcntg_halite_left * GC.INITIAL_HALITE_STOP
+
+    if len(crashed_ships) > 0 and not game.turn_number >= GC.CRASH_TURN and ENABLE_COMBAT:
+        to_remove = []
+        for pos in crashed_ships:
+            GF.add_crashed_position(pos)
+            to_remove.append(pos)
+        for s in to_remove:
+            if s in crashed_ships:
+                crashed_ships.remove(s)
+
+        if len(crashed_positions) > 0:
+            hal, crashed_pos = heappop(crashed_positions)
+            nr_enemies = GF.amount_of_enemies(crashed_pos, 4)
+            if 6 >= nr_enemies and not GF.have_less_ships(0.8):
+                GF.send_ships(crashed_pos, int(
+                    ceil(SAVIOR_FLEET_SIZE * len(me.get_ships()))), "backup", GF.is_savior)
+
+    # Dijkstra the graph based on all dropoffs
+    game_map.create_graph(GF.get_dropoff_positions())
+    if game.turn_number == GC.DETERMINE_CLUSTER_TURN:
+        clusters_determined = True
+        cluster_centers = GF.clusters_with_classifier()
+
+    if game.turn_number == GC.CRASH_SELECTION_TURN:
+        GC.CRASH_TURN = GF.select_crash_turn()
+
+    return_percentage = GC.BIG_PERCENTAGE if game.turn_number < GC.PERCENTAGE_SWITCH else GC.SMALL_PERCENTAGE
+    command_queue = []
+
+    if GF.should_build():
+        GF.process_building(cluster_centers)
+
+    # has_moved ID->True/False, moved or not
+    # ships priority queue of (importance, ship)
+    ships, has_moved = GF.ship_priority_q(me, game_map)
+    # True if a ship moves into the shipyard this turn
+    move_into_shipyard = False
+    # whether a dropoff has been built this turn so that wouldnt use too much
+    # halite
+    dropoff_built = False
+
+    while ships:  # go through all ships
+        ship = heappop(ships)[1]
+        if has_moved[ship.id]:
+            continue
+        if GF.time_left() < 0.3:
+            logging.info("STANDING STILL TOO SLOW")
+            command_queue.append(ship.stay_still())
+            ship_state[ship.id] = "collecting"
+            continue
+        if ship.id not in previous_position:  # if new ship the
+            previous_position[ship.id] = me.shipyard.position
+
+        # setup state
+        # if ship hasnt received a destination yet
+        if ship.id not in ship_dest or not ship.id in ship_state:
+            GF.find_new_destination(game_map.halite_priority, ship)
+            previous_state[ship.id] = "exploring"
+            ship_state[ship.id] = "exploring"  # explore
+
+        # logging.info("SHIP {}, STATE {}, DESTINATION {}".format(
+        #     ship.id, ship_state[ship.id], ship_dest[ship.id]))
+
+        # transition
+        StateMachine(game, ship, ship_path, ship_state, ship_dest, fleet_leader).state_transition()
+
+
+        # if ship is dropoff builder
+        if GF.is_builder(ship):
+            # if enough halite and havent built a dropoff this turn
+            if (ship.halite_amount + me.halite_amount) >= constants.DROPOFF_COST and not dropoff_built:
+                command_queue.append(ship.make_dropoff())
+                game_map.HALITE_STOP = GC.INITIAL_HALITE_STOP
+                dropoff_built = True
+            else:  # cant build
+                ship_state[ship.id] = "waiting"  # wait in the position
+                game_map[ship.position].mark_unsafe(ship)
+                command_queue.append(ship.move(Direction.Still))
+        else:  # not associated with building a dropoff, so move regularly
+            move = MoveProcessor(game, ship_obj, ship_dest, previous_state, ship_path).produce_move(ship)
+            command_queue.append(ship.move(move))
+            previous_position[ship.id] = ship.position
+            game_map[ship.position.directional_offset(move)].mark_unsafe(ship)
+            if move != Direction.Still and game_map[ship.position].ship == ship:
+                game_map[ship.position].ship = None
+
+        GF.clear_dictionaries()  # of crashed or transformed ships
+
+
+        # This ship has made a move
+        has_moved[ship.id] = True
+
+    surrounded_shipyard = game_map.is_surrounded(me.shipyard.position)
+    logging.info(GF.time_left())
+    if not dropoff_built and 2.5 * (GF.max_enemy_ships() + 1) > len(me.get_ships()) and game.turn_number <= GC.SPAWN_TURN \
+            and me.halite_amount >= constants.SHIP_COST and prcntg_halite_left > (1 - 0.65) and \
+            not (game_map[me.shipyard].is_occupied or surrounded_shipyard or "waiting" in ship_state.values()):
+        if not ("build" in ship_state.values() and me.halite_amount <= (constants.SHIP_COST + constants.DROPOFF_COST)):
+            command_queue.append(me.shipyard.spawn())
+    # Send your moves back to the game environment, ending this turn.
+    game.end_turn(command_queue)
