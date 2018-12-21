@@ -585,7 +585,7 @@ class GameMap:
                 self[Position(x, y)].ship = None
                 self[Position(x, y)].inspired = None
                 self[Position(x, y)].enemy_amount = 0
-                self[Postiion(x, y)].enemy_neighbouring = False
+                self[Position(x, y)].enemy_neighbouring = False
 
         for _ in range(int(read_input())):
             cell_x, cell_y, cell_energy = map(int, read_input().split())
