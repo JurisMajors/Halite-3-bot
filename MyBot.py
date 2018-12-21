@@ -139,7 +139,10 @@ def select_crash_turn():
             distance = d
     crash_turn = constants.MAX_TURNS - distance - 5
     # set the crash turn to be turn s.t. all ships make it
-    return max(crash_turn, CRASH_SELECTION_TURN)
+    crash_turn = max(crash_turn, CRASH_SELECTION_TURN)
+    if game_map.width == 64:
+        crash_turn -= 5
+    return crash_turn
 
 
 def dist_to_enemy_doff(pos):
