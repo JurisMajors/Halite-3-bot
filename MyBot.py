@@ -153,65 +153,6 @@ class GF():
 
 
     @staticmethod
-    def find_new_destination(h, ship):
-        ''' h: priority queue of halite factors,
-                                        halite_pos: dictionary of halite factor -> patch position '''
-        ship_id = ship.id
-        biggest_halite, position = heappop(h)  # get biggest halite
-        destination = game_map.normalize(position)
-        not_first_dest = ship_id in ship_dest
-        # get biggest halite while its a position no other ship goes to
-        while not GF.dest_viable(destination, ship) or GF.amount_of_enemies(destination, 4) >= 4 \
-                or GF.too_many_near_dropoff(ship, destination) \
-                or (not_first_dest and destination == ship_dest[ship_id]):
-            if len(h) == 0:
-                logging.info("ran out of options")
-                return
-            biggest_halite, position = heappop(h)
-            destination = game_map.normalize(position)
-
-        ship_dest[ship_id] = destination  # set the destination
-        # if another ship had the same destination
-        s = GF.get_ship_w_destination(destination, ship_id)
-        if s is not None:  # find a new destination for it
-            GF.process_new_destination(s)
-
-
-    @staticmethod
-    def too_many_near_dropoff(ship, destination):
-        if GF.get_shipyard(ship.position) == GF.get_shipyard(destination):
-            return False
-        else:
-            return GF.prcntg_ships_returning_to_doff(GF.get_shipyard(destination)) > (1 / len(GF.get_dropoff_positions()))
-
-
-    @staticmethod
-    def dest_viable(position, ship):
-        if position in ship_dest.values():
-            inspectable_ship = GF.get_ship_w_destination(position, ship.id)
-            if inspectable_ship is None:
-                # if this ship doesnt exist for some reason
-                return True
-
-            my_dist = game_map.calculate_distance(position, ship.position)
-            their_dist = game_map.calculate_distance(
-                position, inspectable_ship.position)
-
-            return my_dist < their_dist
-        else:
-            return True  # nobody has the best patch, all good
-
-
-    @staticmethod
-    def get_ship_w_destination(dest, this_id):
-        if dest in ship_dest.values():
-            for s in ship_dest.keys():  # get ship with the same destination
-                if not s == this_id and ship_state[s] == "exploring" and ship_dest[s] == dest and me.has_ship(s):
-                    return me.get_ship(s)
-        return None
-
-
-    @staticmethod
     def clear_dictionaries():
         # clear dictionaries of crushed ships
         for ship_id in list(ship_dest.keys()):
@@ -520,18 +461,6 @@ class GF():
 
 
     @staticmethod
-    def process_new_destination(ship):
-        ship_path[ship.id] = []
-        if 0 < game_map.calculate_distance(ship.position, ship_dest[ship.id]) <= GC.SHIP_SCAN_AREA:
-            source = ship.position
-        else:
-            source = ship_dest[ship.id]
-
-        ship_h = GF.halite_priority_q(source, GC.SHIP_SCAN_AREA)
-        GF.find_new_destination(ship_h, ship)
-
-
-    @staticmethod
     def get_enemy_dropoff_positions():
         ''' returns a list of enemy dropoffs, including shipyards '''
         positions = []
@@ -654,7 +583,7 @@ class GF():
                 fleet_leader[fleet_ship.id] = leader
 
             GF.state_switch(fleet_ship.id, new_state)
-            GF.find_new_destination(h, fleet_ship)
+            DestinationProcessor(game).find_new_destination(h, fleet_ship)
 
 
     @staticmethod
@@ -975,19 +904,90 @@ class GF():
 class DestinationProcessor():
     """
     Contains functions:
-        find_new_destination
-        process_new_destination
-        dest_viable
-        too_many_near_dropoff
-        diff_ship_same_dest
 
     Needs access to dicts:
+        ship_dest
+        ship_state
 
     Needs access to functions:
+        get_shipyard
+        amount_of_enemies
+        halite_priority_q
+        get_dropoff_positions
+        prcntg_ships_returning_to_doff()
 
     """
-    def __init__(self):
-        pass
+    def __init__(self, game):
+        self.game = game
+        self.game_map = game.game_map
+
+
+    def find_new_destination(self, h, ship):
+        ''' h: priority queue of halite factors,
+                                        halite_pos: dictionary of halite factor -> patch position '''
+        ship_id = ship.id
+        biggest_halite, position = heappop(h)  # get biggest halite
+        destination = self.game_map.normalize(position)
+        not_first_dest = ship_id in ship_dest
+        # get biggest halite while its a position no other ship goes to
+        while not self.dest_viable(destination, ship) or GF.amount_of_enemies(destination, 4) >= 4 \
+                or self.too_many_near_dropoff(ship, destination) \
+                or (not_first_dest and destination == ship_dest[ship_id]):
+            if len(h) == 0:
+                logging.info("ran out of options")
+                return
+            biggest_halite, position = heappop(h)
+            destination = self.game_map.normalize(position)
+
+        ship_dest[ship_id] = destination  # set the destination
+        # if another ship had the same destination
+        s = self.get_ship_w_destination(destination, ship_id)
+        if s is not None:  # find a new destination for it
+            self.process_new_destination(s)
+
+
+    def process_new_destination(self, ship):
+        ship_path[ship.id] = []
+        if 0 < self.game_map.calculate_distance(ship.position, ship_dest[ship.id]) <= GC.SHIP_SCAN_AREA:
+            source = ship.position
+        else:
+            source = ship_dest[ship.id]
+
+        ship_h = GF.halite_priority_q(source, GC.SHIP_SCAN_AREA)
+        self.find_new_destination(ship_h, ship)
+
+
+    def dest_viable(self, position, ship):
+        if position in ship_dest.values():
+            inspectable_ship = self.get_ship_w_destination(position, ship.id)
+            if inspectable_ship is None:
+                # if this ship doesnt exist for some reason
+                return True
+
+            my_dist = self.game_map.calculate_distance(position, ship.position)
+            their_dist = self.game_map.calculate_distance(
+                position, inspectable_ship.position)
+
+            return my_dist < their_dist
+        else:
+            return True  # nobody has the best patch, all good
+
+
+    def too_many_near_dropoff(self, ship, destination):
+        if GF.get_shipyard(ship.position) == GF.get_shipyard(destination):
+            return False
+        else:
+            return GF.prcntg_ships_returning_to_doff(GF.get_shipyard(destination)) > (1 / len(GF.get_dropoff_positions()))
+
+
+    @staticmethod
+    def get_ship_w_destination(dest, this_id):
+        if dest in ship_dest.values():
+            for s in ship_dest.keys():  # get ship with the same destination
+                if not s == this_id and ship_state[s] == "exploring" and ship_dest[s] == dest and me.has_ship(s):
+                    return me.get_ship(s)
+        return None
+
 
 class MoveProcessor():
     """
@@ -1141,7 +1141,7 @@ class StateMachine():
 
         elif self.ship.position in GF.get_dropoff_positions():
             self.ship_path[self.ship.id] = []
-            GF.find_new_destination(
+            DestinationProcessor(game).find_new_destination(
                 self.game_map.halite_priority, self.ship)
             new_state = "exploring"
 
@@ -1166,7 +1166,7 @@ class StateMachine():
 
         elif euclid_to_dest <= 5 and GF.exists_better_in_area(self.ship.position, self.ship_dest[self.ship.id], 4):
             ship_h = GF.halite_priority_q(self.ship.position, GC.SHIP_SCAN_AREA)
-            GF.find_new_destination(ship_h, self.ship)
+            DestinationProcessor(game).find_new_destination(ship_h, self.ship)
             self.ship_path[self.ship.id] = []
 
         elif NR_OF_PLAYERS == 2 and distance_to_dest > GC.CLOSE_TO_SHIPYARD * self.game_map.width and ENABLE_COMBAT:
@@ -1203,7 +1203,7 @@ class StateMachine():
                 for sh in self.me.get_ships():
                     # if somebody else going there recalc the destination
                     if not sh.id == self.ship.id and sh.id in self.ship_dest and self.ship_dest[sh.id] == neighbour.position:
-                        GF.process_new_destination(sh)
+                        DestinationProcessor(game).process_new_destination(sh)
 
                 new_state = "exploring"
 
@@ -1215,7 +1215,7 @@ class StateMachine():
         elif cell_halite < self.game_map.HALITE_STOP * inspire_multiplier:
             # Keep exploring if current halite patch is empty
 
-            GF.process_new_destination(ship)
+            DestinationProcessor(game).process_new_destination(ship)
             new_state = "exploring"
 
         if self.ship.halite_amount <= constants.MAX_HALITE * 0.5 and NR_OF_PLAYERS == 2 and ENABLE_COMBAT:
@@ -1235,7 +1235,7 @@ class StateMachine():
         if self.ship.position in GF.get_dropoff_positions():
             # explore again when back in shipyard
             return "exploring"
-            GF.find_new_destination(
+            DestinationProcessor(game).find_new_destination(
                 self.game_map.halite_priority, self.ship)
         elif self.game_map.calculate_distance(self.ship.position, self.game_map[self.ship.position].dijkstra_dest) == 1:
             # if next to a dropoff
@@ -1258,7 +1258,7 @@ class StateMachine():
         elif self.ship.id in self.fleet_leader:
             leader = self.fleet_leader[self.ship.id]
             if self.me.has_ship(leader.id) and self.ship_state[leader.id] not in ["waiting", "build"]:
-                GF.process_new_destination(self.ship)
+                DestinationProcessor(game).process_new_destination(self.ship)
                 return "exploring"
         return None
 
@@ -1272,7 +1272,7 @@ class StateMachine():
             if distance_to_dest <= GC.CLOSE_TO_SHIPYARD * self.game_map.width:
                 self.ship_dest[self.ship.id] = GF.bfs_unoccupied(future_dropoff_cell.position)
             else:
-                GF.process_new_destination(self.ship)
+                DestinationProcessor(game).process_new_destination(self.ship)
                 return "exploring"
 
         elif GF.amount_of_enemies(future_dropoff_cell.position, 4) >= 4:
@@ -1288,7 +1288,7 @@ class StateMachine():
         elif len(self.game.players.keys()) >= 2:
             smallest_dist = GF.dist_to_enemy_doff(self.ship_dest[self.ship.id])
             if smallest_dist <= (self.game_map.width * GC.ENEMY_SHIPYARD_CLOSE + 1):
-                GF.process_new_destination(self.ship)
+                DestinationProcessor(game).process_new_destination(self.ship)
                 return "exploring"
         return None
 
@@ -1313,7 +1313,7 @@ class StateMachine():
                 self.ship_dest[ship.id] = GF.get_best_neighbour(destination).position
 
         elif GF.amount_of_enemies(destination, 4) >= 4:
-            GF.process_new_destination(self.ship)
+            DestinationProcessor(game).process_new_destination(self.ship)
             return "exploring"
 
         elif NR_OF_PLAYERS == 2 and ENABLE_COMBAT:
@@ -1409,7 +1409,8 @@ while True:
         # setup state
         # if ship hasnt received a destination yet
         if ship.id not in ship_dest or not ship.id in ship_state:
-            GF.find_new_destination(game_map.halite_priority, ship)
+            DestinationProcessor(game).find_new_destination(
+                game_map.halite_priority, ship)
             previous_state[ship.id] = "exploring"
             ship_state[ship.id] = "exploring"  # explore
 
