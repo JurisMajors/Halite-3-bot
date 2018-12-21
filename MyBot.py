@@ -193,59 +193,6 @@ class GF():
 
 
     @staticmethod
-    def make_returning_move(ship, has_moved, command_queue):
-        """
-        Makes a returning move based on Dijkstras and other ship positions.
-        """
-        if ship_path[ship.id]:
-            direction = GF.get_step(ship_path[ship.id])
-            to_go = ship.position.directional_offset(direction)
-            if direction == Direction.Still or not game_map[to_go].is_occupied:
-                return direction
-
-        if game.turn_number >= GC.CRASH_TURN:
-            ''' THIS DOESNT WORK FOR SOME REASON,
-            NO BOTS GET IN THIS STAGE TO CHANGE SUICIDE DROPOFFS
-            THE IDEA IS TO BALANCE OUT THE ENDING SO THAT TOO MANY DONT GO TO SAME
-            DROPOFF '''
-            if GF.should_better_dropoff(ship):
-                other_dropoff = GF.better_dropoff_pos(ship)
-                # if not the same distance
-                if not other_dropoff == game_map[ship.position].dijkstra_dest:
-                    return GF.a_star_move(ship)
-        # Get the cell and direction we want to go to from dijkstra
-        target_pos, move = GF.get_dijkstra_move(ship.position)
-        # Target is occupied
-        if game_map[target_pos].is_occupied:
-            other_ship = game_map[target_pos].ship
-            # target position occupied by own ship
-            if me.has_ship(other_ship.id):
-
-                if other_ship.id not in ship_state or ship_state[other_ship.id] in ["exploring", "build", "fleet",
-                                                                                    "backup"]:
-                    # if other ship has enough halite and hasnt made a move yet:
-                    if not has_moved[other_ship.id] and \
-                            (other_ship.halite_amount > game_map[
-                                other_ship.position].halite_amount / 10 or other_ship.position in GF.get_dropoff_positions()):
-                        # move stays the same target move
-                        # move other_ship to ship.destination
-                        # hence swapping ships
-                        GF.move_ship_to_position(other_ship, ship.position)
-                    else:
-                        move = GF.a_star_move(ship)
-
-                elif ship_state[other_ship.id] in ["returning", "harakiri"]:
-                    move = Direction.Still
-                elif ship_state[other_ship.id] in ["collecting", "waiting"]:
-                    move = GF.a_star_move(ship)
-
-            else:  # target position occupied by enemy ship
-                move = GF.a_star_move(ship)
-
-        return move
-
-
-    @staticmethod
     def should_better_dropoff(ship):
         ''' determines whether there are too many ships going to the same dropoff as ship'''
         current = game_map[ship.position]
@@ -299,7 +246,7 @@ class GF():
                 cell.position, cell.dijkstra_dest)
             dest = GF.interim_djikstra_dest(
                 cell).position if d_to_dijkstra_dest > 10 else cell.dijkstra_dest  
-        return MoveProcessor(game, ship_obj, ship_dest, previous_state, ship_path).exploring(ship, dest)
+        return MoveProcessor(game, ship_obj, ship_dest, previous_state, ship_path, ship_state).exploring(ship, dest)
 
 
     @staticmethod
@@ -312,23 +259,6 @@ class GF():
                 logging.info("STANDING STILL TOO SLOW")
                 return source_cell
         return cell
-
-
-    @staticmethod
-    def move_ship_to_position(ship, destination):
-        ''' moves ship to destination
-        precondition: destination one move away'''
-        normalized_dest = game_map.normalize(destination)
-        for d in Direction.get_all_cardinals():
-            new_pos = game_map.normalize(ship.position.directional_offset(d))
-            if new_pos == normalized_dest:
-                move = d
-                break
-
-        has_moved[ship.id] = True
-        command_queue.append(ship.move(move))
-        game_map[destination].mark_unsafe(ship)
-        game_map[ship.position].ship = None
 
 
     @staticmethod
@@ -903,7 +833,9 @@ class GF():
 
 class DestinationProcessor():
     """
-    Contains functions:
+    Functions only used in this class but not yet in here:
+        prcntg_ships_returning_to_doff()
+
 
     Needs access to dicts:
         ship_dest
@@ -992,17 +924,30 @@ class DestinationProcessor():
 class MoveProcessor():
     """
     needs functions:
-        make_returning_move()
         state_switch()
         interim_exploring_dest()
         get_step()
         get_shipyard()
+        a_star_move()
+        better_dropoff_pos()
+        get_dijkstra_move()
+        get_dropoff_positions()
+        should_better_dropoff()
+
+
+    Functions only used in this class but not yet in here:
+        interim_exploring_dest()
+            only function left that is outside moveProcessor that also uses get_step
+        a_star_move()
+        get_dijkstra_move()
+        should_better_dropoff()
+
 
     Needs variables:
         has_moved
         command_queue
     """
-    def __init__(self, game, ship_obj, ship_dest, previous_state, ship_path):
+    def __init__(self, game, ship_obj, ship_dest, previous_state, ship_path, ship_state):
         self.game = game
         self.game_map = game.game_map
         self.me = game.me
@@ -1010,6 +955,7 @@ class MoveProcessor():
         self.ship_dest = ship_dest
         self.previous_state = previous_state
         self.ship_path = ship_path
+        self.ship_state = ship_state
 
 
 
@@ -1043,7 +989,7 @@ class MoveProcessor():
 
 
     def returning(self, ship, destination):
-        return GF.make_returning_move(ship, has_moved, command_queue)
+        return self.make_returning_move(ship, has_moved, command_queue)
 
 
     def harakiri(self, ship, destination):
@@ -1087,9 +1033,81 @@ class MoveProcessor():
         return GF.get_step(self.ship_path[ship.id])
 
 
+    def make_returning_move(self, ship, has_moved, command_queue):
+        """
+        Makes a returning move based on Dijkstras and other ship positions.
+        """
+        if self.ship_path[ship.id]:
+            direction = GF.get_step(self.ship_path[ship.id])
+            to_go = ship.position.directional_offset(direction)
+            if direction == Direction.Still or not self.game_map[to_go].is_occupied:
+                return direction
+
+        if self.game.turn_number >= GC.CRASH_TURN:
+            ''' THIS DOESNT WORK FOR SOME REASON,
+            NO BOTS GET IN THIS STAGE TO CHANGE SUICIDE DROPOFFS
+            THE IDEA IS TO BALANCE OUT THE ENDING SO THAT TOO MANY DONT GO TO SAME
+            DROPOFF '''
+            if GF.should_better_dropoff(ship):
+                other_dropoff = GF.better_dropoff_pos(ship)
+                # if not the same distance
+                if not other_dropoff == self.game_map[ship.position].dijkstra_dest:
+                    return GF.a_star_move(ship)
+        # Get the cell and direction we want to go to from dijkstra
+        target_pos, move = GF.get_dijkstra_move(ship.position)
+        # Target is occupied
+        if self.game_map[target_pos].is_occupied:
+            other_ship = self.game_map[target_pos].ship
+            # target position occupied by own ship
+            if self.me.has_ship(other_ship.id):
+
+                if other_ship.id not in ship_state or ship_state[other_ship.id] in ["exploring", "build", "fleet",
+                                                                                    "backup"]:
+                    # if other ship has enough halite and hasnt made a move yet:
+                    if not has_moved[other_ship.id] and \
+                            (other_ship.halite_amount > self.game_map[
+                                other_ship.position].halite_amount / 10 or other_ship.position in GF.get_dropoff_positions()):
+                        # move stays the same target move
+                        # move other_ship to ship.destination
+                        # hence swapping ships
+                        self.move_ship_to_position(other_ship, ship.position)
+                    else:
+                        move = GF.a_star_move(ship)
+
+                elif self.ship_state[other_ship.id] in ["returning", "harakiri"]:
+                    move = Direction.Still
+                elif self.ship_state[other_ship.id] in ["collecting", "waiting"]:
+                    move = GF.a_star_move(ship)
+
+            else:  # target position occupied by enemy ship
+                move = GF.a_star_move(ship)
+
+        return move
+
+
+    def move_ship_to_position(self, ship, destination):
+        ''' moves ship to destination
+        precondition: destination one move away'''
+        normalized_dest = self.game_map.normalize(destination)
+        for d in Direction.get_all_cardinals():
+            new_pos = self.game_map.normalize(ship.position.directional_offset(d))
+            if new_pos == normalized_dest:
+                move = d
+                break
+
+        has_moved[ship.id] = True
+        command_queue.append(ship.move(move))
+        self.game_map[destination].mark_unsafe(ship)
+        self.game_map[ship.position].ship = None
+
+
 class StateMachine():
 
     '''
+    Functions only used in this class but not in this class:
+        better_patch_neighbouring
+        
+
     Needs acces to:
       functions currently in GF:
         state_switch
@@ -1433,7 +1451,7 @@ while True:
                 game_map[ship.position].mark_unsafe(ship)
                 command_queue.append(ship.move(Direction.Still))
         else:  # not associated with building a dropoff, so move regularly
-            move = MoveProcessor(game, ship_obj, ship_dest, previous_state, ship_path).produce_move(ship)
+            move = MoveProcessor(game, ship_obj, ship_dest, previous_state, ship_path, ship_state).produce_move(ship)
             command_queue.append(ship.move(move))
             previous_position[ship.id] = ship.position
             game_map[ship.position.directional_offset(move)].mark_unsafe(ship)
