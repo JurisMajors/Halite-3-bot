@@ -24,6 +24,7 @@ class MapCell:
         self.percentage_occupied = None
         self.enemy_amount = 0 # in inspired radius
         self.inspired = None
+        self.enemy_neighbouring = False
 
 
         # Parameters for Dijkstra (to nearest dropoff/shipyard)
@@ -347,7 +348,10 @@ class GameMap:
                 if neighbour.is_occupied or (neighbour.visited is not None and neighbour.visited == ship):
                     continue
                 # node.cost + distance from neighbour to node ( 1 )
-                new_cost = current.cost + 1
+                if neighbour.enemy_neighbouring:
+                    new_cost = current.cost + 2
+                else:
+                    new_cost = current.cost + 1
 
                 if neighbour.visited is None or new_cost < neighbour.cost:
                     # new cost
@@ -476,7 +480,7 @@ class GameMap:
                     heappush(self.halite_priority, (-1 * ratio, cell.position))
 
                 elif cell.halite_amount > 0:
-                    factor = self.cell_factor(closest_d, cell, me)
+                    factor = self.cell_factor(closest_d, cell, me, len(all_players))
                     heappush(self.halite_priority, (factor, cell.position))
 
                 if cell.is_occupied:
@@ -493,7 +497,7 @@ class GameMap:
         return (self.c[0] * halite * halite + self.c[1] * halite + self.c[2]) / (
                 self.c[3] * distance * distance + self.c[4] * distance + self.c[5])
 
-    def cell_factor(self, cntr, cell, me):
+    def cell_factor(self, cntr, cell, me, nr_of_players):
         dropoff_positions = self.get_dropoff_positions(me)
         if cell.position in dropoff_positions:
             return 1000
@@ -503,7 +507,7 @@ class GameMap:
         # get rid of dropoffs
         for neighbour in neighbours[:]:
             inspire_multiplier = self.get_inspire_multiplier(
-                cntr, neighbour, me)
+                cntr, neighbour, nr_of_players)
             if neighbour.position in dropoff_positions:
                 neighbours.remove(neighbour)
             elif neighbour.halite_amount <= self.HALITE_STOP:
@@ -514,18 +518,21 @@ class GameMap:
                 n_factor_sum += self.cell_heuristic(
                     neighbour.halite_amount * inspire_multiplier, self.calculate_distance(neighbour.position, cntr))
 
-        multiplier = self.get_inspire_multiplier(cntr, cell, me)
+        multiplier = self.get_inspire_multiplier(cntr, cell, nr_of_players)
         # cells factor
         c_factor = len(neighbours) * self.cell_heuristic(cell.halite_amount * multiplier,
                                                          self.calculate_distance(cell.position, cntr))
         return round(-1 * (c_factor + n_factor_sum), 2)
 
-    def get_inspire_multiplier(self, cntr, cell, me):
+    def get_inspire_multiplier(self, cntr, cell, nr_of_players):
         if cell.inspired is None:
             cell.inspired = cell.enemy_amount >= constants.INSPIRATION_SHIP_COUNT
                     
         if cell.inspired and self.calculate_distance(cntr, cell.position) <= constants.INSPIRATION_RADIUS:
-            return constants.INSPIRED_BONUS_MULTIPLIER
+            if cell.enemy_neighbouring and nr_of_players == 4:
+                return 1.25
+            else:
+                return constants.INSPIRED_BONUS_MULTIPLIER
         else:
             return 1
 
@@ -578,6 +585,7 @@ class GameMap:
                 self[Position(x, y)].ship = None
                 self[Position(x, y)].inspired = None
                 self[Position(x, y)].enemy_amount = 0
+                self[Postiion(x, y)].enemy_neighbouring = False
 
         for _ in range(int(read_input())):
             cell_x, cell_y, cell_energy = map(int, read_input().split())

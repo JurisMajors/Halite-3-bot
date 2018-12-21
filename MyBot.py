@@ -502,11 +502,11 @@ def get_best_neighbour(position):
     current = game_map[position]
     neighbours = game_map.get_neighbours(current)
     max_halite = current.halite_amount * \
-        game_map.get_inspire_multiplier(position, current, me)
+        game_map.get_inspire_multiplier(position, current)
     best = current
     for n in neighbours:
         n_halite = n.halite_amount * \
-            game_map.get_inspire_multiplier(position, n, me)
+            game_map.get_inspire_multiplier(position, n)
         if not n.is_occupied and n_halite > max_halite:
             best = n
             max_halite = n_halite
@@ -534,10 +534,10 @@ def better_patch_neighbouring(ship, big_diff):
     ''' returns true if there is a lot better patch right next to it'''
     current = game_map[ship.position]
     neighbours = game_map.get_neighbours(current)
-    current_h = current.halite_amount * game_map.get_inspire_multiplier(ship.position, game_map[ship.position], me)
+    current_h = current.halite_amount * game_map.get_inspire_multiplier(ship.position, game_map[ship.position])
 
     for n in neighbours:
-        neighbour_h = n.halite_amount * game_map.get_inspire_multiplier(ship.position, game_map[n.position], me)
+        neighbour_h = n.halite_amount * game_map.get_inspire_multiplier(ship.position, game_map[n.position])
         if not n.is_occupied and neighbour_h >= current_h + big_diff:
             return True
 
@@ -561,6 +561,7 @@ def exploring_transition(ship):
         ship.position, ship_dest[ship.id])
     euclid_to_dest = game_map.euclidean_distance(
         ship.position, ship_dest[ship.id])
+
     if ship.position == ship_dest[ship.id]:
         # collect if reached destination or on medium sized patch
         ship_path[ship.id] = []
@@ -585,7 +586,7 @@ def exploring_transition(ship):
 def collecting_transition(ship):
     new_state = None
     inspire_multiplier = game_map.get_inspire_multiplier(
-        ship.position, game_map[ship.position], me)
+        ship.position, game_map[ship.position])
     cell_halite = game_map[ship.position].halite_amount * inspire_multiplier
 
     if ship.is_full:

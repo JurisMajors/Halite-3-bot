@@ -61,6 +61,9 @@ class Game:
         for player in self.players.values():
             for ship in player.get_ships():
                 self.game_map[ship.position].mark_unsafe(ship)
+                if not ship.owner == self.me.id:
+                    for n in self.game_map.get_neighbours(self.game_map[ship.position]):
+                        n.enemy_neighbouring = True
 
             self.game_map[player.shipyard.position].structure = player.shipyard
             for dropoff in player.get_dropoffs():
