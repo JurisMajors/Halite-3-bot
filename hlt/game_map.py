@@ -24,7 +24,7 @@ class MapCell:
         self.percentage_occupied = None
         self.enemy_amount = 0 # in inspired radius
         self.inspired = None
-        self.enemy_neighbouring = False
+        self.enemy_neighbouring = 0
 
 
         # Parameters for Dijkstra (to nearest dropoff/shipyard)
@@ -529,8 +529,9 @@ class GameMap:
             cell.inspired = cell.enemy_amount >= constants.INSPIRATION_SHIP_COUNT
                     
         if cell.inspired and self.calculate_distance(cntr, cell.position) <= constants.INSPIRATION_RADIUS:
-            if cell.enemy_neighbouring and nr_of_players == 4:
-                return 1.25
+            if cell.enemy_neighbouring != 0 and nr_of_players == 4:
+                muls = [0, 1.5, 1.25, 0.9, 0.8]
+                return muls[cell.enemy_neighbouring]
             else:
                 return constants.INSPIRED_BONUS_MULTIPLIER
         else:
@@ -585,7 +586,7 @@ class GameMap:
                 self[Position(x, y)].ship = None
                 self[Position(x, y)].inspired = None
                 self[Position(x, y)].enemy_amount = 0
-                self[Position(x, y)].enemy_neighbouring = False
+                self[Position(x, y)].enemy_neighbouring = 0
 
         for _ in range(int(read_input())):
             cell_x, cell_y, cell_energy = map(int, read_input().split())
