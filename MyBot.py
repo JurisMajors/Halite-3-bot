@@ -507,11 +507,11 @@ def get_best_neighbour(position):
     current = game_map[position]
     neighbours = game_map.get_neighbours(current)
     max_halite = current.halite_amount * \
-        game_map.get_inspire_multiplier(position, current)
+        game_map.get_inspire_multiplier(position, current, NR_OF_PLAYERS)
     best = current
     for n in neighbours:
         n_halite = n.halite_amount * \
-            game_map.get_inspire_multiplier(position, n)
+            game_map.get_inspire_multiplier(position, n, NR_OF_PLAYERS)
         if not n.is_occupied and n_halite > max_halite:
             best = n
             max_halite = n_halite
@@ -539,10 +539,10 @@ def better_patch_neighbouring(ship, big_diff):
     ''' returns true if there is a lot better patch right next to it'''
     current = game_map[ship.position]
     neighbours = game_map.get_neighbours(current)
-    current_h = current.halite_amount * game_map.get_inspire_multiplier(ship.position, game_map[ship.position])
+    current_h = current.halite_amount * game_map.get_inspire_multiplier(ship.position, game_map[ship.position], NR_OF_PLAYERS)
 
     for n in neighbours:
-        neighbour_h = n.halite_amount * game_map.get_inspire_multiplier(ship.position, game_map[n.position])
+        neighbour_h = n.halite_amount * game_map.get_inspire_multiplier(ship.position, game_map[n.position], NR_OF_PLAYERS)
         if not n.is_occupied and neighbour_h >= current_h + big_diff:
             return True
 
@@ -591,7 +591,7 @@ def exploring_transition(ship):
 def collecting_transition(ship):
     new_state = None
     inspire_multiplier = game_map.get_inspire_multiplier(
-        ship.position, game_map[ship.position])
+        ship.position, game_map[ship.position], NR_OF_PLAYERS)
     cell_halite = game_map[ship.position].halite_amount * inspire_multiplier
 
     if ship.is_full:

@@ -53,7 +53,7 @@ crashed_positions = []  # heap of (-1 * halite, crashed position )
 crashed_ships = []
 
 VARIABLES = ["YEEHAW", 1285, 50, 0.45, 1, 0.85, 500, 50, 0.55,
-            0, 0.8, 0, 0.01, 0.98, 1.05, 0.9, 500, 0.15, 0.25, 4, 8]
+             0, 0.8, 0, 0.01, 0.98, 1.05, 0.9, 500, 0.15, 0.25, 4, 8]
 VERSION = VARIABLES[1]
 # search area for halite relative to shipyard
 SCAN_AREA = int(VARIABLES[2])
@@ -654,7 +654,8 @@ def exploring_transition(ship):
     new_state = None
     distance_to_dest = game_map.calculate_distance(
         ship.position, ship_dest[ship.id])
-    euclid_to_dest = game_map.euclidean_distance(ship.position, ship_dest[ship.id])
+    euclid_to_dest = game_map.euclidean_distance(
+        ship.position, ship_dest[ship.id])
     if ship.position == ship_dest[ship.id]:
         # collect if reached destination or on medium sized patch
         ship_path[ship.id] = []
@@ -668,7 +669,7 @@ def exploring_transition(ship):
             ship.position, SHIP_SCAN_AREA)
         find_new_destination(ship_h, ship)
         ship_path[ship.id] = []
-        
+
     elif NR_OF_PLAYERS == 2 and distance_to_dest > CLOSE_TO_SHIPYARD * game_map.width and ENABLE_COMBAT:
         # if not so close
         # check if neighbours have an enemy nearby with 2x more halite
@@ -898,7 +899,7 @@ def get_dropoff_positions():
 
 def is_savior(ship):
     return me.has_ship(ship.id) and ship.halite_amount < 0.5 * constants.MAX_HALITE\
-     and (ship.id not in ship_state or not (ship_state[ship.id] in ["fleet", "waiting", "returning", "build"]))
+        and (ship.id not in ship_state or not (ship_state[ship.id] in ["fleet", "waiting", "returning", "build"]))
 
 
 def is_fleet(ship):
@@ -1250,7 +1251,8 @@ def process_building(cluster_centers):
             dropoff_pos = bfs_unoccupied(dropoff_pos)
         ship_dest[closest_ship.id] = dropoff_pos  # go to the dropoff
         if game_map.width >= EXTRA_FLEET_MAP_SIZE:
-            send_ships(dropoff_pos, int(FLEET_SIZE / 2), "fleet", leader=closest_ship)
+            send_ships(dropoff_pos, int(FLEET_SIZE / 2),
+                       "fleet", leader=closest_ship)
     else:  # if builder not available
         cluster_centers.insert(0, (dropoff_val, dropoff_pos))
 
