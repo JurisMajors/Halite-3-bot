@@ -208,7 +208,6 @@ def find_new_destination(h, ship):
 
 def process_new_destination(ship):
     ship_path[ship.id] = []
-
     if ship.position in get_dropoff_positions():
         find_new_destination(game_map.halite_priority, ship)
     else:
@@ -467,7 +466,6 @@ def exploring(ship, destination):
                     ship, new_dest) + ship_path[ship.id]
             else:
                 ship_path[ship.id] = game_map.explore(ship, destination)
-
     # move in calculated direction
     return get_step(ship_path[ship.id])
 
@@ -576,7 +574,7 @@ def exploring_transition(ship):
         # for inspiring
         ship_dest[ship.id] = get_best_neighbour(ship.position).position
 
-    elif euclid_to_dest <= 5 \
+    elif (euclid_to_dest <= 5 or (game_map.width >= 48 and game.turn_number >= SPAWN_TURN))\
             and exists_better_in_area(ship.position, ship_dest[ship.id], 4):
         process_new_destination(ship)
 
@@ -793,7 +791,7 @@ def state_transition(ship):
             game_map.halite_priority, ship)
         new_state = "exploring"
 
-    elif ship.halite_amount >= constants.MAX_HALITE * return_percentage and ship_state[ship.id] not in ["build", "waiting", "Collecting"]:
+    elif ship.halite_amount >= constants.MAX_HALITE * return_percentage and ship_state[ship.id] not in ["build", "waiting", "collecting"]:
         new_state = "returning"
 
     elif ship_state[ship.id] == "exploring":
@@ -1006,9 +1004,14 @@ def predict_centers():
             p_data, total_halite, p_center = get_patch_data(
                 x, y, cntr)  # get the data
             prediction = dropoff_clf.predict(p_data)[0]  # predict on it
+            p_center = game_map.normalize(p_center)
             if prediction == 1:  # if should be dropoff
                 # add node with most halite to centers
-                cluster_centers.append((total_halite, p_center))
+                for _, c in cluster_centers:
+                    if c == p_center:
+                        break
+                else:
+                    cluster_centers.append((total_halite, p_center))
     return cluster_centers
 
 
@@ -1075,27 +1078,28 @@ def merge_clusters(centers):
     logging.info("Merging clusters")
     area = CLUSTER_TOO_CLOSE * game_map.width
     metric = distance_metric(type_metric.USER_DEFINED, func=custom_dist)
+    normalizer = MIN_CLUSTER_VALUE
     X = []  # center coordinates that are merged in an iteration
     tmp_centers = []  # to not modify the list looping through
     history = []  # contains all already merged centers
     # for each center
     for c1 in centers:
         # add the center itself
-        X.append([c1[1].x, c1[1].y, c1[0]])
+        X.append([c1[1].x, c1[1].y, round(c1[0]/normalizer, 2)])
         for c2 in centers:  # for other centers
             # if not merged already
             if not c2 == c1:
                 dist = game_map.euclidean_distance(c1[1], c2[1])
                 # if close enough for merging
                 if dist <= area and not dist <= 4:
-                    X.append([c2[1].x, c2[1].y, c2[0]])
+                    X.append([c2[1].x, c2[1].y, round(c2[0]/normalizer, 2)])
 
         # get initialized centers for the algorithm
         init_centers = kmeans_plusplus_initializer(X, 1).initialize()
         median = kmedians(X, init_centers, metric=metric)
         median.process()  # do clustering
         # get clustered centers
-        tmp_centers += [(x[2], game_map.normalize(Position(int(x[0]), int(x[1]))))
+        tmp_centers += [(x[2] * normalizer, game_map.normalize(Position(int(x[0]), int(x[1]))))
                         for x in median.get_medians() if
                         (x[2], game_map.normalize(Position(int(x[0]), int(x[1])))) not in tmp_centers]
         if len(X) > 1:
@@ -1113,9 +1117,9 @@ def custom_dist(p1, p2):
     if len(p1) < 3:
         p1 = p1[0]
         p2 = p2[0]
-    manh_dist = game_map.euclidean_distance(
+    euclid_dist = game_map.euclidean_distance(
         Position(p1[0], p1[1]), Position(p2[0], p2[1]))
-    return manh_dist + abs(p1[2] - p2[2])
+    return euclid_dist# + abs(p1[2] - p2[2])
 
 
 def too_close(centers, position):
