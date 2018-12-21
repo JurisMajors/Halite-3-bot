@@ -92,10 +92,12 @@ game.ready("MLP")
 NR_OF_PLAYERS = len(game.players.keys())
 # for dropoff filtering, what should be minimum value of halite around the dropoff in 5x5 area
 MIN_CLUSTER_VALUE = 6000 if game.game_map.width >= 64 else 8000
-
+if game.game_map.width == 64:
+    CRASH_SELECTION_TURN -= 5
 ENABLE_COMBAT = True  # this gets changed in the loop, initally true though
 TURN_START = 0  # for timing
 UNSAFE_AREA = 4
+
 
 
 def ship_priority_q(me, game_map):
@@ -139,7 +141,10 @@ def select_crash_turn():
             distance = d
     crash_turn = constants.MAX_TURNS - distance - 5
     # set the crash turn to be turn s.t. all ships make it
-    return max(crash_turn, CRASH_SELECTION_TURN)
+    crash_turn = max(crash_turn, CRASH_SELECTION_TURN)
+    if game_map.width == 64:
+        crash_turn -= 5
+    return crash_turn
 
 
 def dist_to_enemy_doff(pos):
