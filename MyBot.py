@@ -51,7 +51,7 @@ ship_obj = {}  # ship.id to ship obj for processing crashed ship stuff
 crashed_positions = []  # heap of (-1 * halite, crashed position )
 crashed_ship_positions = []  # list of crashed ship positions
 
-heuristic_variables = [0, 1., 0, 0.01, 0.78, 1.05]
+heuristic_variables = [0, .8, 0, 0.01, 0.78, 1.05]
 VARIABLES = ["YEEHAW", 1285, 0.4, 0.9, 0.85, 500, 50, 0.55] + heuristic_variables + [0.9, 0.15, 0.25, 4, 8]
 VERSION = VARIABLES[1]
 # when switch collectable percentage of max halite
@@ -112,15 +112,19 @@ def ship_priority_q(me, game_map):
             # importance, the lower the number, bigger importance
             if ship_state[s.id] in ["returning", "harikiri"]:
                 importance = -1 * game_map[
-                    ship.position].dijkstra_distance * game_map.width
+                    ship.position].dijkstra_distance * game_map.width - 1
             elif ship_state[s.id] in ["exploring", "build", "backup", "fleet"]:
+                if s.id in ship_dest:
+                    destination = ship_dest[ship.id]
+                else:
+                    destination = shipyard
                 importance = game_map.calculate_distance(
-                    s.position, shipyard)  # normal distance
+                    s.position, destination) * game_map.width + 1 
             else:  # other
                 importance = game_map.calculate_distance(
-                    s.position, shipyard) * game_map.width * 2
+                    s.position, shipyard) * game_map.width ** 2
         else:
-            importance = -1000  # newly spawned ships max importance
+            importance = -10000  # newly spawned ships max importance
         heappush(ships, (importance, s))
     return ships, has_moved
 
@@ -322,20 +326,22 @@ def make_returning_move(ship, has_moved, command_queue):
 
             if other_ship.id not in ship_state or ship_state[other_ship.id] in ["exploring", "build", "fleet",
                                                                                 "backup"]:
-                # if other ship has enough halite and hasnt made a move yet:
+                # if other ship has enough halite to move, hasnt made a move yet, and if it would move in the ship
                 if not has_moved[other_ship.id] and \
-                        (other_ship.halite_amount > game_map[
-                            other_ship.position].halite_amount / 10 or other_ship.position in get_dropoff_positions()):
+                        (other_ship.halite_amount >= game_map[
+                            other_ship.position].halite_amount * 0.1 or other_ship.position in get_dropoff_positions()) \
+                        and (other_ship.id not in ship_path or (not ship_path[other_ship.id] or\
+                         other_ship.position.directional_offset(ship_path[other_ship.id][0][0]) == ship.position)):
                     # move stays the same target move
-                    # move other_ship to ship.destination
+                    # move other_ship to ship.position
                     # hence swapping ships
                     move_ship_to_position(other_ship, ship.position)
                 else:
                     move = a_star_move(ship)
 
-            elif ship_state[other_ship.id] in ["returning", "harakiri"]:
+            elif ship_state[other_ship.id] in ["returning", "harakiri"]: # suiciding
                 move = Direction.Still
-            elif ship_state[other_ship.id] in ["collecting", "waiting"]:
+            elif ship_state[other_ship.id] in ["collecting", "waiting"]: # move around these ships
                 move = a_star_move(ship)
 
         else:  # target position occupied by enemy ship
@@ -345,23 +351,21 @@ def make_returning_move(ship, has_moved, command_queue):
 
 
 def a_star_move(ship, dest=None):
-    if dest is None:
+    if dest is None: # if returning
         cell = game_map[ship.position]
         d_to_dijkstra_dest = game_map.calculate_distance(
             cell.position, cell.dijkstra_dest)
-        dest = interim_djikstra_dest(
-            cell).position if d_to_dijkstra_dest > 10 else cell.dijkstra_dest
-
+        dest = interim_djikstra_dest(cell).position
     return exploring(ship, dest)
 
 
 def interim_djikstra_dest(source_cell):
     ''' finds the intermediate djikstra destination that is not occupied '''
     cell = source_cell.parent
-    while cell.is_occupied:
+    while cell.is_occupied and not cell.position in get_dropoff_positions():
         cell = cell.parent
-        if time_left() < 0.5:
-            logging.info("STANDING STILL TOO SLOW")
+        if time_left() < 0.3:
+            logging.info("INTERIM DIJKSTRA DESTINATION: STANDING STILL TOO SLOW")
             return source_cell
     return cell
 
@@ -369,13 +373,15 @@ def interim_djikstra_dest(source_cell):
 def move_ship_to_position(ship, destination):
     ''' moves ship to destination
     precondition: destination one move away'''
-    normalized_dest = game_map.normalize(destination)
-    for d in Direction.get_all_cardinals():
-        new_pos = game_map.normalize(ship.position.directional_offset(d))
-        if new_pos == normalized_dest:
-            move = d
-            break
-
+    if ship.id in ship_path and ship_path[ship.id]:
+        move = get_step(ship_path[ship.id])
+    else:
+        normalized_dest = game_map.normalize(destination)
+        for d in Direction.get_all_cardinals():
+            new_pos = game_map.normalize(ship.position.directional_offset(d))
+            if new_pos == normalized_dest:
+                move = d
+                break
     has_moved[ship.id] = True
     command_queue.append(ship.move(move))
     game_map[destination].mark_unsafe(ship)
@@ -441,7 +447,7 @@ def interim_exploring_dest(position, path):
     next_pos = game_map.normalize(position.directional_offset(to_go))
     while game_map[next_pos].is_occupied:
         if time_left() < 0.3:
-            logging.info("STANDING STILL")
+            logging.info("INTERIM EXPLORING STANDING STILL")
             return position
         if not path:
             return next_pos
@@ -457,15 +463,13 @@ def exploring(ship, destination):
     else:
         direction = ship_path[ship.id][0][0]
         if game_map[ship.position.directional_offset(direction)].is_occupied and not direction == Direction.Still:
-            if game_map.calculate_distance(destination, ship.position) > 10:
-                new_dest = interim_exploring_dest(
-                    ship.position, ship_path[ship.id])
-                # use intermediate unoccpied position instead of actual
-                # destination
-                ship_path[ship.id] = game_map.explore(
-                    ship, new_dest) + ship_path[ship.id]
-            else:
-                ship_path[ship.id] = game_map.explore(ship, destination)
+            new_dest = interim_exploring_dest(
+                ship.position, ship_path[ship.id])
+            # use intermediate unoccpied position instead of actual dest
+            ship_path[ship.id] = game_map.explore(
+                ship, new_dest) + ship_path[ship.id]
+            # add rest of the path, interim path + rest of path
+
     # move in calculated direction
     return get_step(ship_path[ship.id])
 
@@ -598,23 +602,6 @@ def collecting_transition(ship):
     elif game_map.percentage_occupied >= BUSY_PERCENTAGE and ship.halite_amount >= BUSY_RETURN_AMOUNT:
         new_state = "returning"
 
-    elif ship.halite_amount >= constants.MAX_HALITE * (return_percentage * 0.8)\
-            and better_patch_neighbouring(ship, MEDIUM_HALITE):
-            # if collecting and ship is half full but next to it there is a really
-            # good patch, explore to that patch
-        neighbour = get_best_neighbour(ship.position)
-        if neighbour.position == ship.position:
-            new_state = "returning"
-        else:
-            ship_dest[ship.id] = neighbour.position
-
-            for sh in me.get_ships():
-                    # if somebody else going there recalc the destination
-                if not sh.id == ship.id and sh.id in ship_dest and ship_dest[sh.id] == neighbour.position:
-                    process_new_destination(sh)
-
-            new_state = "exploring"
-
     elif ship.halite_amount >= constants.MAX_HALITE * return_percentage and \
             not (cell_halite > MEDIUM_HALITE and not ship.is_full):
         # return to shipyard if enough halite
@@ -629,6 +616,19 @@ def collecting_transition(ship):
             and dist_to_enemy_doff(ship.position) >= CLOSE_TO_SHIPYARD * game_map.width:
 
         new_state = attempt_switching_assasinate(ship)
+    elif game_map[ship.position].enemy_neighbouring: # if enemy right next to it
+        # move to neighbour that has minimal enemies, but more halite
+        ratio = cell_halite / (game_map[ship.position].enemy_neighbouring + 1)
+        next_dest = ship.position
+        for n in game_map.get_neighbours(game_map[ship.position]):
+            n_ratio = n.halite_amount * game_map.get_inspire_multiplier(ship.position, n, NR_OF_PLAYERS) / (n.enemy_neighbouring + 1)
+            if n_ratio > ratio:
+                ratio = n_ratio
+                next_dest = n.position
+        ship_path[ship.id] = []
+        new_state = "exploring"
+        ship_dest[ship.id] = n.position
+
 
     return new_state
 
@@ -1225,6 +1225,7 @@ while True:
 
     # initialize shipyard halite, inspiring stuff and other
     game_map.init_map(me, list(game.players.values()))
+    logging.info(f"map init took {time.time() - TURN_START} time")
     if game.turn_number == 1:
         TOTAL_MAP_HALITE = game_map.total_halite
 

@@ -257,6 +257,7 @@ class GameMap:
         node_distance = 0
         source_cell.dijkstra_distance = node_distance
         source_cell.dijkstra_dest = source_cell.position
+        source_cell.parent = source_cell
         heappush(PQ, (source_cell.weight_to_shipyard, source_cell))
         while PQ:
             dist_cell = heappop(PQ)
