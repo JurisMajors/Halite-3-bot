@@ -268,7 +268,7 @@ class GameMap:
                 continue
             for neighbour in self.get_neighbours(cell):
                 new_dist = dist + neighbour.halite_amount + \
-                           70  # Maybe divide halite amount by 10 here
+                           70 + neighbour.enemy_neighbouring
                 if new_dist < neighbour.weight_to_shipyard:
                     neighbour.weight_to_shipyard = new_dist
                     neighbour.parent = cell
@@ -298,14 +298,12 @@ class GameMap:
         target = self.normalize(target)
         heappush(PQ, (0, self[source]))
         # determine whether reachable
-
         reachable = self.is_reachable(ship, self[source], self[
             target]) and self.is_reachable(ship, self[target], self[source])
         self[source].cost = 0
         lowest_distance = self.calculate_distance(source, target)  # init
         closest_pos = source
         visited = []  # visited nodes
-
         while PQ:
             current = heappop(PQ)[1]
             current.visited = ship  # visit cell
@@ -336,8 +334,9 @@ class GameMap:
                     neighbour.cost = new_cost
                     # distance is the heuristic
                     priority = new_cost + \
-                               self.calculate_distance(neighbour.position, target) + neighbour.enemy_neighbouring
+                               self.calculate_distance(neighbour.position, target)
                     neighbour.a_star_parent = current
+                    neighbour.visited = ship
                     visited.append(neighbour)
                     heappush(PQ, (priority, neighbour))
         return (visited, target) if reachable else (visited, closest_pos)
@@ -348,12 +347,10 @@ class GameMap:
 
         visited, new_destination = self.do_a_star(ship, destination)
         path = self.find_path(ship.position, new_destination)
-
         for node in visited:  # reset
             node.cost = None
             node.a_star_parent = None
             node.visited = None
-
         return path
 
     def find_path(self, position, destination):
@@ -387,27 +384,29 @@ class GameMap:
         return path[::-1]  # return the path, but reversed
 
     def is_reachable(self, ship, start_cell, end_cell):
-        ''' Flood fill algorithm from end cell.
+        ''' Greedy best first search from end cell.
          Returns True if start_cell is reachable from end_cell'''
         if end_cell.is_occupied and not end_cell.ship == ship:
             return False
-        Q = deque([])
-        Q.append(end_cell)
-        visited = []
+        Q = []
+        heappush(Q, (self.calculate_distance(end_cell.position, start_cell.position), end_cell))
+        visited = set()
         while Q:
-            cur = Q.popleft()
-            visited.append(cur)
-
+            cur = heappop(Q)[1]
+            visited.add(cur)
+            # assume reachable if got so far
             if self.calculate_distance(cur.position, end_cell.position) > 10:
                 return True
+            # rachable if start cell reached
             if cur == start_cell:
                 return True
 
             for neighbour in self.get_neighbours(cur):
                 if neighbour == start_cell:  # needed because start will be occupied by our ship
                     return True
-                if not neighbour.is_occupied and neighbour not in Q and neighbour not in visited:
-                    Q.append(neighbour)
+                if not neighbour.is_occupied and neighbour not in visited:
+                    heappush(Q, (self.calculate_distance(neighbour.position, start_cell.position), neighbour))
+                    visited.add(neighbour)
         return False
 
     def is_surrounded(self, position):
@@ -448,7 +447,9 @@ class GameMap:
         self.total_halite = 0
         my_dropoff_pos = self.get_dropoff_positions(me)
         if not (self.width == 64 and len(all_players) == 4): # disable insppiration for 4p 64x64 games
+            t = time.time()
             self.mark_inspired_cells(me, all_players)
+            logging.info(f"Marked inspired cells in {time.time() - t}")
         self.halite_priority = []
         num_occupied = 0
         for y in range(self.height):
@@ -514,7 +515,7 @@ class GameMap:
                     
         if cell.inspired and self.calculate_distance(cntr, cell.position) <= constants.INSPIRATION_RADIUS:
             if cell.enemy_neighbouring != 0 and nr_of_players == 4:
-                muls = [0, 1.25, 1.1, 0.9, 0.8]
+                muls = [0, 1.5, 1.25, 0.9, 0.8]
                 return muls[cell.enemy_neighbouring]
             else:
                 return constants.INSPIRED_BONUS_MULTIPLIER
