@@ -2,6 +2,7 @@ MyBot
 Makefile
 *.hlt
 *.log
+fluorine-master/
 *~
 *.pyc
 *.pyo
@@ -65,3 +66,4 @@ HeuristicVisualization/Visualizer.py
 illegalBot.py
 *.iml
 .idea/*
+*.html
