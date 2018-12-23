@@ -644,7 +644,7 @@ class MoveProcessor():
         if len(self.me.get_dropoffs()) >= 1:  # if there are multiple dropoffs then check for other options
             my_dest = current.dijkstra_dest
             amount = 0  # ship amount going to the same dropoff
-            for other in me.get_ships():
+            for other in self.me.get_ships():
                 other_cell = self.game_map[other.position]
                 other_dest = other_cell.dijkstra_dest
                 # count other ships that are returning, with the same destinationa
@@ -654,7 +654,7 @@ class MoveProcessor():
                     amount += 1
                 # if more than 30 percent of the ships are very close to the
                 # shipyard
-                if amount > ratio * len(me.get_ships()):
+                if amount > ratio * len(self.me.get_ships()):
                     return True
         return False
 
@@ -1119,7 +1119,8 @@ class main():
                         self.game_map[ship.position].mark_unsafe(ship)
                         command_queue.append(ship.move(Direction.Still))
                 else:  # not associated with building a dropoff, so move regularly
-                    move = MoveProcessor(self.game, self.ship_obj, self.ship_dest, self.previous_state, self.ship_path, self.ship_state, self.turn_start, self.has_moved, command_queue).produce_move(ship)
+                    MP = MoveProcessor(self.game, self.ship_obj, self.ship_dest, self.previous_state, self.ship_path, self.ship_state, self.turn_start, self.has_moved, command_queue)
+                    move = MP.produce_move(ship)
                     command_queue.append(ship.move(move))
                     self.previous_position[ship.id] = ship.position
                     self.game_map[ship.position.directional_offset(move)].mark_unsafe(ship)
@@ -1196,7 +1197,7 @@ class main():
                 self.fleet_leader[fleet_ship.id] = leader
 
             GlobalFunctions(self.game).state_switch(fleet_ship.id, new_state, self.previous_state, self.ship_state, self.ship_path)
-            DestinationProcessor(game).find_new_destination(h, fleet_ship)
+            DestinationProcessor(self.game, self.ship_dest, self.ship_state).find_new_destination(h, fleet_ship)
 
 
     def get_fleet(self, position, fleet_size, condition=None):
