@@ -579,7 +579,7 @@ class MoveProcessor():
             THE IDEA IS TO BALANCE OUT THE ENDING SO THAT TOO MANY DONT GO TO SAME
             DROPOFF '''
             if self.should_better_dropoff(ship):
-                other_dropoff = GlobalFunctions(self.game).better_dropoff_pos(ship)
+                other_dropoff = self.better_dropoff_pos(ship)
                 # if not the same distance
                 if not other_dropoff == self.game_map[ship.position].dijkstra_dest:
                     return self.a_star_move(ship)
