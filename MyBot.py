@@ -89,7 +89,7 @@ EXTRA_FLEET_MAP_SIZE = 32  # which maps >= to send fleets on
 BUSY_PERCENTAGE = 0.15
 BUSY_RETURN_AMOUNT = 400
 
-game.ready("MLP")
+game.ready("v53")
 NR_OF_PLAYERS = len(game.players.keys())
 # for dropoff filtering, what should be minimum value of halite around the
 # dropoff in 5x5 area
@@ -113,7 +113,7 @@ def ship_priority_q(me, game_map):
             # importance, the lower the number, bigger importance
             if ship_state[s.id] in ["returning", "harikiri"]:
                 importance = -1 * game_map[
-                    ship.position].dijkstra_distance * game_map.width - 1
+                    s.position].dijkstra_distance * game_map.width - 1
             elif ship_state[s.id] in ["exploring", "build", "backup", "fleet"]:
                 if s.id in ship_dest:
                     destination = ship_dest[ship.id]
@@ -331,17 +331,20 @@ def make_returning_move(ship, has_moved, command_queue):
 
             if other_ship.id not in ship_state or ship_state[other_ship.id] in ["exploring", "build", "fleet",
                                                                                 "backup"]:
+                can_move = other_ship.halite_amount >= game_map[
+                           other_ship.position].halite_amount * 0.1 
                 # if other ship has enough halite to move, hasnt made a move
                 # yet, and if it would move in the ship
                 if not has_moved[other_ship.id] and \
-                        (other_ship.halite_amount >= game_map[
-                            other_ship.position].halite_amount * 0.1 or other_ship.position in get_dropoff_positions()) \
-                        and (other_ship.id not in ship_path or (not ship_path[other_ship.id] or
+                        (can_move or other_ship.position in get_dropoff_positions()):
+                    if (other_ship.id not in ship_path or (not ship_path[other_ship.id] or
                                                                 other_ship.position.directional_offset(ship_path[other_ship.id][0][0]) == ship.position)):
-                    # move stays the same target move
-                    # move other_ship to ship.position
-                    # hence swapping ships
-                    move_ship_to_position(other_ship, ship.position)
+                        # move stays the same target move
+                        # move other_ship to ship.position
+                        # hence swapping ships
+                        move_ship_to_position(other_ship, ship.position)
+                    elif other_ship.id in ship_path and ship_path[other_ship.id] and ship_path[other_ship.id][0][0] == Direction.Still:
+                        move = a_star_move(ship)
                 else:
                     move = a_star_move(ship)
 
@@ -604,7 +607,7 @@ def exploring_transition(ship):
         # for inspiring
         ship_dest[ship.id] = get_best_neighbour(ship.position).position
 
-    elif euclid_to_dest <= 5\
+    elif euclid_to_dest <= 2\
             and exists_better_in_area(ship.position, ship_dest[ship.id], 4):
         process_new_destination(ship)
 
