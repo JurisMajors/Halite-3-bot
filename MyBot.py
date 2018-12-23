@@ -187,30 +187,6 @@ class GF():
 
 
     @staticmethod
-    def enemies_nearby(vicinity, position):
-        """
-        Returns a list of position objects of all enemy ships near the shipyard
-        and enemy ships near dropoffs that carry more than KILL_ENEMY_SHIP halite
-        """
-        nearby_enemy_ships = []
-        # Check shipyard vicinity
-        for y in range(-1 * vicinity + position.y, vicinity + 1 + position.y):
-            for x in range(-1 * vicinity + position.x, vicinity + 1 + position.x):
-                if game_map[Position(x, y)].is_occupied and not game_map[Position(x, y)].ship in me.get_ships():
-                    nearby_enemy_ships.append(Position(x, y))
-
-        return nearby_enemy_ships
-
-
-    @staticmethod
-    def check_shipyard_blockade(enemies, ship_position):
-        for enemy_position in enemies:
-            if game_map.calculate_distance(ship_position, enemy_position) < 3:
-                return enemy_position
-        return None
-
-
-    @staticmethod
     def state_switch(ship_id, new_state):
         if ship_id not in previous_state:
             previous_state[ship_id] = "exploring"
@@ -221,23 +197,6 @@ class GF():
 
         previous_state[ship_id] = ship_state[ship_id]
         ship_state[ship_id] = new_state
-
-
-    @staticmethod
-    def exists_better_in_area(cntr, current, area):
-        top_left = Position(int(-1 * area / 2),
-                            int(-1 * area / 2)) + cntr  # top left of scan area
-        current_factor = game_map.cell_factor(cntr, game_map[current], me)
-        for y in range(area):
-            for x in range(area):
-                p = Position((top_left.x + x) % game_map.width,
-                             (top_left.y + y) % game_map.height)  # position of patch
-                cell = game_map[p]
-                if cell.halite_amount >= game_map.HALITE_STOP:
-                    other_factor = game_map.cell_factor(cntr, cell, me)
-                    if not cell.is_occupied and other_factor < current_factor:
-                        return True
-        return False
 
 
     @staticmethod
@@ -353,207 +312,8 @@ class GF():
 
 
     @staticmethod
-    def get_cell_data(x, y, center):
-        cell = game_map[Position(x, y)]
-        # normalized data of cell: halite amount and distance to shipyard
-        return [round(cell.halite_amount / 1000, 2),
-                round(game_map.calculate_distance(cell.position, center) / game_map.width, 2)]
-
-
-    @staticmethod
     def any_builders():
         return "waiting" in ship_state.values() or "build" in ship_state.values()
-
-
-    @staticmethod
-    def get_patch_data(x, y, center):
-        # pool + 1 x pool + 1 size square inspected for data (classifier trained
-        # on 5x5)
-        pool = 4
-        # add center info
-        total_halite = 0  # total 5x5 patch halite
-        cntr_cell_data = GF.get_cell_data(x, y, center)
-        biggest_cell = Position(x, y)
-        biggest_halite = cntr_cell_data[0]
-        # data must contain normalized game_size
-        area_d = [round(game_map.width / 64, 2)] + cntr_cell_data
-
-        for diff_x in range(-1 * int(pool / 2), int(pool / 2) + 1):
-            for diff_y in range(-1 * int(pool / 2), int(pool / 2) + 1):
-
-                new_coord_x, new_coord_y = x - diff_x, y - \
-                                           diff_y  # get patch coordinates from centr
-                total_halite += game_map[Position(new_coord_x,
-                                                  new_coord_y)].halite_amount  # add to total halite
-                c_data = GF.get_cell_data(new_coord_x, new_coord_y, center)
-
-                if biggest_halite < c_data[0]:  # determine cell with most halite
-                    biggest_halite = c_data[0]
-                    biggest_cell = Position(new_coord_x, new_coord_y)
-
-                area_d += c_data
-
-        return [area_d], total_halite, biggest_cell
-
-
-    @staticmethod
-    def find_center():
-        ''' finds center of our part of the map '''
-        travel = int(game_map.width / NR_OF_PLAYERS)
-        # get all the centers depending on the amount of players
-        if NR_OF_PLAYERS == 4:
-            cntrs = [Position(travel, travel), Position(travel * 3, travel),
-                     Position(travel * 3, travel * 3), Position(travel, travel * 3)]
-        elif NR_OF_PLAYERS == 2:
-            cntrs = [Position(int(travel / 2), travel),
-                     Position(travel + int(travel / 2), travel)]
-        else:
-            cntrs = [me.shipyard.position]
-
-        min_dist = 1000
-        # find the center thats the closes to the shipyard
-        for pos in cntrs:
-            dist = game_map.calculate_distance(pos, me.shipyard.position)
-            if dist < min_dist:
-                cntr = pos
-                min_dist = dist
-        return cntr
-
-
-    @staticmethod
-    def predict_centers():
-        cntr = GF.find_center()
-
-        # get area around our cntr
-        x_size = int(game_map.width /
-                     2) if NR_OF_PLAYERS in [2, 4] else game_map.width
-        y_size = game_map.height if NR_OF_PLAYERS in [2, 1] else int(
-            game_map.height / 2)
-        diff1, diff2, diff3, diff4 = (0, 0, 0, 0)
-
-        # in 4 player maps limit the scanning area so that we dont classify centers of map
-        # or too close to enemies
-        if NR_OF_PLAYERS == 4:
-            if cntr.x > x_size:  # if right side of map
-                diff1 = 2
-                diff2 = 3
-            else:
-                diff2 = -2
-
-            if cntr.y > y_size:
-                diff3 = 2
-
-        cluster_centers = []
-        # classify areas of the map
-        for x in range(cntr.x - int(x_size / 2) + diff1,
-                       cntr.x + int(x_size / 2) + diff2, 5):
-            for y in range(cntr.y - int(y_size / 2) + diff3,
-                           cntr.y + int(y_size / 2) + diff4, 5):
-                p_data, total_halite, p_center = GF.get_patch_data(
-                    x, y, cntr)  # get the data
-                prediction = dropoff_clf.predict(p_data)[0]  # predict on it
-                if prediction == 1:  # if should be dropoff
-                    # add node with most halite to centers
-                    cluster_centers.append((total_halite, p_center))
-        return cluster_centers
-
-
-    @staticmethod
-    def clusters_with_classifier():
-        ''' uses classifier to determine clusters for dropoff '''
-        cluster_centers = GF.predict_centers()
-        # do filtering
-        cluster_centers = GF.filter_clusters(cluster_centers, GC.MAX_CLUSTERS)
-        logging.info("Finally")
-        logging.info(cluster_centers)
-        return cluster_centers
-
-
-    @staticmethod
-    def filter_clusters(centers, max_centers):
-        '''filters cluster centres on some human logic '''
-        centers.sort(key=lambda x: x[0], reverse=True)  # sort by halite amount
-        if len(centers) > max_centers:  # if more than max centres specified
-            centers = centers[:max_centers]  # get everything until that index
-        centers_copy = centers[:]  # copy to remove stuff from original
-
-        logging.info("additional filtering")
-        for i, d in enumerate(centers_copy):
-            halite, pos = d
-
-            if halite < 8000:  # if area contains less than 8k then remove it
-                if d in centers:  # if not removed arldy
-                    centers.remove(d)
-
-        logging.info(centers)
-        # do clustering algorithm on classified patches
-        if len(centers) > 2:
-            centers = GF.merge_clusters(centers)
-        logging.info(centers)
-
-        centers_copy = centers[:]
-        # remove points that are too close to each other or the shipyard
-        # in priority of points that are have the largest amount of points in area
-        for i, d in enumerate(centers_copy, start=0):
-            halite, pos = d
-            diff = game_map.euclidean_distance(pos, me.shipyard.position)
-            if diff < GC.CLOSE_TO_SHIPYARD * game_map.width or GF.dist_to_enemy_doff(pos) < GC.CLOSE_TO_SHIPYARD * game_map.width:
-                if d in centers:
-                    centers.remove(d)
-                continue
-
-            if i < len(centers_copy) - 1:  # if not out of bounds
-                # get list of centers too close
-                r = GF.too_close(centers_copy[i + 1:], pos)
-                for t in r:
-                    if t in centers:
-                        centers.remove(t)  # remove those centers
-
-        return centers
-
-
-    @staticmethod
-    def merge_clusters(centers):
-        ''' merges clusters using clustering in 3D where
-        x: x
-        y: y
-        z: halite amount / 8000 '''
-
-        logging.info("Merging clusters")
-        normalizer = 1
-        area = GC.CLUSTER_TOO_CLOSE * game_map.width
-        metric = distance_metric(type_metric.USER_DEFINED, func=GF.custom_dist)
-        X = []  # center coordinates that are merged in an iteration
-        tmp_centers = []  # to not modify the list looping through
-        history = []  # contains all already merged centers
-        # for each center
-        for c1 in centers:
-            # add the center itself
-            X.append([c1[1].x, c1[1].y, c1[0] / normalizer])
-            for c2 in centers:  # for other centers
-                # if not merged already
-                if not c2 == c1:
-                    dist = game_map.euclidean_distance(c1[1], c2[1])
-                    # if close enough for merging
-                    if dist <= area:
-                        X.append([c2[1].x, c2[1].y, c2[0] / normalizer])
-
-            # get initialized centers for the algorithm
-            init_centers = kmeans_plusplus_initializer(X, 1).initialize()
-            median = kmedians(X, init_centers, metric=metric)
-            median.process()  # do clustering
-            # get clustered centers
-            tmp_centers += [(x[2], game_map.normalize(Position(int(x[0]), int(x[1]))))
-                            for x in median.get_medians() if
-                            (x[2], game_map.normalize(Position(int(x[0]), int(x[1])))) not in tmp_centers]
-            if len(X) > 1:
-                history += X[1:]
-            X = []
-
-        centers = tmp_centers
-        centers.sort(key=lambda x: x[0], reverse=True)  # sort by best patches
-        logging.info("Done merging")
-        return centers
 
 
     @staticmethod
@@ -566,21 +326,6 @@ class GF():
         manh_dist = game_map.calculate_distance(
             Position(p1[0], p1[1]), Position(p2[0], p2[1]))
         return manh_dist + abs(p1[2] - p2[2])
-
-
-    @staticmethod
-    def too_close(centers, position):
-        ''' removes clusters that are too close to each other '''
-        to_remove = []
-        for d in centers:
-            _, other = d
-            distance = game_map.euclidean_distance(position, other)
-            shipyard_distance = game_map.euclidean_distance(
-                me.shipyard.position, other)
-            if distance < GC.CLUSTER_TOO_CLOSE * game_map.width or \
-                    shipyard_distance < GC.CLOSE_TO_SHIPYARD * game_map.width:
-                to_remove.append(d)
-        return to_remove
 
 
     @staticmethod
@@ -645,6 +390,226 @@ class GF():
             if not player_id == me.id:
                 ships = max(ships, GF.get_ship_amount(player_id))
         return ships
+
+
+class ClusterProcessor():
+    '''
+    Needs functions:
+        dist_to_enemy_doff
+    '''
+
+
+    def __init__(self, game):
+        self.game = game
+        self.game_map = game.game_map
+        self.me = game.me
+
+
+    def clusters_with_classifier(self):
+        ''' uses classifier to determine clusters for dropoff '''
+        cluster_centers = self.predict_centers()
+        # do filtering
+        cluster_centers = self.filter_clusters(cluster_centers, GC.MAX_CLUSTERS)
+        logging.info("Finally")
+        logging.info(cluster_centers)
+        return cluster_centers
+
+
+    def predict_centers(self):
+        cntr = self.find_center()
+
+        # get area around our cntr
+        x_size = int(self.game_map.width /
+                     2) if NR_OF_PLAYERS in [2, 4] else self.game_map.width
+        y_size = self.game_map.height if NR_OF_PLAYERS in [2, 1] else int(
+            game_map.height / 2)
+        diff1, diff2, diff3, diff4 = (0, 0, 0, 0)
+
+        # in 4 player maps limit the scanning area so that we dont classify centers of map
+        # or too close to enemies
+        if NR_OF_PLAYERS == 4:
+            if cntr.x > x_size:  # if right side of map
+                diff1 = 2
+                diff2 = 3
+            else:
+                diff2 = -2
+
+            if cntr.y > y_size:
+                diff3 = 2
+
+        cluster_centers = []
+        # classify areas of the map
+        for x in range(cntr.x - int(x_size / 2) + diff1,
+                       cntr.x + int(x_size / 2) + diff2, 5):
+            for y in range(cntr.y - int(y_size / 2) + diff3,
+                           cntr.y + int(y_size / 2) + diff4, 5):
+                p_data, total_halite, p_center = self.get_patch_data(
+                    x, y, cntr)  # get the data
+                prediction = dropoff_clf.predict(p_data)[0]  # predict on it
+                if prediction == 1:  # if should be dropoff
+                    # add node with most halite to centers
+                    cluster_centers.append((total_halite, p_center))
+        return cluster_centers
+
+
+    def find_center(self):
+        ''' finds center of our part of the map '''
+        travel = int(self.game_map.width / NR_OF_PLAYERS)
+        # get all the centers depending on the amount of players
+        if NR_OF_PLAYERS == 4:
+            cntrs = [Position(travel, travel), Position(travel * 3, travel),
+                     Position(travel * 3, travel * 3), Position(travel, travel * 3)]
+        elif NR_OF_PLAYERS == 2:
+            cntrs = [Position(int(travel / 2), travel),
+                     Position(travel + int(travel / 2), travel)]
+        else:
+            cntrs = [self.me.shipyard.position]
+
+        min_dist = 1000
+        # find the center thats the closes to the shipyard
+        for pos in cntrs:
+            dist = game_map.calculate_distance(pos, me.shipyard.position)
+            if dist < min_dist:
+                cntr = pos
+                min_dist = dist
+        return cntr
+
+
+    def filter_clusters(self, centers, max_centers):
+        '''filters cluster centres on some human logic '''
+        centers.sort(key=lambda x: x[0], reverse=True)  # sort by halite amount
+        if len(centers) > max_centers:  # if more than max centres specified
+            centers = centers[:max_centers]  # get everything until that index
+        centers_copy = centers[:]  # copy to remove stuff from original
+
+        logging.info("additional filtering")
+        for i, d in enumerate(centers_copy):
+            halite, pos = d
+
+            if halite < 8000:  # if area contains less than 8k then remove it
+                if d in centers:  # if not removed arldy
+                    centers.remove(d)
+
+        logging.info(centers)
+        # do clustering algorithm on classified patches
+        if len(centers) > 2:
+            centers = self.merge_clusters(centers)
+        logging.info(centers)
+
+        centers_copy = centers[:]
+        # remove points that are too close to each other or the shipyard
+        # in priority of points that are have the largest amount of points in area
+        for i, d in enumerate(centers_copy, start=0):
+            halite, pos = d
+            diff = game_map.euclidean_distance(pos, self.me.shipyard.position)
+            if diff < GC.CLOSE_TO_SHIPYARD * self.game_map.width or GF.dist_to_enemy_doff(pos) < GC.CLOSE_TO_SHIPYARD * self.game_map.width:
+                if d in centers:
+                    centers.remove(d)
+                continue
+
+            if i < len(centers_copy) - 1:  # if not out of bounds
+                # get list of centers too close
+                r = self.too_close(centers_copy[i + 1:], pos)
+                for t in r:
+                    if t in centers:
+                        centers.remove(t)  # remove those centers
+
+        return centers
+
+
+    def too_close(self, centers, position):
+        ''' removes clusters that are too close to each other '''
+        to_remove = []
+        for d in centers:
+            _, other = d
+            distance = self.game_map.euclidean_distance(position, other)
+            shipyard_distance = self.game_map.euclidean_distance(
+                self.me.shipyard.position, other)
+            if distance < GC.CLUSTER_TOO_CLOSE * self.game_map.width or \
+                    shipyard_distance < GC.CLOSE_TO_SHIPYARD * self.game_map.width:
+                to_remove.append(d)
+        return to_remove
+
+
+    def merge_clusters(self, centers):
+        ''' merges clusters using clustering in 3D where
+        x: x
+        y: y
+        z: halite amount / 8000 '''
+
+        logging.info("Merging clusters")
+        normalizer = 1
+        area = GC.CLUSTER_TOO_CLOSE * self.game_map.width
+        metric = distance_metric(type_metric.USER_DEFINED, func=GF.custom_dist)
+        X = []  # center coordinates that are merged in an iteration
+        tmp_centers = []  # to not modify the list looping through
+        history = []  # contains all already merged centers
+        # for each center
+        for c1 in centers:
+            # add the center itself
+            X.append([c1[1].x, c1[1].y, c1[0] / normalizer])
+            for c2 in centers:  # for other centers
+                # if not merged already
+                if not c2 == c1:
+                    dist = self.game_map.euclidean_distance(c1[1], c2[1])
+                    # if close enough for merging
+                    if dist <= area:
+                        X.append([c2[1].x, c2[1].y, c2[0] / normalizer])
+
+            # get initialized centers for the algorithm
+            init_centers = kmeans_plusplus_initializer(X, 1).initialize()
+            median = kmedians(X, init_centers, metric=metric)
+            median.process()  # do clustering
+            # get clustered centers
+            tmp_centers += [(x[2], self.game_map.normalize(Position(int(x[0]), int(x[1]))))
+                            for x in median.get_medians() if
+                            (x[2], self.game_map.normalize(Position(int(x[0]), int(x[1])))) not in tmp_centers]
+            if len(X) > 1:
+                history += X[1:]
+            X = []
+
+        centers = tmp_centers
+        centers.sort(key=lambda x: x[0], reverse=True)  # sort by best patches
+        logging.info("Done merging")
+        return centers
+
+
+    def get_patch_data(self, x, y, center):
+        # pool + 1 x pool + 1 size square inspected for data (classifier trained
+        # on 5x5)
+        pool = 4
+        # add center info
+        total_halite = 0  # total 5x5 patch halite
+        cntr_cell_data = self.get_cell_data(x, y, center)
+        biggest_cell = Position(x, y)
+        biggest_halite = cntr_cell_data[0]
+        # data must contain normalized game_size
+        area_d = [round(self.game_map.width / 64, 2)] + cntr_cell_data
+
+        for diff_x in range(-1 * int(pool / 2), int(pool / 2) + 1):
+            for diff_y in range(-1 * int(pool / 2), int(pool / 2) + 1):
+
+                new_coord_x, new_coord_y = x - diff_x, y - \
+                                           diff_y  # get patch coordinates from centr
+                total_halite += game_map[Position(new_coord_x,
+                                                  new_coord_y)].halite_amount  # add to total halite
+                c_data = self.get_cell_data(new_coord_x, new_coord_y, center)
+
+                if biggest_halite < c_data[0]:  # determine cell with most halite
+                    biggest_halite = c_data[0]
+                    biggest_cell = Position(new_coord_x, new_coord_y)
+
+                area_d += c_data
+
+        return [area_d], total_halite, biggest_cell
+
+
+    def get_cell_data(self, x, y, center):
+        cell = self.game_map[Position(x, y)]
+        # normalized data of cell: halite amount and distance to shipyard
+        return [round(cell.halite_amount / 1000, 2),
+                round(self.game_map.calculate_distance(cell.position, center) / self.game_map.width, 2)]
+
 
 class DestinationProcessor():
     """
@@ -730,12 +695,11 @@ class DestinationProcessor():
         return amount / len(self.me.get_ships())
 
 
-    @staticmethod
-    def get_ship_w_destination(dest, this_id):
+    def get_ship_w_destination(self, dest, this_id):
         if dest in ship_dest.values():
             for s in ship_dest.keys():  # get ship with the same destination
-                if not s == this_id and ship_state[s] == "exploring" and ship_dest[s] == dest and me.has_ship(s):
-                    return me.get_ship(s)
+                if not s == this_id and ship_state[s] == "exploring" and ship_dest[s] == dest and self.me.has_ship(s):
+                    return self.me.get_ship(s)
         return None
 
 
@@ -1071,7 +1035,7 @@ class StateMachine():
             # for inspiring
             self.ship_dest[self.ship.id] = self.get_best_neighbour(self.ship.position).position
 
-        elif euclid_to_dest <= 5 and GF.exists_better_in_area(self.ship.position, self.ship_dest[self.ship.id], 4):
+        elif euclid_to_dest <= 5 and self.exists_better_in_area(self.ship.position, self.ship_dest[self.ship.id], 4):
             ship_h = GF.halite_priority_q(self.ship.position, GC.SHIP_SCAN_AREA)
             DestinationProcessor(game).find_new_destination(ship_h, self.ship)
             self.ship_path[self.ship.id] = []
@@ -1087,6 +1051,22 @@ class StateMachine():
                         self.ship_dest[self.ship.id] = n.position
                         return "assassinate"
         return None
+
+
+    def exists_better_in_area(self, cntr, current, area):
+        top_left = Position(int(-1 * area / 2),
+                            int(-1 * area / 2)) + cntr  # top left of scan area
+        current_factor = self.game_map.cell_factor(cntr, self.game_map[current], self.me)
+        for y in range(area):
+            for x in range(area):
+                p = Position((top_left.x + x) % self.game_map.width,
+                             (top_left.y + y) % self.game_map.height)  # position of patch
+                cell = game_map[p]
+                if cell.halite_amount >= self.game_map.HALITE_STOP:
+                    other_factor = self.game_map.cell_factor(cntr, cell, self.me)
+                    if not cell.is_occupied and other_factor < current_factor:
+                        return True
+        return False
 
 
     def collecting_transition(self):
@@ -1331,7 +1311,7 @@ while True:
     game_map.create_graph(GF.get_dropoff_positions())
     if game.turn_number == GC.DETERMINE_CLUSTER_TURN:
         clusters_determined = True
-        cluster_centers = GF.clusters_with_classifier()
+        cluster_centers = ClusterProcessor(game).clusters_with_classifier()
 
     if game.turn_number == GC.CRASH_SELECTION_TURN:
         GC.CRASH_TURN = GF.select_crash_turn()
