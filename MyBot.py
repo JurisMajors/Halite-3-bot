@@ -87,20 +87,6 @@ class GF():
 
 
     @staticmethod
-    def should_inspire():
-        return (NR_OF_PLAYERS == 2 and game_map.width in [32, 40, 48]) or \
-               (NR_OF_PLAYERS == 4 and game_map.width in [32, 40])
-
-
-    @staticmethod
-    def get_inspire_multiplier(cntr, cell):
-        if cell.inspired and (GF.should_inspire() or game_map.calculate_distance(cntr, cell.position) < 6):
-            return -3
-        else:
-            return -1
-
-
-    @staticmethod
     def ship_priority_q(me, game_map):
         ships = []  # ship priority queue
         has_moved = {}
@@ -178,44 +164,6 @@ class GF():
 
 
     @staticmethod
-    def get_dijkstra_move(current_position):
-        """
-        Gets a move from the map created by Dijkstra
-        :return: The target position of the move and the direction of the move.
-        """
-        cell = game_map[current_position].parent
-        new_pos = cell.position
-        dirs = game_map.get_target_direction(ship.position, new_pos)
-        new_dir = dirs[0] if dirs[0] is not None else dirs[
-            1] if dirs[1] is not None else Direction.Still
-
-        return new_pos, new_dir
-
-
-    @staticmethod
-    def should_better_dropoff(ship):
-        ''' determines whether there are too many ships going to the same dropoff as ship'''
-        current = game_map[ship.position]
-        ratio = 1 / len(GF.get_dropoff_positions())
-        if len(me.get_dropoffs()) >= 1:  # if there are multiple dropoffs then check for other options
-            my_dest = current.dijkstra_dest
-            amount = 0  # ship amount going to the same dropoff
-            for other in me.get_ships():
-                other_cell = game_map[other.position]
-                other_dest = other_cell.dijkstra_dest
-                # count other ships that are returning, with the same destinationa
-                # and are within 80% of ships dijkstra distance
-                if other.id in ship_state and ship_state[other.id] == "returning" and \
-                        other_cell.dijkstra_dest == my_dest and other_cell.dijkstra_distance < 0.7 * current.dijkstra_distance:
-                    amount += 1
-                # if more than 30 percent of the ships are very close to the
-                # shipyard
-                if amount > ratio * len(me.get_ships()):
-                    return True
-        return False
-
-
-    @staticmethod
     def better_dropoff_pos(ship):
         ''' find the better dropoff position
         precondition: should_better_dropoff(ship) and
@@ -236,29 +184,6 @@ class GF():
         if new_dest is None:
             return current_dest
         return new_dest
-
-
-    @staticmethod
-    def a_star_move(ship, dest=None):
-        if dest is None:
-            cell = game_map[ship.position]
-            d_to_dijkstra_dest = game_map.calculate_distance(
-                cell.position, cell.dijkstra_dest)
-            dest = GF.interim_djikstra_dest(
-                cell).position if d_to_dijkstra_dest > 10 else cell.dijkstra_dest  
-        return MoveProcessor(game, ship_obj, ship_dest, previous_state, ship_path, ship_state).exploring(ship, dest)
-
-
-    @staticmethod
-    def interim_djikstra_dest(source_cell):
-        ''' finds the intermediate djikstra destination that is not occupied '''
-        cell = source_cell.parent
-        while cell.is_occupied:
-            cell = cell.parent
-            if GF.time_left() < 0.5:
-                logging.info("STANDING STILL TOO SLOW")
-                return source_cell
-        return cell
 
 
     @staticmethod
@@ -299,81 +224,6 @@ class GF():
 
 
     @staticmethod
-    def prcntg_ships_returning_to_doff(d_pos):
-        amount = 0
-        for s in me.get_ships():
-            if GF.get_shipyard(s.position) == d_pos:
-                amount += 1
-        return amount / len(me.get_ships())
-
-
-    @staticmethod
-    def interim_exploring_dest(position, path):
-        ''' finds intermediate destination from a direction path that is not occupied '''
-        to_go = GF.get_step(path)
-        next_pos = game_map.normalize(position.directional_offset(to_go))
-        while game_map[next_pos].is_occupied:
-            if GF.time_left() < 0.3:
-                logging.info("STANDING STILL")
-                return position
-            if not path:
-                return next_pos
-            to_go = GF.get_step(path)
-            next_pos = game_map.normalize(next_pos.directional_offset(to_go))
-        return next_pos
-
-
-    @staticmethod
-    def get_step(path):
-        path[0][1] -= 1  # take that direction
-        direction = path[0][0]
-        if path[0][1] == 0:  # if no more left that direction remove it
-            del path[0]
-        return direction
-
-
-    @staticmethod
-    def better_patch_neighbouring(ship, big_diff):
-        ''' returns true if there is a lot better patch right next to it'''
-        current = game_map[ship.position]
-        neighbours = game_map.get_neighbours(current)
-        current_h = current.halite_amount
-
-        if current.inspired:
-            current_h *= 3
-        for n in neighbours:
-            neighbour_h = n.halite_amount
-            if n.inspired:
-                neighbour_h *= 3
-            if not n.is_occupied and neighbour_h >= current_h + big_diff:
-                return True
-
-        return False
-
-
-    @staticmethod
-    def get_best_neighbour(position):
-        ''' gets best neighbour at the ships positioņ
-        returns a cell'''
-        current = game_map[position]
-        neighbours = game_map.get_neighbours(current)
-        if current.inspired:
-            max_halite = 3 * current.halite_amount
-        else:
-            max_halite = current.halite_amount
-        best = current
-        for n in neighbours:
-            n_halite = n.halite_amount
-            if n.inspired:
-                n_halite *= 3
-            if not n.is_occupied and n_halite > max_halite:
-                best = n
-                max_halite = n_halite
-
-        return best
-
-
-    @staticmethod
     def exists_better_in_area(cntr, current, area):
         top_left = Position(int(-1 * area / 2),
                             int(-1 * area / 2)) + cntr  # top left of scan area
@@ -400,20 +250,6 @@ class GF():
                 for d_off in player.get_dropoffs():
                     positions.append(d_off.position)
         return positions
-
-
-    @staticmethod
-    def closest_shipyard_id(ship_pos):
-        ''' returns shipyard id that is closest to ship '''
-        distance = game_map.calculate_distance(ship_pos, me.shipyard.position)
-        shipyard_id = me.shipyard.id
-        for dropoff in me.get_dropoffs():
-            new_distance = game_map.calculate_distance(
-                ship_pos, dropoff.position)
-            if new_distance < distance:
-                distance = new_distance
-                shipyard_id = dropoff.id
-        return shipyard_id
 
 
     @staticmethod
@@ -767,19 +603,6 @@ class GF():
 
 
     @staticmethod
-    def amount_of_halite(pos, area):
-        top_left = Position(int(-1 * area / 2),
-                            int(-1 * area / 2)) + pos  # top left of scan area
-        amount = 0
-        for y in range(area):
-            for x in range(area):
-                p = Position((top_left.x + x) % game_map.width,
-                             (top_left.y + y) % game_map.height)  # position of patch
-                amount += game_map[p].halite_amount
-        return amount
-
-
-    @staticmethod
     def have_less_ships(ratio):
         for player in game.players.values():
             if len(me.get_ships()) < ratio * len(player.get_ships()):
@@ -809,14 +632,6 @@ class GF():
 
 
     @staticmethod
-    def mark_around_enemies(enemies):
-        for pos in enemies:
-            enemy_neighbours = game_map.get_neighbours(game_map[pos])
-            for neighbour_cell in enemy_neighbours:
-                neighbour_cell.mark_unsafe(game_map[pos].ship)
-
-
-    @staticmethod
     def get_ship_amount(playerID):
         return len(game.players[playerID].get_ships())
 
@@ -833,10 +648,6 @@ class GF():
 
 class DestinationProcessor():
     """
-    Functions only used in this class but not yet in here:
-        prcntg_ships_returning_to_doff()
-
-
     Needs access to dicts:
         ship_dest
         ship_state
@@ -846,12 +657,11 @@ class DestinationProcessor():
         amount_of_enemies
         halite_priority_q
         get_dropoff_positions
-        prcntg_ships_returning_to_doff()
-
     """
     def __init__(self, game):
         self.game = game
         self.game_map = game.game_map
+        self.me = game.me
 
 
     def find_new_destination(self, h, ship):
@@ -909,7 +719,15 @@ class DestinationProcessor():
         if GF.get_shipyard(ship.position) == GF.get_shipyard(destination):
             return False
         else:
-            return GF.prcntg_ships_returning_to_doff(GF.get_shipyard(destination)) > (1 / len(GF.get_dropoff_positions()))
+            return self.prcntg_ships_returning_to_doff(GF.get_shipyard(destination)) > (1 / len(GF.get_dropoff_positions()))
+
+
+    def prcntg_ships_returning_to_doff(self, d_pos):
+        amount = 0
+        for s in self.me.get_ships():
+            if GF.get_shipyard(s.position) == d_pos:
+                amount += 1
+        return amount / len(self.me.get_ships())
 
 
     @staticmethod
@@ -925,22 +743,12 @@ class MoveProcessor():
     """
     needs functions:
         state_switch()
-        interim_exploring_dest()
-        get_step()
         get_shipyard()
-        a_star_move()
         better_dropoff_pos()
-        get_dijkstra_move()
         get_dropoff_positions()
-        should_better_dropoff()
 
 
     Functions only used in this class but not yet in here:
-        interim_exploring_dest()
-            only function left that is outside moveProcessor that also uses get_step
-        a_star_move()
-        get_dijkstra_move()
-        should_better_dropoff()
 
 
     Needs variables:
@@ -1021,7 +829,7 @@ class MoveProcessor():
             direction = self.ship_path[ship.id][0][0]
             if self.game_map[ship.position.directional_offset(direction)].is_occupied and not direction == Direction.Still:
                 if self.game_map.calculate_distance(destination, ship.position) > 10:
-                    new_dest = GF.interim_exploring_dest(
+                    new_dest = self.interim_exploring_dest(
                         ship.position, self.ship_path[ship.id])
                     # use intermediate unoccpied position instead of actual
                     # destination
@@ -1030,7 +838,31 @@ class MoveProcessor():
                 else:
                     self.ship_path[ship.id] = self.game_map.explore(ship, destination)
         # move in calculated direction
-        return GF.get_step(self.ship_path[ship.id])
+        return MoveProcessor.get_step(self.ship_path[ship.id])
+
+
+    def interim_exploring_dest(self, position, path):
+        ''' finds intermediate destination from a direction path that is not occupied '''
+        to_go = MoveProcessor.get_step(path)
+        next_pos = self.game_map.normalize(position.directional_offset(to_go))
+        while self.game_map[next_pos].is_occupied:
+            if GF.time_left() < 0.3:
+                logging.info("STANDING STILL")
+                return position
+            if not path:
+                return next_pos
+            to_go = MoveProcessor.get_step(path)
+            next_pos = self.game_map.normalize(next_pos.directional_offset(to_go))
+        return next_pos
+
+
+    @staticmethod
+    def get_step(path):
+        path[0][1] -= 1  # take that direction
+        direction = path[0][0]
+        if path[0][1] == 0:  # if no more left that direction remove it
+            del path[0]
+        return direction
 
 
     def make_returning_move(self, ship, has_moved, command_queue):
@@ -1038,7 +870,7 @@ class MoveProcessor():
         Makes a returning move based on Dijkstras and other ship positions.
         """
         if self.ship_path[ship.id]:
-            direction = GF.get_step(self.ship_path[ship.id])
+            direction = MoveProcessor.get_step(self.ship_path[ship.id])
             to_go = ship.position.directional_offset(direction)
             if direction == Direction.Still or not self.game_map[to_go].is_occupied:
                 return direction
@@ -1048,13 +880,13 @@ class MoveProcessor():
             NO BOTS GET IN THIS STAGE TO CHANGE SUICIDE DROPOFFS
             THE IDEA IS TO BALANCE OUT THE ENDING SO THAT TOO MANY DONT GO TO SAME
             DROPOFF '''
-            if GF.should_better_dropoff(ship):
+            if self.should_better_dropoff(ship):
                 other_dropoff = GF.better_dropoff_pos(ship)
                 # if not the same distance
                 if not other_dropoff == self.game_map[ship.position].dijkstra_dest:
-                    return GF.a_star_move(ship)
+                    return self.a_star_move(ship)
         # Get the cell and direction we want to go to from dijkstra
-        target_pos, move = GF.get_dijkstra_move(ship.position)
+        target_pos, move = self.get_dijkstra_move(ship)
         # Target is occupied
         if self.game_map[target_pos].is_occupied:
             other_ship = self.game_map[target_pos].ship
@@ -1072,17 +904,76 @@ class MoveProcessor():
                         # hence swapping ships
                         self.move_ship_to_position(other_ship, ship.position)
                     else:
-                        move = GF.a_star_move(ship)
+                        move = self.a_star_move(ship)
 
                 elif self.ship_state[other_ship.id] in ["returning", "harakiri"]:
                     move = Direction.Still
                 elif self.ship_state[other_ship.id] in ["collecting", "waiting"]:
-                    move = GF.a_star_move(ship)
+                    move = self.a_star_move(ship)
 
             else:  # target position occupied by enemy ship
-                move = GF.a_star_move(ship)
+                move = self.a_star_move(ship)
 
         return move
+
+
+    def should_better_dropoff(self, ship):
+        ''' determines whether there are too many ships going to the same dropoff as ship'''
+        current = self.game_map[ship.position]
+        ratio = 1 / len(GF.get_dropoff_positions())
+        if len(self.me.get_dropoffs()) >= 1:  # if there are multiple dropoffs then check for other options
+            my_dest = current.dijkstra_dest
+            amount = 0  # ship amount going to the same dropoff
+            for other in me.get_ships():
+                other_cell = self.game_map[other.position]
+                other_dest = other_cell.dijkstra_dest
+                # count other ships that are returning, with the same destinationa
+                # and are within 80% of ships dijkstra distance
+                if other.id in self.ship_state and self.ship_state[other.id] == "returning" and \
+                        other_cell.dijkstra_dest == my_dest and other_cell.dijkstra_distance < 0.7 * current.dijkstra_distance:
+                    amount += 1
+                # if more than 30 percent of the ships are very close to the
+                # shipyard
+                if amount > ratio * len(me.get_ships()):
+                    return True
+        return False
+
+
+    def get_dijkstra_move(self, ship):
+        """
+        Gets a move from the map created by Dijkstra
+        :return: The target position of the move and the direction of the move.
+        """
+        current_position = ship.position
+        cell = self.game_map[current_position].parent
+        new_pos = cell.position
+        dirs = self.game_map.get_target_direction(ship.position, new_pos)
+        new_dir = dirs[0] if dirs[0] is not None else dirs[
+            1] if dirs[1] is not None else Direction.Still
+
+        return new_pos, new_dir
+
+
+    def a_star_move(self, ship, dest=None):
+        if dest is None:
+            cell = self.game_map[ship.position]
+            d_to_dijkstra_dest = self.game_map.calculate_distance(
+                cell.position, cell.dijkstra_dest)
+            dest = MoveProcessor.interim_djikstra_dest(
+                cell).position if d_to_dijkstra_dest > 10 else cell.dijkstra_dest  
+        return self.exploring(ship, dest)
+
+
+    @staticmethod
+    def interim_djikstra_dest(source_cell):
+        ''' finds the intermediate djikstra destination that is not occupied '''
+        cell = source_cell.parent
+        while cell.is_occupied:
+            cell = cell.parent
+            if GF.time_left() < 0.5:
+                logging.info("STANDING STILL TOO SLOW")
+                return source_cell
+        return cell
 
 
     def move_ship_to_position(self, ship, destination):
@@ -1105,7 +996,6 @@ class StateMachine():
 
     '''
     Functions only used in this class but not in this class:
-        better_patch_neighbouring
         
 
     Needs acces to:
@@ -1114,10 +1004,9 @@ class StateMachine():
         get_shipyard
         halite_priority_q
         amount_of_enemies
-        get_best_neighbour
-        better_patch_neighbouring
         process_new_destination
         find_new_destination
+        dist_to_enemy_doff
     '''
 
     def __init__(self, game, ship, ship_path, ship_state, ship_dest, fleet_leader):
@@ -1180,7 +1069,7 @@ class StateMachine():
 
         elif GF.amount_of_enemies(self.ship.position, 4) >= 2:
             # for inspiring
-            self.ship_dest[self.ship.id] = GF.get_best_neighbour(self.ship.position).position
+            self.ship_dest[self.ship.id] = self.get_best_neighbour(self.ship.position).position
 
         elif euclid_to_dest <= 5 and GF.exists_better_in_area(self.ship.position, self.ship_dest[self.ship.id], 4):
             ship_h = GF.halite_priority_q(self.ship.position, GC.SHIP_SCAN_AREA)
@@ -1209,10 +1098,10 @@ class StateMachine():
         elif self.game_map.percentage_occupied >= GC.BUSY_PERCENTAGE and self.ship.halite_amount >= GC.BUSY_RETURN_AMOUNT:
             new_state = "returning"
         elif self.ship.halite_amount >= constants.MAX_HALITE * (return_percentage * 0.8) \
-                and GF.better_patch_neighbouring(self.ship, GC.MEDIUM_HALITE):
+                and self.better_patch_neighbouring(GC.MEDIUM_HALITE):
             # if collecting and ship is half full but next to it there is a really
             # good patch, explore to that patch
-            neighbour = GF.get_best_neighbour(self.ship.position)
+            neighbour = self.get_best_neighbour(self.ship.position)
             if neighbour.position == self.ship.position:
                 new_state = "returning"
             else:
@@ -1249,6 +1138,24 @@ class StateMachine():
         return new_state
 
 
+    def better_patch_neighbouring(self, big_diff):
+        ''' returns true if there is a lot better patch right next to it'''
+        current = self.game_map[self.ship.position]
+        neighbours = self.game_map.get_neighbours(current)
+        current_h = current.halite_amount
+
+        if current.inspired:
+            current_h *= 3
+        for n in neighbours:
+            neighbour_h = n.halite_amount
+            if n.inspired:
+                neighbour_h *= 3
+            if not n.is_occupied and neighbour_h >= current_h + big_diff:
+                return True
+
+        return False
+
+
     def returning_transition(self):
         if self.ship.position in GF.get_dropoff_positions():
             # explore again when back in shipyard
@@ -1271,7 +1178,7 @@ class StateMachine():
 
         elif self.game_map.calculate_distance(self.ship.position, destination) == 1:
             if self.game_map[destination].is_occupied:
-                self.ship_dest[self.ship.id] = GF.get_best_neighbour(destination).position
+                self.ship_dest[self.ship.id] = self.get_best_neighbour(destination).position
 
         elif self.ship.id in self.fleet_leader:
             leader = self.fleet_leader[self.ship.id]
@@ -1300,7 +1207,7 @@ class StateMachine():
             neighbours = self.game_map.get_neighbours(self.game_map[ship.position])
             for n in neighbours:
                 if n.is_occupied and not self.me.has_ship(n.ship.id):
-                    self.ship_dest[self.ship.id] = GF.get_best_neighbour(self.ship.position).position
+                    self.ship_dest[self.ship.id] = self.get_best_neighbour(self.ship.position).position
                     return "build"
 
         elif len(self.game.players.keys()) >= 2:
@@ -1315,7 +1222,7 @@ class StateMachine():
         neighbours = self.game_map.get_neighbours(self.game_map[self.ship.position])
         for n in neighbours:
             if n.is_occupied and not self.me.has_ship(n.ship.id):
-                self.ship_dest[self.ship.id] = GF.get_best_neighbour(self.ship.position).position
+                self.ship_dest[self.ship.id] = self.get_best_neighbour(self.ship.position).position
                 return "build"
         return None
 
@@ -1328,7 +1235,7 @@ class StateMachine():
 
         elif self.game_map.calculate_distance(self.ship.position, destination) == 1:
             if self.game_map[destination].is_occupied:
-                self.ship_dest[ship.id] = GF.get_best_neighbour(destination).position
+                self.ship_dest[ship.id] = self.get_best_neighbour(destination).position
 
         elif GF.amount_of_enemies(destination, 4) >= 4:
             DestinationProcessor(game).process_new_destination(self.ship)
@@ -1346,6 +1253,38 @@ class StateMachine():
                         return "assassinate"
         return None
 
+
+    def get_best_neighbour(self, position):
+        ''' gets best neighbour at the ships positioņ
+        returns a cell'''
+        current = self.game_map[position]
+        neighbours = self.game_map.get_neighbours(current)
+        if current.inspired:
+            max_halite = 3 * current.halite_amount
+        else:
+            max_halite = current.halite_amount
+        best = current
+        for n in neighbours:
+            n_halite = n.halite_amount
+            if n.inspired:
+                n_halite *= 3
+            if not n.is_occupied and n_halite > max_halite:
+                best = n
+                max_halite = n_halite
+        return best
+
+
+"""
+Needed functions for while loop not used anywhere else:
+    max_enemy_ships
+    get_ship_amount
+    process_building
+    have_less_ships
+    should_build
+    is_builder
+    is_savior
+    select_crash_turn
+"""
 
 clusters_determined = False
 backuped_dropoffs = []
