@@ -443,10 +443,10 @@ class GameMap:
                 for their in p.get_ships():
                     self.bfs_around_enemy(their.position, constants.INSPIRATION_RADIUS)
 
-    def init_map(self, me, all_players):
+    def init_map(self, me, all_players, enable_inspire=True, backup=False):
         self.total_halite = 0
         my_dropoff_pos = self.get_dropoff_positions(me)
-        if not (self.width == 64 and len(all_players) == 4): # disable insppiration for 4p 64x64 games
+        if enable_inspire:
             t = time.time()
             self.mark_inspired_cells(me, all_players)
             logging.info(f"Marked inspired cells in {time.time() - t}")
@@ -465,7 +465,7 @@ class GameMap:
                     heappush(self.halite_priority, (-1 * ratio, cell.position))
 
                 elif cell.halite_amount > 0:
-                    factor = self.cell_factor(closest_d, cell, me, len(all_players))
+                    factor = self.cell_factor(closest_d, cell, me, backup)
                     heappush(self.halite_priority, (factor, cell.position))
 
                 if cell.is_occupied:
@@ -482,7 +482,7 @@ class GameMap:
         return (self.c[0] * halite * halite + self.c[1] * halite + self.c[2]) / (
                 self.c[3] * distance * distance + self.c[4] * distance + self.c[5])
 
-    def cell_factor(self, cntr, cell, me, nr_of_players):
+    def cell_factor(self, cntr, cell, me, backup):
         dropoff_positions = self.get_dropoff_positions(me)
         if cell.position in dropoff_positions:
             return 1000
@@ -492,7 +492,7 @@ class GameMap:
         # get rid of dropoffs
         for neighbour in neighbours[:]:
             inspire_multiplier = self.get_inspire_multiplier(
-                cntr, neighbour, nr_of_players)
+                cntr, neighbour, backup)
             if neighbour.position in dropoff_positions:
                 neighbours.remove(neighbour)
             elif neighbour.halite_amount <= self.HALITE_STOP:
@@ -503,22 +503,19 @@ class GameMap:
                 n_factor_sum += self.cell_heuristic(
                     neighbour.halite_amount * inspire_multiplier, self.calculate_distance(neighbour.position, cntr))
 
-        multiplier = self.get_inspire_multiplier(cntr, cell, nr_of_players)
+        multiplier = self.get_inspire_multiplier(cntr, cell, backup)
         # cells factor
         c_factor = len(neighbours) * self.cell_heuristic(cell.halite_amount * multiplier,
                                                          self.calculate_distance(cell.position, cntr))
         return round(-1 * (c_factor + n_factor_sum), 2)
 
-    def get_inspire_multiplier(self, cntr, cell, nr_of_players):
+    def get_inspire_multiplier(self, cntr, cell, backup):
         if cell.inspired is None:
             cell.inspired = cell.enemy_amount >= constants.INSPIRATION_SHIP_COUNT
                     
-        if cell.inspired and self.calculate_distance(cntr, cell.position) <= constants.INSPIRATION_RADIUS:
-            if cell.enemy_neighbouring != 0 and nr_of_players == 4:
-                muls = [0, 1.5, 1.25, 0.9, 0.8]
-                return muls[cell.enemy_neighbouring]
-            else:
-                return constants.INSPIRED_BONUS_MULTIPLIER
+        if cell.inspired and self.calculate_distance(cntr, cell.position) <= constants.INSPIRATION_RADIUS\
+        and (not backup or cell.halite_amount <= constants.MAX_HALITE):
+            return constants.INSPIRED_BONUS_MULTIPLIER
         else:
             return 1
 
