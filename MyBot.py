@@ -231,7 +231,7 @@ def too_many_near_dropoff(ship, destination):
     if get_shipyard(ship.position) == get_shipyard(destination):
         return False
     else:
-        return prcntg_ships_returning_to_doff(get_shipyard(destination)) > 1.5 * (1 / len(get_dropoff_positions()))
+        return prcntg_ships_returning_to_doff(get_shipyard(destination)) > (1 / len(get_dropoff_positions()))
 
 
 def bad_destination(ship, destination):
@@ -719,7 +719,7 @@ def builder_transition(ship):
                 new_state = "build"
                 ship_dest[ship.id] = get_best_neighbour(ship.position).position
                 break
-    elif NR_OF_PLAYERS > 2: # for 4 players be careful w dropoffs
+    elif NR_OF_PLAYERS == 4 or game_map.width >= 56: # for 4 players and large maps 1v1
         smallest_dist = dist_to_enemy_doff(ship_dest[ship.id])
         if smallest_dist <= game_map.width * ENEMY_SHIPYARD_CLOSE:
             process_new_destination(ship)
@@ -907,7 +907,7 @@ def fleet_availability():
 
 def should_build():
     """ definition of sending a ship to build """
-    return clusters_determined and game.turn_number >= dropoff_last_built + 10 and cluster_centers\
+    return clusters_determined and game.turn_number >= dropoff_last_built + 15 and cluster_centers\
         and len(me.get_ships()) > (len(get_dropoff_positions()) + 1) * FLEET_SIZE\
         and fleet_availability() >= 1.5 * FLEET_SIZE and not any_builders()
 
@@ -1103,7 +1103,7 @@ def merge_clusters(centers):
     logging.info("Merging clusters")
     area = CLUSTER_TOO_CLOSE * game_map.width
     metric = distance_metric(type_metric.USER_DEFINED, func=custom_dist)
-    normalizer = MIN_CLUSTER_VALUE
+    normalizer = 1
     X = []  # center coordinates that are merged in an iteration
     tmp_centers = []  # to not modify the list looping through
     history = []  # contains all already merged centers
@@ -1248,7 +1248,7 @@ while True:
     TURN_START = time.time()
 
     enable_inspire = not have_less_ships(0.8)
-    enable_backup = ENABLE_COMBAT or game_map.width == 64
+    enable_backup = ENABLE_COMBAT
     # initialize shipyard halite, inspiring stuff and other
     game_map.init_map(me, list(game.players.values()), enable_inspire, enable_backup)
     logging.info(f"map init took {time.time() - TURN_START} time")
