@@ -1107,6 +1107,7 @@ class main():
                 StateMachine(self.game, ship, self.ship_path, self.ship_state, self.ship_dest, self.fleet_leader, return_percentage, self.previous_state).state_transition()
 
 
+                MP = MoveProcessor(self.game, self.ship_obj, self.ship_dest, self.previous_state, self.ship_path, self.ship_state, self.turn_start, self.has_moved, command_queue)
                 # if ship is dropoff builder
                 if self.is_builder(ship):
                     # if enough halite and havent built a dropoff this turn
@@ -1119,7 +1120,6 @@ class main():
                         self.game_map[ship.position].mark_unsafe(ship)
                         command_queue.append(ship.move(Direction.Still))
                 else:  # not associated with building a dropoff, so move regularly
-                    MP = MoveProcessor(self.game, self.ship_obj, self.ship_dest, self.previous_state, self.ship_path, self.ship_state, self.turn_start, self.has_moved, command_queue)
                     move = MP.produce_move(ship)
                     command_queue.append(ship.move(move))
                     self.previous_position[ship.id] = ship.position
