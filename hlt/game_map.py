@@ -460,11 +460,11 @@ class GameMap:
                 if cell.inspired is None:
                     cell.inspired = cell.enemy_amount >= 2
 
-                if 0 < cell.halite_amount <= self.HALITE_STOP:
-                    ratio = cell.halite_amount / (2 * self.calculate_distance(cell.position, closest_d))
-                    heappush(self.halite_priority, (-1 * ratio, cell.position))
+                # if 0 < cell.halite_amount <= self.HALITE_STOP:
+                #     ratio = cell.halite_amount / (2 * self.calculate_distance(cell.position, closest_d))
+                #     heappush(self.halite_priority, (-1 * ratio, cell.position))
 
-                elif cell.halite_amount > 0:
+                if cell.halite_amount > 0:
                     factor = self.cell_factor(closest_d, cell, me, backup)
                     heappush(self.halite_priority, (factor, cell.position))
 
@@ -487,7 +487,7 @@ class GameMap:
         if cell.position in dropoff_positions:
             return 1000
 
-        neighbours = self.get_cells_in_area(cell, 2)
+        neighbours = self.get_neighbours(cell)
         n_factor_sum = 0  # neighbour factor sum
         # get rid of dropoffs
         for neighbour in neighbours[:]:
@@ -495,9 +495,9 @@ class GameMap:
                 cntr, neighbour, backup)
             if neighbour.position in dropoff_positions:
                 neighbours.remove(neighbour)
-            elif neighbour.halite_amount <= self.HALITE_STOP:
+            elif neighbour.halite_amount * inspire_multiplier <= self.HALITE_STOP:
                 # maybe smt more punishing
-                n_factor_sum += self.cell_heuristic(
+                n_factor_sum -= self.cell_heuristic(
                     neighbour.halite_amount * inspire_multiplier, self.calculate_distance(neighbour.position, cntr))
             else:
                 n_factor_sum += self.cell_heuristic(

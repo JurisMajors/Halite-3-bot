@@ -51,8 +51,8 @@ ship_obj = {}  # ship.id to ship obj for processing crashed ship stuff
 crashed_positions = []  # heap of (-1 * halite, crashed position )
 crashed_ship_positions = []  # list of crashed ship positions
 
-heuristic_variables = [0, .8, 0, 0.01, 0.78, 1.05]
-VARIABLES = ["YEEHAW", 1285, 0.4, 0.9, 0.85, 500, 50, 0.55] + \
+heuristic_variables = [0, 1, 0, 0.01, 0.78, 1.05]
+VARIABLES = ["YEEHAW", 1285, 0.4, 0.85, 0.95, 500, 50, 0.55] + \
     heuristic_variables + [0.9, 0.15, 0.25, 4, 8]
 VERSION = VARIABLES[1]
 # when switch collectable percentage of max halite
@@ -116,7 +116,7 @@ def ship_priority_q(me, game_map):
                     s.position].dijkstra_distance * game_map.width - 1
             elif ship_state[s.id] in ["exploring", "build", "backup", "fleet"]:
                 if s.id in ship_dest:
-                    destination = ship_dest[ship.id]
+                    destination = ship_dest[s.id]
                 else:
                     destination = shipyard
                 importance = game_map.calculate_distance(
@@ -185,25 +185,24 @@ def halite_priority_q(pos, area):
     return h
 
 
-def find_new_destination(h, ship):
+def find_new_destination(h, this_ship):
     ''' h: priority queue of halite factors,
     halite_pos: dictionary of halite factor -> patch position '''
 
-    ship_id = ship.id
+    ship_id = this_ship.id
     biggest_halite, position = heappop(h)  # get biggest halite
     destination = game_map.normalize(position)
     not_first_dest = ship_id in ship_dest
     # repeat while not a viable destination, or enemies around the position or
     # too many ships going to that dropoff area
     # or the same destination as before
-    while bad_destination(ship, destination):
+    while bad_destination(this_ship, destination):
         # if no more options, use the same destination
         if len(h) == 0:
             logging.info("ran out of options")
             return
         biggest_halite, position = heappop(h)
         destination = game_map.normalize(position)
-
     ship_dest[ship_id] = destination  # set the destination
     # if another ship had the same destination
     s = get_ship_w_destination(destination, ship_id)
@@ -211,20 +210,19 @@ def find_new_destination(h, ship):
         process_new_destination(s)
 
 
-def process_new_destination(ship):
+def process_new_destination(this_ship):
     """ Processes new destination for ship """ 
-    ship_path[ship.id] = []
-    if ship.position in get_dropoff_positions():
-        find_new_destination(game_map.halite_priority, ship)
+    ship_path[this_ship.id] = []
+    if this_ship.position in get_dropoff_positions() or this_ship.id not in ship_dest:
+        find_new_destination(game_map.halite_priority, this_ship)
     else:
-        if game_map.calculate_distance(ship.position, ship_dest[ship.id]) <= CLOSE_TO_SHIPYARD * game_map.width :
-            source = ship.position
-        else:
-            source = ship_dest[ship.id]
+        # if game_map.calculate_distance(ship.position, ship_dest[ship.id]) <= CLOSE_TO_SHIPYARD * game_map.width :
+        #     source = ship.position
+        # else:
+        source = ship_dest[this_ship.id]
 
         ship_h = halite_priority_q(source, SHIP_SCAN_AREA)
-        find_new_destination(ship_h, ship)
-
+        find_new_destination(ship_h, this_ship)
 
 def too_many_near_dropoff(ship, destination):
     ''' checks if ship distribution over dropoffs is balanced '''
@@ -234,27 +232,27 @@ def too_many_near_dropoff(ship, destination):
         return prcntg_ships_returning_to_doff(get_shipyard(destination)) > (1 / len(get_dropoff_positions()))
 
 
-def bad_destination(ship, destination):
+def bad_destination(this_ship, destination):
     """ definition of unviable destination for ship """
     if game.turn_number <= SPAWN_TURN:
-        return not dest_viable(destination, ship) or game_map[destination].enemy_amount >= UNSAFE_AREA\
+        return not dest_viable(destination, this_ship) or game_map[destination].enemy_amount >= UNSAFE_AREA\
             or too_many_near_dropoff(ship, destination)
     else:
-        return not dest_viable(destination, ship) or game_map[destination].enemy_amount >= UNSAFE_AREA
+        return not dest_viable(destination, this_ship) or game_map[destination].enemy_amount >= UNSAFE_AREA
 
 
-def dest_viable(position, ship):
+def dest_viable(position, this_ship):
     """ is a destination viable for ship, i.e. 
     if any other ship is going there, if thats the case
     then if that ship is further away than ship """
     if position in ship_dest.values():
         # get another ship with same destination
-        inspectable_ship = get_ship_w_destination(position, ship.id)
+        inspectable_ship = get_ship_w_destination(position, this_ship.id)
         if inspectable_ship is None:  # shouldnt happen but for safety
             # if this ship doesnt exist for some reason
             return True
 
-        my_dist = game_map.calculate_distance(position, ship.position)
+        my_dist = game_map.calculate_distance(position, this_ship.position)
         their_dist = game_map.calculate_distance(
             position, inspectable_ship.position)
 
@@ -346,7 +344,7 @@ def make_returning_move(ship, has_moved, command_queue):
                     elif other_ship.id in ship_path and ship_path[other_ship.id] and ship_path[other_ship.id][0][0] == Direction.Still:
                         move = a_star_move(ship)
                 else:
-                    move = a_star_move(ship)
+                    move = Direction.Still
 
             elif ship_state[other_ship.id] in ["returning", "harakiri"]:  # suiciding
                 move = Direction.Still
@@ -410,7 +408,8 @@ def state_switch(ship_id, new_state):
         ship_state[ship_id] = previous_state[ship_id]
     if not new_state == "exploring":  # reset path to empty list
         ship_path[ship_id] = []
-
+    if new_state == "returning":
+        ship_dest[ship.id] = game_map[ship.position].dijkstra_dest
     previous_state[ship_id] = ship_state[ship_id]
     ship_state[ship_id] = new_state
 
@@ -670,8 +669,7 @@ def returning_transition(ship):
     elif ship.position in get_dropoff_positions():
         # explore again when back in shipyard
         new_state = "exploring"
-        find_new_destination(
-            game_map.halite_priority, ship)
+        process_new_destination(ship)
     elif game_map.calculate_distance(ship.position, game_map[ship.position].dijkstra_dest) == 1:
         # if next to a dropoff
         cell = game_map[game_map[ship.position].dijkstra_dest]
@@ -754,7 +752,7 @@ def backup_transition(ship):
         ship_path[ship.id] = []
         new_state = "collecting"
     elif ship.halite_amount >= constants.MAX_HALITE * return_percentage:
-        new_State = "returning"
+        new_state = "returning"
     elif game_map.calculate_distance(ship.position, destination) == 1:
         if game_map[destination].is_occupied and me.has_ship(game_map[destination].ship.id):
             ship_dest[ship.id] = get_best_neighbour(destination).position
@@ -814,9 +812,7 @@ def state_transition(ship):
         new_state = "returning"
 
     elif ship.position in get_dropoff_positions():
-        ship_path[ship.id] = []
-        find_new_destination(
-            game_map.halite_priority, ship)
+        process_new_destination(ship)
         new_state = "exploring"
 
     elif ship.halite_amount >= constants.MAX_HALITE * return_percentage and ship_state[ship.id] not in ["build", "waiting", "collecting", "returning"]:
@@ -1228,6 +1224,23 @@ def process_backup_sending():
             # send a backup fleet there
             send_ships(crashed_pos, 2, "backup", is_savior)
 
+def deal_with_duplicate_destinations():
+    # create inverted ship_dest , s.t. position -> ship.id
+    inv_dest = {}
+    for k, v in ship_dest.items():
+        if k in ship_state and ship_state[k] in ["exploring","backup","fleet", "collecting"]:
+            if v not in inv_dest:
+                inv_dest[v] = k
+            else: # duplicate
+                first = me.get_ship(inv_dest[v]) # first ship
+                second = me.get_ship(k) # second ship
+                # if second closer to it than first
+                if game_map.calculate_distance(first.position, v) > game_map.calculate_distance(second.position, v):
+                    ship_dest[second.id] = v
+                    process_new_destination(first) # get new dest for first
+                else: # else new dest for other
+                    process_new_destination(second)
+
 
 clusters_determined = False
 enable_backup = True
@@ -1240,6 +1253,7 @@ while True:
     game_map = game.game_map
     command_queue = []
 
+    clear_dictionaries()  # of crashed or transformed ships
     if game.turn_number == 1:
         game_map.HALITE_STOP = INITIAL_HALITE_STOP
         game_map.c = [A, B, C, D, E, F]  # set the heuristic constants
@@ -1255,7 +1269,7 @@ while True:
     # initialize shipyard halite, inspiring stuff and other
     game_map.init_map(me, list(game.players.values()), enable_inspire, enable_backup)
     logging.info(f"map init took {time.time() - TURN_START} time")
-
+    deal_with_duplicate_destinations()
     if game.turn_number == 1:
         TOTAL_MAP_HALITE = game_map.total_halite
 
@@ -1308,7 +1322,7 @@ while True:
         # setup state
         # if ship hasnt received a destination yet
         if ship.id not in ship_dest or not ship.id in ship_state:
-            find_new_destination(game_map.halite_priority, ship)
+            process_new_destination(ship)
             previous_state[ship.id] = "exploring"
             ship_state[ship.id] = "exploring"  # explore
 
