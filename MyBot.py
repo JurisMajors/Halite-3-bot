@@ -53,7 +53,7 @@ ship_obj = {}  # ship.id to ship obj for processing crashed ship stuff
 crashed_positions = []  # heap of (-1 * halite, crashed position )
 crashed_ship_positions = []  # list of crashed ship positions
 
-heuristic_variables = [0, .8, 0, 0.01, 0.78, 1.05]
+heuristic_variables = [0, 0.8, 0, 0.01, 0.78, 1.05]
 VARIABLES = ["YEEHAW", 1285, 0.4, 0.9, 0.85, 500, 50, 0.55] + \
     heuristic_variables + [0.9, 0.15, 0.25, 4, 8]
 VERSION = VARIABLES[1]
@@ -91,7 +91,7 @@ EXTRA_FLEET_MAP_SIZE = 32  # which maps >= to send fleets on
 BUSY_PERCENTAGE = 0.15
 BUSY_RETURN_AMOUNT = 400
 
-game.ready("v53")
+game.ready("v54")
 NR_OF_PLAYERS = len(game.players.keys())
 # for dropoff filtering, what should be minimum value of halite around the
 # dropoff in 5x5 area
@@ -207,7 +207,11 @@ def find_new_destination(h, this_ship):
         destination = game_map.normalize(position)
     ship_dest[ship_id] = destination  # set the destination
     # if another ship had the same destination
-    s = get_ship_w_destination(destination, ship_id)
+    reassign_duplicate_dests(destination, ship_id)
+
+def reassign_duplicate_dests(destination, this_id):
+    # if another ship had the same destination
+    s = get_ship_w_destination(destination, this_id)
     if s:  # find a new destination for it
         for other in s:
             process_new_destination(other)
@@ -330,9 +334,14 @@ def make_returning_move(ship, has_moved, command_queue):
             if other_ship.id not in ship_state or ship_state[other_ship.id] in ["exploring", "build", "fleet",
                                                                                 "backup"]:
                 can_move = other_ship.halite_amount >= game_map[
-                           other_ship.position].halite_amount * 0.1 
+                           other_ship.position].halite_amount / constants.MOVE_COST_RATIO
+
+                if other_ship.id in ship_dest:
+                    can_move = can_move and ship_dest[other_ship.id] != other_ship.position
                 # if other ship has enough halite to move, hasnt made a move
                 # yet, and if it would move in the ship
+                if other_ship.id  in ship_path:
+                    logging.info(ship_path[other_ship.id])
                 if not has_moved[other_ship.id] and \
                         (can_move or other_ship.position in get_dropoff_positions()):
                     if (other_ship.id not in ship_path or (not ship_path[other_ship.id] or
@@ -340,20 +349,28 @@ def make_returning_move(ship, has_moved, command_queue):
                         # move stays the same target move
                         # move other_ship to ship.position
                         # hence swapping ships
+                        logging.info(f"swapping w {other_ship.id}")
                         move_ship_to_position(other_ship, ship.position)
                     elif other_ship.id in ship_path and ship_path[other_ship.id] and ship_path[other_ship.id][0][0] == Direction.Still:
                         move = a_star_move(ship)
-                else:
+                        logging.info(f"other_id {other_ship.id}, its path {ship_path[other_ship.id]}")
+                else: # wait until can move
+                    logging.info(f"waiting for {other_ship.id} to move")
+                    logging.info(f"hasmoved {has_moved[other_ship.id]}")
+                    logging.info(f"canmove {can_move}")
                     move = Direction.Still
 
             elif ship_state[other_ship.id] in ["returning", "harakiri"]:  # suiciding
                 move = Direction.Still
             elif ship_state[other_ship.id] in ["collecting", "waiting"]:  # move around these ships
-                move = a_star_move(ship)
+                if ship_state[other_ship.id] == "collecting" and game_map[other_ship.position].halite_amount - game_map[other_ship.position].halite_amount/constants.EXTRACT_RATIO <= game_map.HALITE_STOP:
+                    move = Direction.Still
+                else:
+                    move = a_star_move(ship)
 
         else:  # target position occupied by enemy ship
             move = a_star_move(ship)
-
+    logging.info(move)
     return move
 
 
@@ -430,7 +447,7 @@ def produce_move(ship):
     destination = ship_dest[ship.id]
     ''' produces move for ship '''
 
-    if ship.halite_amount < game_map[ship.position].halite_amount * 0.1:
+    if ship.halite_amount < game_map[ship.position].halite_amount / constants.MOVE_COST_RATIO:
         return Direction.Still
 
     mover = {
@@ -484,14 +501,26 @@ def exploring(ship, destination):
         next_pos = ship.position.directional_offset(direction)
         if game_map[next_pos].is_occupied and not direction == Direction.Still:
             other_ship = game_map[next_pos].ship
-            # move to intermediate destination, aka move around
-            new_dest = interim_exploring_dest(
-                ship.position, ship_path[ship.id])
-            # use intermediate unoccpied position instead of actual dest
-            ship_path[ship.id] = game_map.explore(
-                ship, new_dest) + ship_path[ship.id]
-                # add rest of the path, interim path + rest of path
-
+            if other_ship.id in ship_state and ship_state[other_ship.id] in ["exploring", "build", "fleet", "backup"]:
+                can_move = other_ship.halite_amount >= game_map[
+                    other_ship.position].halite_amount / constants.MOVE_COST_RATIO and not has_moved[other_ship.id]
+                if other_ship.id in ship_path and can_move:
+                    pass
+                else:
+                    logging.info("goin around with new path")
+                    ship_path[ship.id] = game_map.explore(ship, destination)
+                    logging.info(ship_path[ship.id])
+            elif other_ship.id in ship_state and ship_state[other_ship.id] == "returning":
+                return Direction.Still
+            else:
+                logging.info("interim dest calculating")
+                # move to intermediate destination, aka move around
+                new_dest = interim_exploring_dest(
+                    ship.position, ship_path[ship.id])
+                # use intermediate unoccpied position instead of actual dest
+                ship_path[ship.id] = game_map.explore(
+                    ship, new_dest) + ship_path[ship.id]
+                    # add rest of the path, interim path + rest of path
     # move in calculated direction
     return get_step(ship_path[ship.id])
 
@@ -605,6 +634,7 @@ def exploring_transition(ship):
     elif game_map[ship.position].inspired and game_map[ship.position].enemy_amount <= UNSAFE_AREA:
         # for inspiring
         ship_dest[ship.id] = get_best_neighbour(ship.position).position
+        reassign_duplicate_dests(ship_dest[ship.id], ship.id)
 
     elif euclid_to_dest <= 2\
             and exists_better_in_area(ship.position, ship_dest[ship.id], 4):
@@ -641,8 +671,8 @@ def collecting_transition(ship):
 
     elif ship.halite_amount <= constants.MAX_HALITE * 0.4 and ENABLE_COMBAT\
             and dist_to_enemy_doff(ship.position) >= CLOSE_TO_SHIPYARD * game_map.width:
-
         new_state = attempt_switching_assasinate(ship)
+
     elif game_map[ship.position].enemy_neighbouring:  # if enemy right next to it
         # move to neighbour that has minimal enemies, but more halite
         ratio = cell_halite / (game_map[ship.position].enemy_neighbouring + 1)
@@ -656,6 +686,7 @@ def collecting_transition(ship):
         ship_path[ship.id] = []
         new_state = "exploring"
         ship_dest[ship.id] = n.position
+        reassign_duplicate_dests(ship_dest[ship.id], ship.id)
 
     return new_state
 
@@ -688,6 +719,7 @@ def fleet_transition(ship):
     elif game_map.calculate_distance(ship.position, destination) == 1:
         if game_map[destination].is_occupied:
             ship_dest[ship.id] = get_best_neighbour(destination).position
+            reassign_duplicate_dests(ship_dest[ship.id], ship.id)
     elif ship.id in fleet_leader:
         leader = fleet_leader[ship.id]
         if me.has_ship(leader.id) and ship_state[leader.id] not in ["waiting", "build"]:
@@ -705,6 +737,7 @@ def builder_transition(ship):
     if future_dropoff_cell.has_structure:
         if distance_to_dest <= CLOSE_TO_SHIPYARD * game_map.width:
             ship_dest[ship.id] = bfs_unoccupied(future_dropoff_cell.position)
+            reassign_duplicate_dests(ship_dest[ship.id], ship.id)
         else:
             process_new_destination(ship)
             new_state = "exploring"
@@ -719,6 +752,7 @@ def builder_transition(ship):
             if n.is_occupied and not me.has_ship(n.ship.id):
                 new_state = "build"
                 ship_dest[ship.id] = get_best_neighbour(ship.position).position
+                reassign_duplicate_dests(ship_dest[ship.id], ship.id)
                 break
     elif NR_OF_PLAYERS == 4 or game_map.width >= 56: # for 4 players and large maps 1v1
         smallest_dist = dist_to_enemy_doff(ship_dest[ship.id])
@@ -736,11 +770,13 @@ def waiting_transition(ship):
         if n.is_occupied and not me.has_ship(n.ship.id):
             new_state = "build"
             ship_dest[ship.id] = get_best_neighbour(ship.position).position
+            reassign_duplicate_dests(ship_dest[ship.id], ship.id)
             break
     else:
         if cell.halite_amount <= 500 or (ship.is_full and cell.halite_amount <= 800):
             new_state = "build"
             ship_dest[ship.id] = get_best_neighbour(ship.position).position
+            reassign_duplicate_dests(ship_dest[ship.id], ship.id)
 
     return new_state
 
@@ -756,6 +792,7 @@ def backup_transition(ship):
     elif game_map.calculate_distance(ship.position, destination) == 1:
         if game_map[destination].is_occupied and me.has_ship(game_map[destination].ship.id):
             ship_dest[ship.id] = get_best_neighbour(destination).position
+            reassign_duplicate_dests(ship_dest[ship.id], ship.id)
         elif game_map[destination].is_occupied:  # not our ship
             new_state = attempt_switching_assasinate(ship)
     elif game_map[destination].enemy_amount >= UNSAFE_AREA:
@@ -1256,7 +1293,8 @@ while True:
         TOTAL_MAP_HALITE = game_map.total_halite
 
     prcntg_halite_left = game_map.total_halite / TOTAL_MAP_HALITE
-    if clusters_determined and not cluster_centers:
+    # if clusters_determined and not cluster_centers:
+    if game.turn_number >= SPAWN_TURN:
         game_map.HALITE_STOP = prcntg_halite_left * INITIAL_HALITE_STOP
 
     if crashed_ship_positions and game.turn_number < CRASH_TURN and enable_backup:
@@ -1311,8 +1349,8 @@ while True:
         # transition
         state_transition(ship)
 
-        # logging.info("SHIP {}, STATE {}, DESTINATION {}".format(
-        #     ship.id, ship_state[ship.id], ship_dest[ship.id]))
+        logging.info("SHIP {}, STATE {}, DESTINATION {}".format(
+            ship.id, ship_state[ship.id], ship_dest[ship.id]))
 
         # if ship is dropoff builder
         if builder_at_destination(ship):
