@@ -497,7 +497,7 @@ class GameMap:
                 neighbours.remove(neighbour)
             elif neighbour.halite_amount * inspire_multiplier <= self.HALITE_STOP:
                 # maybe smt more punishing
-                n_factor_sum -= self.cell_heuristic(
+                n_factor_sum += self.cell_heuristic(
                     neighbour.halite_amount * inspire_multiplier, self.calculate_distance(neighbour.position, cntr))
             else:
                 n_factor_sum += self.cell_heuristic(
@@ -505,7 +505,7 @@ class GameMap:
 
         multiplier = self.get_inspire_multiplier(cntr, cell, backup)
         # cells factor
-        c_factor = len(neighbours) * self.cell_heuristic(cell.halite_amount * multiplier,
+        c_factor = len(neighbours) *self.cell_heuristic(cell.halite_amount * multiplier,
                                                          self.calculate_distance(cell.position, cntr))
         return round(-1 * (c_factor + n_factor_sum), 2)
 
