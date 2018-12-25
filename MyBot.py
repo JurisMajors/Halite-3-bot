@@ -89,7 +89,7 @@ SHIP_SCAN_AREA = 20  # area to scan around ship when changing destinations
 EXTRA_FLEET_MAP_SIZE = 32  # which maps >= to send fleets on
 # % of patches that have a ship on them for ships to return earlier
 BUSY_PERCENTAGE = 0.15
-BUSY_RETURN_AMOUNT = 400
+BUSY_RETURN_AMOUNT = 0.5 * constants.MAX_HALITE
 
 game.ready("v54")
 NR_OF_PLAYERS = len(game.players.keys())
@@ -349,21 +349,17 @@ def make_returning_move(ship, has_moved, command_queue):
                         # move stays the same target move
                         # move other_ship to ship.position
                         # hence swapping ships
-                        logging.info(f"swapping w {other_ship.id}")
                         move_ship_to_position(other_ship, ship.position)
                     elif other_ship.id in ship_path and ship_path[other_ship.id] and ship_path[other_ship.id][0][0] == Direction.Still:
                         move = a_star_move(ship)
-                        logging.info(f"other_id {other_ship.id}, its path {ship_path[other_ship.id]}")
                 else: # wait until can move
-                    logging.info(f"waiting for {other_ship.id} to move")
-                    logging.info(f"hasmoved {has_moved[other_ship.id]}")
-                    logging.info(f"canmove {can_move}")
                     move = Direction.Still
 
-            elif ship_state[other_ship.id] in ["returning", "harakiri"]:  # suiciding
+            elif ship_state[other_ship.id] in ["returning", "harakiri"]:  # suiciding or queue
                 move = Direction.Still
             elif ship_state[other_ship.id] in ["collecting", "waiting"]:  # move around these ships
-                if ship_state[other_ship.id] == "collecting" and game_map[other_ship.position].halite_amount - game_map[other_ship.position].halite_amount/constants.EXTRACT_RATIO <= game_map.HALITE_STOP:
+                if ship_state[other_ship.id] == "collecting" and \
+                game_map[other_ship.position].halite_amount - game_map[other_ship.position].halite_amount / constants.EXTRACT_RATIO <= game_map.HALITE_STOP:
                     move = Direction.Still
                 else:
                     move = a_star_move(ship)
@@ -501,26 +497,13 @@ def exploring(ship, destination):
         next_pos = ship.position.directional_offset(direction)
         if game_map[next_pos].is_occupied and not direction == Direction.Still:
             other_ship = game_map[next_pos].ship
-            if other_ship.id in ship_state and ship_state[other_ship.id] in ["exploring", "build", "fleet", "backup"]:
-                can_move = other_ship.halite_amount >= game_map[
-                    other_ship.position].halite_amount / constants.MOVE_COST_RATIO and not has_moved[other_ship.id]
-                if other_ship.id in ship_path and can_move:
-                    pass
-                else:
-                    logging.info("goin around with new path")
-                    ship_path[ship.id] = game_map.explore(ship, destination)
-                    logging.info(ship_path[ship.id])
-            elif other_ship.id in ship_state and ship_state[other_ship.id] == "returning":
-                return Direction.Still
-            else:
-                logging.info("interim dest calculating")
-                # move to intermediate destination, aka move around
-                new_dest = interim_exploring_dest(
-                    ship.position, ship_path[ship.id])
-                # use intermediate unoccpied position instead of actual dest
-                ship_path[ship.id] = game_map.explore(
-                    ship, new_dest) + ship_path[ship.id]
-                    # add rest of the path, interim path + rest of path
+            # move to intermediate destination, aka move around
+            new_dest = interim_exploring_dest(
+                ship.position, ship_path[ship.id])
+            # use intermediate unoccpied position instead of actual dest
+            ship_path[ship.id] = game_map.explore(
+                ship, new_dest) + ship_path[ship.id]
+                # add rest of the path, interim path + rest of path
     # move in calculated direction
     return get_step(ship_path[ship.id])
 
@@ -616,6 +599,7 @@ def get_enemy_dropoff_positions():
             positions.append(player.shipyard.position)
             for d_off in player.get_dropoffs():
                 positions.append(d_off.position)
+
     return positions
 
 
@@ -656,7 +640,7 @@ def collecting_transition(ship):
     if ship.is_full:
         new_state = "returning"
 
-    elif game_map.percentage_occupied >= BUSY_PERCENTAGE and ship.halite_amount >= BUSY_RETURN_AMOUNT:
+    elif game_map.percentage_occupied >= BUSY_PERCENTAGE and ship.halite_amount >= BUSY_RETURN_AMOUNT and NR_OF_PLAYERS == 4:
         new_state = "returning"
 
     elif ship.halite_amount >= constants.MAX_HALITE * return_percentage and \
@@ -697,10 +681,12 @@ def returning_transition(ship):
             game_map[ship.position].parent.is_occupied and not me.has_ship(game_map[ship.position].parent.ship.id):
         new_state = "assassinate"
         ship_dest[ship.id] = game_map[ship.position].parent.position
+
     elif ship.position in get_dropoff_positions():
         # explore again when back in shipyard
         new_state = "exploring"
         process_new_destination(ship)
+
     elif game_map.calculate_distance(ship.position, game_map[ship.position].dijkstra_dest) == 1:
         # if next to a dropoff
         cell = game_map[game_map[ship.position].dijkstra_dest]
@@ -716,10 +702,12 @@ def fleet_transition(ship):
     if ship.position == destination:  # if arrived
         ship_path[ship.id] = []
         new_state = "collecting"
+
     elif game_map.calculate_distance(ship.position, destination) == 1:
         if game_map[destination].is_occupied:
             ship_dest[ship.id] = get_best_neighbour(destination).position
             reassign_duplicate_dests(ship_dest[ship.id], ship.id)
+
     elif ship.id in fleet_leader:
         leader = fleet_leader[ship.id]
         if me.has_ship(leader.id) and ship_state[leader.id] not in ["waiting", "build"]:
