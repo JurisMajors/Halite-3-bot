@@ -22,10 +22,10 @@ class MapCell:
         self.ship = None
         self.structure = None
         self.percentage_occupied = None
-        self.enemy_amount = 0 # in inspired radius
+        self.enemy_amount = 0  # in inspired radius
         self.inspired = None
         self.enemy_neighbouring = 0
-
+        self.close_friendly_ships = 0
 
         # Parameters for Dijkstra (to nearest dropoff/shipyard)
         self.weight_to_shipyard = 0
@@ -416,7 +416,6 @@ class GameMap:
                 return False
         return True
 
-
     def bfs_around_enemy(self, position, distance):
         """ BFS around position assuming thats an enemy ship position,
         in radius - distance, incrementing cells parameter .enemy_amount 
@@ -429,8 +428,8 @@ class GameMap:
             visited.add(cur)
             self[cur].enemy_amount += 1
             for neighbour in self.get_neighbours(self[cur]):
-                if neighbour.position not in visited\
-                and self.calculate_distance(position, neighbour.position) <= distance:
+                if neighbour.position not in visited \
+                        and self.calculate_distance(position, neighbour.position) <= distance:
                     Q.append(neighbour.position)
                     visited.add(neighbour.position)
 
@@ -465,10 +464,9 @@ class GameMap:
                     heappush(self.halite_priority, (factor, cell.position))
 
                 if cell.is_occupied:
-                   num_occupied += 1
+                    num_occupied += 1
 
         self.percentage_occupied = num_occupied / (self.height * self.width)
-
 
     def get_dropoff_positions(self, player):
         # returns a players dropoff positions including shipyard
@@ -501,15 +499,15 @@ class GameMap:
 
         multiplier = self.get_inspire_multiplier(cntr, cell, backup)
         # cells factor
-        c_factor = len(neighbours) *self.cell_heuristic(cell.halite_amount * multiplier,
+        c_factor = len(neighbours) * self.cell_heuristic(cell.halite_amount * multiplier,
                                                          self.calculate_distance(cell.position, cntr))
         return round(-1 * (c_factor + n_factor_sum), 2)
 
     def get_inspire_multiplier(self, cntr, cell, backup):
         if cell.inspired is None:
             cell.inspired = cell.enemy_amount >= constants.INSPIRATION_SHIP_COUNT
-        if cell.inspired and self.calculate_distance(cntr, cell.position) <= constants.INSPIRATION_RADIUS\
-        and (not backup or cell.halite_amount <= constants.MAX_HALITE):
+        if cell.inspired and self.calculate_distance(cntr, cell.position) <= constants.INSPIRATION_RADIUS \
+                and (not backup or cell.halite_amount <= constants.MAX_HALITE):
             return constants.INSPIRED_BONUS_MULTIPLIER
         else:
             return 1
@@ -534,6 +532,45 @@ class GameMap:
                 if not pos == cell.position:
                     cells.append(self[pos])
         return cells
+
+    def set_close_friendly_ships(self, me):
+        """ Sets a number of close friendly ships for each cell """
+        # reset close friendly ships
+        for y in range(self.height):
+            for x in range(self.width):
+                self[Position(x, y)].close_friendly_ships = 0
+
+        for y in range(self.height):
+            for x in range(self.width):
+                if self[Position(x, y)].ship in me.get_ships():
+                    self.set_area(self[Position(x, y)])
+
+    def set_area(self, cell, area=4):
+        top_left = Position(int(-1 * area / 2),
+                            int(-1 * area / 2)) + cell.position  # top left of scan area
+
+        for y in range(area):
+            for x in range(area):
+                pos = Position((top_left.x + x) % self.width,
+                               (top_left.y + y) % self.height)
+                self[pos].close_friendly_ships += 1
+
+    def get_most_dense_dropoff_position(self, dropoff_positions, min_dist=10):
+        """ Returns the position of the cell with the most close friendly ships that is at least
+        min_dist away from all other dropoffs """
+        max_nearby = 0  # maximum nearby friendly ships
+        best_pos = Position(0, 0)
+        for x in range(self.width):
+            for y in range(self.height):
+                if self[Position(x, y)].structure is not None:
+                    continue
+                if self[Position(x, y)].close_friendly_ships > max_nearby:
+                    for d in dropoff_positions:
+                        if self.euclidean_distance(Position(x, y), d) > min_dist:
+                            max_nearby = self[Position(x, y)].close_friendly_ships
+                            best_pos = Position(x, y)
+
+        return best_pos
 
     @staticmethod
     def _generate():

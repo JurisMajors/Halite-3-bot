@@ -55,7 +55,7 @@ crashed_ship_positions = []  # list of crashed ship positions
 
 heuristic_variables = [0, 0.8, 0, 0.01, 0.98, 1.05]
 VARIABLES = ["YEEHAW", 1285, 0.4, 0.9, 0.95, 500, 50, 0.55] + \
-    heuristic_variables + [0.9, 0.15, 0.25, 8, 8]
+    heuristic_variables + [0.9, 0.15, 0.15, 8, 8]
 VERSION = VARIABLES[1]
 # when switch collectable percentage of max halite
 PERCENTAGE_SWITCH = int(float(VARIABLES[2]) * constants.MAX_TURNS)
@@ -90,6 +90,8 @@ EXTRA_FLEET_MAP_SIZE = 32  # which maps >= to send fleets on
 # % of patches that have a ship on them for ships to return earlier
 BUSY_PERCENTAGE = 0.15
 BUSY_RETURN_AMOUNT = 0.5 * constants.MAX_HALITE
+
+MAX_SHIP_DROPOFF_RATIO = 40  # for each 40 ships there should be a dropoff
 
 game.ready("v54")
 NR_OF_PLAYERS = len(game.players.keys())
@@ -991,6 +993,17 @@ def fleet_availability():
 
 def should_build():
     """ definition of sending a ship to build """
+    if len(me.get_ships()) / len(get_dropoff_positions()) >= MAX_SHIP_DROPOFF_RATIO and not any_builders():
+        # there are more than 40 ships per dropoff
+        if cluster_centers:  # there is already a dropoff position
+            return True
+        # there is no good dropoff position yet, make one
+        game_map.set_close_friendly_ships(me)
+        pos = game_map.get_most_dense_dropoff_position(get_dropoff_positions())
+        cluster_centers.append((10000, pos))  # fake 10000 halite for new needed cluster
+        return True
+
+    # Original dropoff code
     return clusters_determined and game.turn_number >= dropoff_last_built + 15 and cluster_centers\
         and len(me.get_ships()) > (len(get_dropoff_positions()) + 1) * FLEET_SIZE\
         and fleet_availability() >= 1.5 * FLEET_SIZE and not any_builders()
@@ -1127,8 +1140,10 @@ def predict_centers():
 def clusters_with_classifier():
     ''' uses classifier to determine clusters for dropoff '''
     cluster_centers = predict_centers()
+    logging.info(f"found {len(cluster_centers)} clusters from classifier")
     # do filtering
     cluster_centers = filter_clusters(cluster_centers, MAX_CLUSTERS)
+    logging.info(f"found {len(cluster_centers)} clusters after filtering")
     logging.info("Finally")
     logging.info(cluster_centers)
     return cluster_centers
