@@ -29,8 +29,8 @@ import numpy as np
 from math import ceil
 from copy import deepcopy
 
-# stderr = sys.stderr
-# sys.stderr = open(os.devnull, 'w')
+stderr = sys.stderr
+sys.stderr = open(os.devnull, 'w')
 
 dropoff_clf = pickle.load(open('mlp.sav', 'rb'))
 # This game object contains the initial game state.
@@ -55,7 +55,7 @@ crashed_ship_positions = []  # list of crashed ship positions
 
 heuristic_variables = [0, 0.8, 0, 0.01, 0.98, 1.05]
 VARIABLES = ["YEEHAW", 1285, 0.4, 0.9, 0.95, 500, 50, 0.55] + \
-    heuristic_variables + [0.9, 0.15, 0.25, 4, 8]
+    heuristic_variables + [0.9, 0.15, 0.25, 8, 8]
 VERSION = VARIABLES[1]
 # when switch collectable percentage of max halite
 PERCENTAGE_SWITCH = int(float(VARIABLES[2]) * constants.MAX_TURNS)
@@ -80,7 +80,7 @@ CRASH_SELECTION_TURN = int(float(VARIABLES[14]) * constants.MAX_TURNS)
 # Minimum halite needed to join a halite cluster
 DETERMINE_CLUSTER_TURN = int(float(VARIABLES[15]) * constants.MAX_TURNS)
 CLUSTER_TOO_CLOSE = float(VARIABLES[16])  # distance two clusters can be within
-MAX_CLUSTERS = int(VARIABLES[17])  # max amount of clusters
+MAX_CLUSTERS = int(VARIABLES[17])  # max amount of clusters: currently 8
 FLEET_SIZE = int(VARIABLES[18])  # fleet size to send for new dropoff
 
 CLOSE_TO_SHIPYARD = 0.18  # close to main shipyard
@@ -239,6 +239,8 @@ def too_many_near_dropoff(this_ship, destination):
 
 def bad_destination(this_ship, destination):
     """ definition of unviable destination for ship """
+    if game_map[destination].halite_amount == 0:
+        return True
     if game.turn_number <= SPAWN_TURN:
         return not dest_viable(destination, this_ship) or game_map[destination].enemy_amount >= UNSAFE_AREA\
             or too_many_near_dropoff(this_ship, destination)
