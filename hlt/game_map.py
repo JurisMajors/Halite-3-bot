@@ -460,10 +460,6 @@ class GameMap:
                 if cell.inspired is None:
                     cell.inspired = cell.enemy_amount >= 2
 
-                # if 0 < cell.halite_amount <= self.HALITE_STOP:
-                #     ratio = cell.halite_amount / (2 * self.calculate_distance(cell.position, closest_d))
-                #     heappush(self.halite_priority, (-1 * ratio, cell.position))
-
                 if cell.halite_amount > 0:
                     factor = self.cell_factor(closest_d, cell, me, backup)
                     heappush(self.halite_priority, (factor, cell.position))
@@ -512,7 +508,6 @@ class GameMap:
     def get_inspire_multiplier(self, cntr, cell, backup):
         if cell.inspired is None:
             cell.inspired = cell.enemy_amount >= constants.INSPIRATION_SHIP_COUNT
-                    
         if cell.inspired and self.calculate_distance(cntr, cell.position) <= constants.INSPIRATION_RADIUS\
         and (not backup or cell.halite_amount <= constants.MAX_HALITE):
             return constants.INSPIRED_BONUS_MULTIPLIER

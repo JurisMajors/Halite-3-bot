@@ -1,1 +1,1 @@
-halite.exe --replay-directory replays/ -s  1545601199 -vvv "python MyBot.py" "python 52.py"
+halite.exe --replay-directory replays/ -vvv -s 1545964352 "python MyBot.py" "python MyBot.py"
