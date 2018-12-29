@@ -131,19 +131,6 @@ class GlobalFunctions():
         return 2 - (time.time() - GlobalVariablesSingleton.getInstance().turn_start)
 
 
-    def amount_of_enemies(self, pos, area):
-        top_left = Position(int(-1 * area / 2),
-                            int(-1 * area / 2)) + pos  # top left of scan area
-        amount = 0
-        for y in range(area):
-            for x in range(area):
-                p = Position((top_left.x + x) % self.game_map.width,
-                             (top_left.y + y) % self.game_map.height)  # position of patch
-                if self.game_map[p].is_occupied and not self.me.has_ship(self.game_map[p].ship.id):
-                    amount += 1
-        return amount
-
-
 class ClusterProcessor():
 
     def __init__(self, game):
@@ -194,9 +181,14 @@ class ClusterProcessor():
                 p_data, total_halite, p_center = self.get_patch_data(
                     x, y, cntr)  # get the data
                 prediction = dropoff_clf.predict(p_data)[0]  # predict on it
+                p_center = self.game_map.normalize(p_center)
                 if prediction == 1:  # if should be dropoff
                     # add node with most halite to centers
-                    cluster_centers.append((total_halite, p_center))
+                    for _, c in cluster_centers:
+                        if c == p_center:
+                            break
+                    else:
+                        cluster_centers.append((total_halite, p_center))
         return cluster_centers
 
 
@@ -271,10 +263,7 @@ class ClusterProcessor():
         for d in centers:
             _, other = d
             distance = self.game_map.euclidean_distance(position, other)
-            shipyard_distance = self.game_map.euclidean_distance(
-                self.me.shipyard.position, other)
-            if distance < GC.CLUSTER_TOO_CLOSE * self.game_map.width or \
-                    shipyard_distance < GC.CLOSE_TO_SHIPYARD * self.game_map.width:
+            if distance < GC.CLUSTER_TOO_CLOSE * self.game_map.width:
                 to_remove.append(d)
         return to_remove
 
@@ -318,7 +307,6 @@ class ClusterProcessor():
 
         centers = tmp_centers
         centers.sort(key=lambda x: x[0], reverse=True)  # sort by best patches
-        logging.info("Done merging")
         return centers
 
 
@@ -455,17 +443,17 @@ class DestinationProcessor():
 
     def too_many_near_dropoff(self, ship, destination):
         # if no more options, use the same destination
-        if GlobalFunctions(self.game).get_shipyard(ship.position)== GlobalFunctions(self.game).get_shipyard(destination):
+        if GlobalFunctions(self.game).get_shipyard(ship.position) == GlobalFunctions(self.game).get_shipyard(destination):
             return False
         else:
-            return self.prcntg_ships_returning_to_doff(self.game_map[destination].dijkstra_dest) > (1 / len(GlobalFunctions(self.game).get_dropoff_positions()))
+            return self.prcntg_ships_returning_to_doff(GlobalFunctions(self.game).get_shipyard(destination)) > (1 / len(GlobalFunctions(self.game).get_dropoff_positions()))
 
 
     def prcntg_ships_returning_to_doff(self, d_pos):
         amount = 0
         for s in self.me.get_ships():
             eval_pos = s.position if s.id not in self.ship_dest else self.ship_dest[s.id]
-            if self.game_map[eval_pos].dijkstra_dest == d_pos:
+            if GlobalFunctions(self.game).get_shipyard(eval_pos) == d_pos:
                 amount += 1
         return amount / len(self.me.get_ships())
 
@@ -781,7 +769,7 @@ class StateMachine():
     def state_transition(self):
         # transition
         new_state = None
-        shipyard = self.game_map[self.ship.position].dijkstra_dest
+        shipyard = GlobalFunctions(self.game).get_shipyard(self.ship.position)
         DP = DestinationProcessor(self.game, self.ship_dest, self.ship_state, self.ship_path, self.previous_state)
         GF = GlobalFunctions(self.game)
 
@@ -995,9 +983,9 @@ class StateMachine():
             DP.process_new_destination(self.ship)
             return "exploring"
 
-        elif self.game_map.calculate_distance(self.ship.position, self.game_map[self.ship.position].dijkstra_dest) == 1:
-            # if next to a dropoff
-            cell = self.game_map[self.game_map[self.ship.position].dijkstra_dest]
+        elif self.game_map.calculate_distance(self.ship.position, GlobalFunctions(self.game).get_shipyard(self.ship.position)) == 1:
+            # if next to a dropoff 
+            cell = self.game_map[GlobalFunctions(self.game).get_shipyard(self.ship.position)]
             if cell.is_occupied and not self.me.has_ship(cell.ship.id) and "harakiri" not in self.ship_state.values():
                 return "harakiri"
         return None
@@ -1438,7 +1426,7 @@ class main():
             has_moved[s.id] = False
             if s.id in self.ship_state:
                 # get ships shipyard
-                shipyard = self.game_map[s.position].dijkstra_dest
+                shipyard = GlobalFunctions(self.game).get_shipyard(s.position)
                 # importance, the lower the number, bigger importance
                 if s.position == shipyard:
                     importance = -10000
