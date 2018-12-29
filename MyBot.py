@@ -50,6 +50,9 @@ class GlobalFunctions():
         self.game = game
         self.game_map = game.game_map
         self.me = game.me
+        GV = GlobalVariablesSingleton.getInstance()
+        self.ENABLE_BACKUP = GV.ENABLE_BACKUP
+        self.ENABLE_COMBAT = GV.ENABLE_COMBAT
 
 
     def halite_priority_q(self, pos, area):
@@ -70,7 +73,7 @@ class GlobalFunctions():
                                 (2 * self.game_map.calculate_distance(p, pos))
                         heappush(h, (-1 * ratio, p))
                     elif cell.halite_amount > 0:
-                        factor = self.game_map.cell_factor(pos, cell, self.me, GC.ENABLE_BACKUP)
+                        factor = self.game_map.cell_factor(pos, cell, self.me, self.ENABLE_BACKUP)
                         # add negative halite amounts so that would act as maxheap
                         heappush(h, (factor, p))
         return h
@@ -112,8 +115,8 @@ class GlobalFunctions():
 
 
     @staticmethod
-    def time_left(turn_start):
-        return 2 - (time.time() - turn_start)
+    def time_left():
+        return 2 - (time.time() - GlobalVariablesSingleton.getInstance().turn_start)
 
 
     def amount_of_enemies(self, pos, area):
@@ -135,6 +138,7 @@ class ClusterProcessor():
         self.game = game
         self.game_map = game.game_map
         self.me = game.me
+        GV = GlobalVariablesSingleton.getInstance()
 
 
     def clusters_with_classifier(self):
@@ -360,10 +364,11 @@ class DestinationProcessor():
         self.game = game
         self.game_map = game.game_map
         self.me = game.me
-        self.ship_dest = ship_dest
-        self.ship_state = ship_state
-        self.ship_path = ship_path
-        self.previous_state = previous_state
+        GV = GlobalVariablesSingleton.getInstance()
+        self.ship_dest = GV.ship_dest
+        self.ship_state = GV.ship_state
+        self.ship_path = GV.ship_path
+        self.previous_state = GV.previous_state
 
 
     def find_new_destination(self, h, ship):
@@ -465,16 +470,16 @@ class DestinationProcessor():
 
 class MoveProcessor():
 
-    def __init__(self, game, ship_obj, ship_dest, previous_state, ship_path, ship_state, turn_start, has_moved, command_queue):
+    def __init__(self, game, has_moved, command_queue):
         self.game = game
         self.game_map = game.game_map
         self.me = game.me
-        self.ship_obj = ship_obj
-        self.ship_dest = ship_dest
-        self.previous_state = previous_state
-        self.ship_path = ship_path
-        self.ship_state = ship_state
-        self.turn_start = turn_start
+        GV = GlobalVariablesSingleton.getInstance()
+        self.ship_obj = GV.ship_obj
+        self.ship_dest = GV.ship_dest
+        self.previous_state = GV.previous_state
+        self.ship_path = GV.ship_path
+        self.ship_state = GV.ship_state
         self.has_moved = has_moved
         self.command_queue = command_queue
 
@@ -550,8 +555,8 @@ class MoveProcessor():
         if ship.position == destination:
             self.ship_path[ship.id] = []
             return Direction.Still
-        elif GlobalFunctions(self.game).time_left(self.turn_start) < 0.1:
-            logging.info(f"Exploring ship standing still, {GlobalFunctions(self.game).time_left(self.turn_start)} left")
+        elif GlobalFunctions(self.game).time_left() < 0.1:
+            logging.info(f"Exploring ship standing still, {GlobalFunctions(self.game).time_left()} left")
             return Direction.Still
         elif ship.position in GlobalFunctions(self.game).get_dropoff_positions() and self.game_map.is_surrounded(ship.position): # if in a dropoff and surrounded
             # find closest neighbour
@@ -606,7 +611,7 @@ class MoveProcessor():
         to_go = self.get_step(path)
         next_pos = self.game_map.normalize(position.directional_offset(to_go))
         while self.game_map[next_pos].is_occupied:
-            if GlobalFunctions(self.game).time_left(self.turn_start) < 0.3:
+            if GlobalFunctions(self.game).time_left() < 0.3:
                 logging.info("INTERIM EXPLORING STANDING STILL")
                 return position
             if not path:
@@ -722,7 +727,7 @@ class MoveProcessor():
         cell = source_cell.parent
         while cell.is_occupied:
             cell = cell.parent
-            if GlobalFunctions(self.game).time_left(self.turn_start) < 0.5:
+            if GlobalFunctions(self.game).time_left() < 0.5:
                 logging.info("INTERIM DIJKSTRA DESTINATION STANDING STILL TOO SLOW")
                 return source_cell
         return cell
@@ -755,6 +760,9 @@ class StateMachine():
         self.return_percentage = return_percentage
         self.previous_state = previous_state
         self.prcntg_halite_left = prcntg_halite_left
+        GV = GlobalVariablesSingleton.getInstance()
+        self.ENABLE_BACKUP = GV.ENABLE_BACKUP
+        self.ENABLE_COMBAT = GV.ENABLE_COMBAT
 
 
     def state_transition(self):
@@ -819,7 +827,7 @@ class StateMachine():
                 and self.exists_better_in_area(self.ship.position, self.ship_dest[self.ship.id], 4):
             DP.process_new_destination(self.ship)
 
-        elif GC.ENABLE_COMBAT and (distance_to_dest > GC.CLOSE_TO_SHIPYARD * self.game_map.width or distance_to_dest == 1)\
+        elif self.ENABLE_COMBAT and (distance_to_dest > GC.CLOSE_TO_SHIPYARD * self.game_map.width or distance_to_dest == 1)\
                 and GlobalFunctions(self.game).dist_to_enemy_doff(self.ship.position) >= GC.ENEMY_SHIPYARD_CLOSE * self.game_map.width:
             return self.attempt_switching_assasinate()
         return None
@@ -867,7 +875,7 @@ class StateMachine():
                              (top_left.y + y) % self.game_map.height)  # position of patch
                 cell = self.game_map[p]
                 if cell.halite_amount >= self.game_map.HALITE_STOP:
-                    other_factor = self.game_map.cell_factor(cntr, cell, self.me, GC.ENABLE_BACKUP)
+                    other_factor = self.game_map.cell_factor(cntr, cell, self.me, self.ENABLE_BACKUP)
                     if not cell.is_occupied and other_factor < current_factor:
                         return True
         return False
@@ -876,7 +884,7 @@ class StateMachine():
     def collecting_transition(self):
         new_state = None
         inspire_multiplier = self.game_map.get_inspire_multiplier(
-            self.ship.position, self.game_map[self.ship.position], GC.ENABLE_BACKUP)
+            self.ship.position, self.game_map[self.ship.position], self.ENABLE_BACKUP)
         cell_halite = self.game_map[self.ship.position].halite_amount * inspire_multiplier
         DP = DestinationProcessor(self.game, self.ship_dest, self.ship_state, self.ship_path, self.previous_state)
 
@@ -907,7 +915,7 @@ class StateMachine():
             # return if cell has low halite
             new_state = "returning"
 
-        elif self.ship.halite_amount <= constants.MAX_HALITE * 0.4 and GC.ENABLE_COMBAT\
+        elif self.ship.halite_amount <= constants.MAX_HALITE * 0.4 and self.ENABLE_COMBAT\
                 and GlobalFunctions(game).dist_to_enemy_doff(self.ship.position) >= GC.CLOSE_TO_SHIPYARD * self.game_map.width and self.game_map[self.ship.position].enemy_neighbouring:
             # if not that mch halite and not too close to assasinate and enemy is neighbouring, attempt to kill sm1 
             new_state = self.attempt_switching_assasinate()
@@ -918,7 +926,7 @@ class StateMachine():
             next_dest = self.ship.position
             for n in self.game_map.get_neighbours(self.game_map[self.ship.position]):
                 n_ratio = n.halite_amount * self.game_map.get_inspire_multiplier(
-                    self.ship.position, n, GC.ENABLE_BACKUP) / (n.enemy_neighbouring + 1)
+                    self.ship.position, n, self.ENABLE_BACKUP) / (n.enemy_neighbouring + 1)
                 if n_ratio > ratio:
                     ratio = n_ratio
                     next_dest = n.position
@@ -936,12 +944,12 @@ class StateMachine():
         neighbours = self.game_map.get_neighbours(current)
         current_h = current.halite_amount * \
             self.game_map.get_inspire_multiplier(
-                self.ship.position, self.game_map[self.ship.position], GC.ENABLE_BACKUP)
+                self.ship.position, self.game_map[self.ship.position], self.ENABLE_BACKUP)
 
         for n in neighbours:
             neighbour_h = n.halite_amount * \
                 self.game_map.get_inspire_multiplier(
-                    self.ship.position, self.game_map[n.position], GC.ENABLE_BACKUP)
+                    self.ship.position, self.game_map[n.position], self.ENABLE_BACKUP)
             if n.enemy_amount < GC.UNSAFE_AREA and neighbour_h >= current_h + big_diff:
                 return True
 
@@ -1056,7 +1064,7 @@ class StateMachine():
         elif self.game_map[destination].enemy_amount >= GC.UNSAFE_AREA:
             DP.process_new_destination(ship)
             return "exploring"
-        elif GC.ENABLE_COMBAT and GlobalFunctions(self.game).dist_to_enemy_doff(self.ship.position) >= GC.CLOSE_TO_SHIPYARD * self.game_map.width:
+        elif self.ENABLE_COMBAT and GlobalFunctions(self.game).dist_to_enemy_doff(self.ship.position) >= GC.CLOSE_TO_SHIPYARD * self.game_map.width:
             return self.attempt_switching_assasinate()
         return None
 
@@ -1067,11 +1075,11 @@ class StateMachine():
         current = self.game_map[position]
         neighbours = self.game_map.get_neighbours(current)
         max_halite = current.halite_amount * \
-            self.game_map.get_inspire_multiplier(position, current, GC.ENABLE_BACKUP)
+            self.game_map.get_inspire_multiplier(position, current, self.ENABLE_BACKUP)
         best = current
         for n in neighbours:
             n_halite = n.halite_amount * \
-                self.game_map.get_inspire_multiplier(position, n, GC.ENABLE_BACKUP)
+                self.game_map.get_inspire_multiplier(position, n, self.ENABLE_BACKUP)
             if n.enemy_amount < GC. UNSAFE_AREA and n_halite > max_halite:
                 best = n
                 max_halite = n_halite
@@ -1084,16 +1092,19 @@ class main():
         self.game = game
         self.game_map = game.game_map
         self.me = game.me
-        self.ship_state = {} # ship.id -> ship state
-        self.ship_path = {} # ship.id -> directional path to ship_dest[ship.id]
-        self.ship_dest = {} # ship.id -> destination
-        self.previous_position = {} # ship.id-> previous pos
-        self.previous_state = {} # ship.id -> previous state
-        self.fleet_leader = {}
-        self.ship_obj = {} # ship.id to ship obj for processing crashed ship stuff
-        self.crashed_positions = [] # heap of (-1 * halite, crashed position )
-        self.crashed_ships = []
-        self.turn_start = 0 # for timing
+        GV = GlobalVariablesSingleton.getInstance()
+
+        self.ENABLE_BACKUP = GV.ENABLE_BACKUP
+        self.ENABLE_COMBAT = GV.ENABLE_COMBAT
+        self.ship_state = GV.ship_state
+        self.ship_path = GV.ship_path
+        self.ship_dest = GV.ship_dest
+        self.previous_position = GV.previous_position
+        self.previous_state = GV.previous_state
+        self.fleet_leader = GV.fleet_leader
+        self.ship_obj = GV.ship_obj
+
+        self.crashed_positions = []
         self.cluster_centers = []
         self.clusters_determined = False
         self.crashed_ship_positions = []
@@ -1104,7 +1115,7 @@ class main():
         while True:
             self.game.update_frame()
             self.game_map = self.game.game_map
-            self.em = self.game.me
+            self.me = self.game.me
             swapped = set() # for swapping destinations
             self.clear_dictionaries()  # of crashed or transformed ships
             command_queue = []
@@ -1116,13 +1127,15 @@ class main():
                 if s.id not in self.ship_state:
                     self.ship_state[s.id] = "exploring"
 
-            GC.ENABLE_COMBAT = not self.have_less_ships(0.8) and NR_OF_PLAYERS == 2
-            self.turn_start = time.time()
+            GlobalVariablesSingleton.getInstance().ENABLE_COMBAT = not self.have_less_ships(0.8) and NR_OF_PLAYERS == 2
+            GlobalVariablesSingleton.getInstance().turn_start = time.time()
+            self.ENABLE_COMBAT = GlobalVariablesSingleton.getInstance().ENABLE_COMBAT
 
             enable_inspire = not self.have_less_ships(0.8)
-            GC.ENABLE_BACKUP = GC.ENABLE_COMBAT
+            GlobalVariablesSingleton.getInstance().ENABLE_BACKUP = self.ENABLE_COMBAT
+            self.ENABLE_BACKUP = GlobalVariablesSingleton.getInstance().ENABLE_BACKUP
             # initialize shipyard halite, inspiring stuff and other
-            self.game_map.init_map(self.me, list(self.game.players.values()), enable_inspire, GC.ENABLE_BACKUP)
+            self.game_map.init_map(self.me, list(self.game.players.values()), enable_inspire, self.ENABLE_BACKUP)
             if self.game.turn_number == 1:
                 TOTAL_MAP_HALITE = self.game_map.total_halite
 
@@ -1131,7 +1144,7 @@ class main():
             if self.game.turn_number >= GC.SPAWN_TURN:
                 self.game_map.HALITE_STOP = prcntg_halite_left * GC.INITIAL_HALITE_STOP
 
-            if self.crashed_ship_positions and self.game.turn_number < GC.CRASH_TURN and GC.ENABLE_BACKUP:
+            if self.crashed_ship_positions and self.game.turn_number < GC.CRASH_TURN and self.ENABLE_BACKUP:
                 self.process_backup_sending()
 
             # Dijkstra the graph based on all dropoffs
@@ -1166,10 +1179,10 @@ class main():
                 ship = heappop(ships)[1]
                 if self.has_moved[ship.id]:
                     continue
-                if GlobalFunctions(self.game).time_left(self.turn_start) < 0.15:
+                if GlobalFunctions(self.game).time_left() < 0.15:
                     logging.info("STANDING STILL TOO SLOW")
                     command_queue.append(ship.stay_still())
-                    ship_state[ship.id] = "collecting"
+                    self.ship_state[ship.id] = "collecting"
                     continue
                 if ship.id not in self.previous_position:  # if new ship the
                     self.previous_position[ship.id] = self.me.shipyard.position
@@ -1191,7 +1204,7 @@ class main():
                 SM.state_transition()
 
 
-                MP = MoveProcessor(self.game, self.ship_obj, self.ship_dest, self.previous_state, self.ship_path, self.ship_state, self.turn_start, self.has_moved, command_queue)
+                MP = MoveProcessor(self.game, self.has_moved, command_queue)
                 # if ship is dropoff builder
                 if self.is_builder(ship):
                     # if enough halite and havent built a dropoff this turn
@@ -1221,7 +1234,7 @@ class main():
                 self.has_moved[ship.id] = True
 
             surrounded_shipyard = self.game_map.is_surrounded(self.me.shipyard.position)
-            logging.info(GlobalFunctions(self.game).time_left(self.turn_start))
+            logging.info(GlobalFunctions(self.game).time_left())
             if not dropoff_built and 2.5 * (self.max_enemy_ships() + 1) > len(self.me.get_ships()) and self.game.turn_number <= GC.SPAWN_TURN \
                     and self.me.halite_amount >= constants.SHIP_COST and prcntg_halite_left > (1 - 0.65) and \
                     not (self.game_map[self.me.shipyard].is_occupied or surrounded_shipyard or "waiting" in self.ship_state.values()):
@@ -1464,6 +1477,35 @@ class main():
             if self.game_map[crashed_pos].enemy_amount <= GC.UNSAFE_AREA and self.game_map[crashed_pos].halite_amount >= constants.MAX_HALITE:
                 # send a backup fleet there
                 self.send_ships(crashed_pos, 2, "backup", is_savior)
+
+
+class GlobalVariablesSingleton():
+    # Here the instance will be stored
+    __instance = None
+
+    @staticmethod
+    def getInstance():
+        ''' static access method '''
+        if GlobalVariablesSingleton.__instance == None:
+            GlobalVariablesSingleton()
+        return GlobalVariablesSingleton.__instance
+
+    def __init__(self):
+        ''' virtually private constructor. '''
+        if GlobalVariablesSingleton.__instance != None:
+            raise Exception("This class is a singleton!")
+        else:
+            GlobalVariablesSingleton.__instance = self
+            self.ENABLE_BACKUP = True
+            self.ENABLE_COMBAT = True
+            self.ship_state = {} # ship.id -> ship state
+            self.ship_path = {} # ship.id -> directional path to ship_dest[ship.id]
+            self.ship_dest = {} # ship.id -> destination
+            self.previous_position = {} # ship.id-> previous pos
+            self.previous_state = {} # ship.id -> previous state
+            self.fleet_leader = {}
+            self.ship_obj = {} # ship.id to ship obj for processing crashed ship stuff
+            self.turn_start = 0 # for timing
 
 
 backuped_dropoffs = []
