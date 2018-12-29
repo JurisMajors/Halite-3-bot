@@ -21,8 +21,11 @@ class MapCell:
         self.halite_amount = halite_amount
         self.ship = None
         self.structure = None
-        self.inspired = None
         self.percentage_occupied = None
+        self.enemy_amount = 0  # in inspired radius
+        self.inspired = None
+        self.enemy_neighbouring = 0
+        self.close_friendly_ships = 0
 
         # Parameters for Dijkstra (to nearest dropoff/shipyard)
         self.weight_to_shipyard = 0
@@ -66,7 +69,6 @@ class MapCell:
     def mark_unsafe(self, ship):
         """
         Mark this cell as unsafe (occupied) for navigation.
-
         Use in conjunction with GameMap.naive_navigate.
         """
         self.ship = ship
@@ -90,7 +92,6 @@ class MapCell:
 class GameMap:
     """
     The game map.
-
     Can be indexed by a position, or by a contained entity.
     Coordinates start at 0. Coordinates are normalized for you
     """
@@ -101,6 +102,7 @@ class GameMap:
         self._cells = cells
         self.HALITE_STOP = 50
         self.c = []
+        self.extra_dropoff_possibilities = set()  # set of positions
 
     def __getitem__(self, location):
         """
@@ -127,7 +129,7 @@ class GameMap:
         target = self.normalize(target)
         resulting_position = abs(source - target)
         return min(resulting_position.x, self.width - resulting_position.x) + \
-               min(resulting_position.y, self.height - resulting_position.y)
+            min(resulting_position.y, self.height - resulting_position.y)
 
     def euclidean_distance(self, source, target):
         ''' Computes euclidean distance on torus map '''
@@ -201,7 +203,6 @@ class GameMap:
     def naive_navigate(self, ship, destination):
         """
         Returns a singular safe move towards the destination.
-
         :param ship: The ship to move.
         :param destination: Ending position
         :return: A direction.
@@ -226,26 +227,6 @@ class GameMap:
             move = random.choice(all_moves)
         self[ship.position.directional_offset(move)].mark_unsafe(ship)
         return move
-
-    def select_best_direction(self, prev_position, ship, destination):
-        # selects best direction that is not occupied but with smallest
-        # distance to destination
-        # (direction, distance to destination if taken that direction)
-        possible_moves = []
-        for direction in Direction.get_all_cardinals():  # for 4 directions
-            next_position = ship.position.directional_offset(direction)
-            if not (self[next_position].is_occupied or self[prev_position] == self[
-                next_position]):  # check if the position is valid
-                # that is.. if its not occupied and not previous position (so
-                # the ship doesnt wiggle back and forth)
-                possible_moves.append(
-                    (direction, self.calculate_distance(next_position, destination)))
-
-        if len(possible_moves) == 0:
-            return Direction.Still
-        # select direction with best distance
-        final_direction = min(possible_moves, key=lambda t: t[1])[0]
-        return final_direction
 
     def create_graph(self, dropoff_list):
         """
@@ -274,6 +255,7 @@ class GameMap:
         node_distance = 0
         source_cell.dijkstra_distance = node_distance
         source_cell.dijkstra_dest = source_cell.position
+        source_cell.parent = source_cell
         heappush(PQ, (source_cell.weight_to_shipyard, source_cell))
         while PQ:
             dist_cell = heappop(PQ)
@@ -284,7 +266,7 @@ class GameMap:
                 continue
             for neighbour in self.get_neighbours(cell):
                 new_dist = dist + neighbour.halite_amount + \
-                           70  # Maybe divide halite amount by 10 here
+                    70 + neighbour.enemy_neighbouring
                 if new_dist < neighbour.weight_to_shipyard:
                     neighbour.weight_to_shipyard = new_dist
                     neighbour.parent = cell
@@ -314,14 +296,12 @@ class GameMap:
         target = self.normalize(target)
         heappush(PQ, (0, self[source]))
         # determine whether reachable
-
         reachable = self.is_reachable(ship, self[source], self[
             target]) and self.is_reachable(ship, self[target], self[source])
         self[source].cost = 0
         lowest_distance = self.calculate_distance(source, target)  # init
         closest_pos = source
         visited = []  # visited nodes
-
         while PQ:
             current = heappop(PQ)[1]
             current.visited = ship  # visit cell
@@ -352,11 +332,11 @@ class GameMap:
                     neighbour.cost = new_cost
                     # distance is the heuristic
                     priority = new_cost + \
-                               self.calculate_distance(neighbour.position, target)
+                        self.calculate_distance(neighbour.position, target)
                     neighbour.a_star_parent = current
+                    neighbour.visited = ship
                     visited.append(neighbour)
                     heappush(PQ, (priority, neighbour))
-
         return (visited, target) if reachable else (visited, closest_pos)
 
     def explore(self, ship, destination):
@@ -365,15 +345,14 @@ class GameMap:
 
         visited, new_destination = self.do_a_star(ship, destination)
         path = self.find_path(ship.position, new_destination)
-
         for node in visited:  # reset
             node.cost = None
             node.a_star_parent = None
             node.visited = None
-
         return path
 
     def find_path(self, position, destination):
+        """ returns the path that a_star found from position to destination """
         start = self[position]
         end = self[destination]
         path = []
@@ -386,44 +365,48 @@ class GameMap:
             t_direction = self.get_target_direction(
                 next_cell.position, end.position)
             direction = t_direction[0] if t_direction[
-                                              0] is not None else t_direction[1]
+                0] is not None else t_direction[1]
             direction = direction if direction is not None else Direction.Still
 
             if path:  # if not length zero check last element
-                previous = path[0]  # last element
+                previous = path[-1]  # last element
                 if previous[0] == direction:  # if same direction
                     # increment the amount of times to move that direction
                     previous[1] += 1
                 else:  # new direction
-                    path.insert(0, [direction, 1])
+                    path.append([direction, 1])
             else:  # empty
-                path.insert(0, [direction, 1])
+                path.append([direction, 1])
             end = next_cell
 
-        return path  # return the neighbour we arrived
+        return path[::-1]  # return the path, but reversed
 
     def is_reachable(self, ship, start_cell, end_cell):
-        ''' Flood fill algorithm from end cell.
+        ''' Greedy best first search from end cell.
          Returns True if start_cell is reachable from end_cell'''
         if end_cell.is_occupied and not end_cell.ship == ship:
             return False
-        Q = deque([])
-        Q.append(end_cell)
-        visited = []
+        Q = []
+        heappush(Q, (self.calculate_distance(
+            end_cell.position, start_cell.position), end_cell))
+        visited = set()
         while Q:
-            cur = Q.popleft()
-            visited.append(cur)
-
+            cur = heappop(Q)[1]
+            visited.add(cur)
+            # assume reachable if got so far
             if self.calculate_distance(cur.position, end_cell.position) > 10:
                 return True
+            # rachable if start cell reached
             if cur == start_cell:
                 return True
 
             for neighbour in self.get_neighbours(cur):
                 if neighbour == start_cell:  # needed because start will be occupied by our ship
                     return True
-                if not neighbour.is_occupied and neighbour not in Q and neighbour not in visited:
-                    Q.append(neighbour)
+                if not neighbour.is_occupied and neighbour not in visited:
+                    heappush(Q, (self.calculate_distance(
+                        neighbour.position, start_cell.position), neighbour))
+                    visited.add(neighbour)
         return False
 
     def is_surrounded(self, position):
@@ -433,9 +416,40 @@ class GameMap:
                 return False
         return True
 
-    def init_map(self, me):
+    def bfs_around_enemy(self, position, distance):
+        """ BFS around position assuming thats an enemy ship position,
+        in radius - distance, incrementing cells parameter .enemy_amount 
+        to determine how many enemies are in each cells distance radius """
+        Q = deque([])
+        Q.append(position)
+        visited = set()
+        while Q:
+            cur = Q.popleft()
+            visited.add(cur)
+            self[cur].enemy_amount += 1
+            for neighbour in self.get_neighbours(self[cur]):
+                if neighbour.position not in visited \
+                        and self.calculate_distance(position, neighbour.position) <= distance:
+                    Q.append(neighbour.position)
+                    visited.add(neighbour.position)
+
+    def mark_inspired_cells(self, me, players):
+        """ Using enemy ship position, BFS s in a diamond shape around them
+        to determine the enemy_amount in INSPIRATION_RADIUS distance """
+        for p in players:
+            if not p.id == me.id:
+                # bfs around the ships
+                for their in p.get_ships():
+                    self.bfs_around_enemy(
+                        their.position, constants.INSPIRATION_RADIUS)
+
+    def init_map(self, me, all_players, enable_inspire=True, backup=False):
         self.total_halite = 0
         my_dropoff_pos = self.get_dropoff_positions(me)
+        if enable_inspire:
+            t = time.time()
+            self.mark_inspired_cells(me, all_players)
+            logging.info(f"Marked inspired cells in {time.time() - t}")
         self.halite_priority = []
         num_occupied = 0
         for y in range(self.height):
@@ -444,35 +458,16 @@ class GameMap:
                 closest_d = self.get_closest(cell.position, my_dropoff_pos)
                 self.total_halite += cell.halite_amount
                 if cell.inspired is None:
-                    cell.inspired = self.is_cell_inspired(cell, me)
+                    cell.inspired = cell.enemy_amount >= 2
 
-                if 0 < cell.halite_amount <= self.HALITE_STOP:
-                    ratio = cell.halite_amount / (2 * self.calculate_distance(cell.position, closest_d))
-                    heappush(self.halite_priority, (-1 * ratio, cell.position))
-
-                elif cell.halite_amount > 0:
-                    factor = self.cell_factor(closest_d, cell, me)
+                if cell.halite_amount > 0:
+                    factor = self.cell_factor(closest_d, cell, me, backup)
                     heappush(self.halite_priority, (factor, cell.position))
 
                 if cell.is_occupied:
-                   num_occupied += 1
+                    num_occupied += 1
 
         self.percentage_occupied = num_occupied / (self.height * self.width)
-
-    def is_cell_inspired(self, cell, me):
-        area = constants.INSPIRATION_RADIUS
-        top_left = Position(int(-1 * area),
-                            int(-1 * area)) + cell.position  # top left of scan area
-        counter = 0
-        for y in range(area):
-            for x in range(area):
-                other_cell = self[Position(x, y)]
-                if self.calculate_distance(cell.position, other_cell.position) <= constants.INSPIRATION_RADIUS:
-                    if other_cell.is_occupied and not me.has_ship(other_cell.ship.id):
-                        counter += 1
-                if counter >= 2:
-                    return True
-        return False
 
     def get_dropoff_positions(self, player):
         # returns a players dropoff positions including shipyard
@@ -480,22 +475,22 @@ class GameMap:
 
     def cell_heuristic(self, halite, distance):
         return (self.c[0] * halite * halite + self.c[1] * halite + self.c[2]) / (
-                self.c[3] * distance * distance + self.c[4] * distance + self.c[5])
+            self.c[3] * distance * distance + self.c[4] * distance + self.c[5])
 
-    def cell_factor(self, cntr, cell, me):
+    def cell_factor(self, cntr, cell, me, backup):
         dropoff_positions = self.get_dropoff_positions(me)
         if cell.position in dropoff_positions:
             return 1000
 
-        neighbours = self.get_cells_in_area(cell, 2)
+        neighbours = self.get_neighbours(cell)
         n_factor_sum = 0  # neighbour factor sum
         # get rid of dropoffs
         for neighbour in neighbours[:]:
             inspire_multiplier = self.get_inspire_multiplier(
-                cntr, neighbour, me)
+                cntr, neighbour, backup)
             if neighbour.position in dropoff_positions:
                 neighbours.remove(neighbour)
-            elif neighbour.halite_amount <= self.HALITE_STOP:
+            elif neighbour.halite_amount * inspire_multiplier <= self.HALITE_STOP:
                 # maybe smt more punishing
                 n_factor_sum += self.cell_heuristic(
                     neighbour.halite_amount * inspire_multiplier, self.calculate_distance(neighbour.position, cntr))
@@ -503,19 +498,20 @@ class GameMap:
                 n_factor_sum += self.cell_heuristic(
                     neighbour.halite_amount * inspire_multiplier, self.calculate_distance(neighbour.position, cntr))
 
-        multiplier = self.get_inspire_multiplier(cntr, cell, me)
+        multiplier = self.get_inspire_multiplier(cntr, cell, backup)
         # cells factor
         c_factor = len(neighbours) * self.cell_heuristic(cell.halite_amount * multiplier,
                                                          self.calculate_distance(cell.position, cntr))
-        return c_factor + n_factor_sum
+        return round(-1 * (c_factor + n_factor_sum), 2)
 
-    def get_inspire_multiplier(self, cntr, cell, me):
+    def get_inspire_multiplier(self, cntr, cell, backup):
         if cell.inspired is None:
-            cell.inspired = self.is_cell_inspired(cell, me)
-        if cell.inspired and self.width <= 48 and self.calculate_distance(cntr, cell.position):
-            return -3
+            cell.inspired = cell.enemy_amount >= constants.INSPIRATION_SHIP_COUNT
+        if cell.inspired and self.calculate_distance(cntr, cell.position) <= constants.INSPIRATION_RADIUS \
+                and (not backup or cell.halite_amount <= constants.MAX_HALITE):
+            return constants.INSPIRED_BONUS_MULTIPLIER
         else:
-            return -1
+            return 1
 
     def get_closest(self, point, other_points):
         dist, closest = (None, None)
@@ -538,17 +534,45 @@ class GameMap:
                     cells.append(self[pos])
         return cells
 
-    def amount_of_enemies(pos, area, me):
+    def set_close_friendly_ships(self, me):
+        """ Sets a number of close friendly ships for each cell """
+        self.extra_dropoff_possibilities = set()
+        for s in me.get_ships():
+            self.set_area(self[s.position])
+
+    def set_area(self, cell, area=4):
         top_left = Position(int(-1 * area / 2),
-                    int(-1 * area / 2)) + pos  # top left of scan area
-        amount = 0
+                            int(-1 * area / 2)) + cell.position  # top left of scan area
+
         for y in range(area):
             for x in range(area):
-                p = Position((top_left.x + x) % self.width,
-                             (top_left.y + y) % self.height)  # position of patch
-                if self[p].is_occupied and not me.has_ship(self[p].ship.id):
-                    amount += 1
-        return amount
+                pos = Position((top_left.x + x) % self.width,
+                               (top_left.y + y) % self.height)
+                self[pos].close_friendly_ships += 1
+                self.extra_dropoff_possibilities.add(
+                    pos)  # add the position
+
+    def get_most_dense_dropoff_position(self, dropoff_positions, min_dist=10):
+        """ Returns the position of the cell with the most close friendly ships that is at least
+        min_dist away from all other dropoffs """
+        max_nearby = 0  # maximum nearby friendly ships
+        best_pos = Position(0, 0)
+
+        for possible_pos in self.extra_dropoff_possibilities:  # for each possibility
+            if self[possible_pos].structure is not None:
+                continue
+            if self[possible_pos].close_friendly_ships > max_nearby:  # if more than the max
+                min_distance_to_dropoff = 9999
+
+                for d in dropoff_positions:  # check if its far enough from a current dropoffs
+                    min_distance_to_dropoff = min(
+                        min_distance_to_dropoff, self.euclidean_distance(possible_pos, d))
+
+                if min_distance_to_dropoff > min_dist:
+                    max_nearby = self[possible_pos].close_friendly_ships
+                    best_pos = possible_pos
+
+        return best_pos
 
     @staticmethod
     def _generate():
@@ -576,6 +600,10 @@ class GameMap:
         for y in range(self.height):
             for x in range(self.width):
                 self[Position(x, y)].ship = None
+                self[Position(x, y)].inspired = None
+                self[Position(x, y)].enemy_amount = 0
+                self[Position(x, y)].enemy_neighbouring = 0
+                self[Position(x, y)].close_friendly_ships = 0
 
         for _ in range(int(read_input())):
             cell_x, cell_y, cell_energy = map(int, read_input().split())

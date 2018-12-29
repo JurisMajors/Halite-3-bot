@@ -5,7 +5,7 @@ import hlt
 from hlt import constants
 
 VARIABLES = ["YEEHAW", 1285, 50, 0.45, 1, 0.85, 500, 50, 0.55,
-             0, 0.8, 0, 0.01, 0.98, 1.05, 0.9, 0.15, 0.25, 4, 8]
+             0, 0.8, 0, 0.01, 0.98, 1.05, 0.9, 0.15, 0.15, 8, 8]
 VERSION = VARIABLES[1]
 # search area for halite relative to shipyard
 SCAN_AREA = int(VARIABLES[2])
@@ -35,10 +35,16 @@ DETERMINE_CLUSTER_TURN = int(float(VARIABLES[16]) * constants.MAX_TURNS)
 CLUSTER_TOO_CLOSE = float(VARIABLES[17])  # distance two clusters can be within
 MAX_CLUSTERS = int(VARIABLES[18])  # max amount of clusters
 FLEET_SIZE = int(VARIABLES[19])  # fleet size to send for new dropoff
-CLOSE_TO_SHIPYARD = 0.25
-ENEMY_SHIPYARD_CLOSE = 0.15
-SHIP_SCAN_AREA = 10
-EXTRA_FLEET_MAP_SIZE = 32
+CLOSE_TO_SHIPYARD = 0.25 # definition of percentage of map size that we consider close to shipyard
+ENEMY_SHIPYARD_CLOSE = 0.15 # -//- close to enemy shipyard
+SHIP_SCAN_AREA = 10 # when ship changing destinations relative to its position, the area used to scan around him for halite
+EXTRA_FLEET_MAP_SIZE = 32 # for maps >= we send an extra fleet together with the builder of a dropoff
+CHANGE_HEURISTIC_TURN = int(0.3 * constants.MAX_TURNS)
 # % of patches that have a ship on them for ships to return earlier
 BUSY_PERCENTAGE = 0.15
 BUSY_RETURN_AMOUNT = 400
+ENABLE_BACKUP = True
+UNSAFE_AREA = 4
+ENABLE_COMBAT = True
+
+MAX_SHIP_DROPOFF_RATIO = 40  # for each 40 ships there should be a dropoff
