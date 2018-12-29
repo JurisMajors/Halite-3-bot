@@ -1,4 +1,6 @@
-import os,sys,inspect
+import os
+import sys
+import inspect
 sys.path.insert(1, os.path.join(sys.path[0], '..'))
 
 import hlt
@@ -9,6 +11,7 @@ from heapq import heappush, heappop, merge
 from bot.GlobalFunctions import GlobalFunctions
 from bot.GlobalVariablesSingleton import GlobalVariablesSingleton
 from hlt.positionals import Direction, Position
+import time
 
 class DestinationProcessor():
 
@@ -22,26 +25,44 @@ class DestinationProcessor():
         self.ship_path = GV.ship_path
         self.previous_state = GV.previous_state
         self.NR_OF_PLAYERS = GV.NR_OF_PLAYERS
+        self.inv_ship_dest = {}
+        self.dropoff_distribution = {}
 
 
     def find_new_destination(self, h, ship):
         ''' h: priority queue of halite factors,
                                         halite_pos: dictionary of halite factor -> patch position '''
+        removed = set()  # all elements removed from the heap during this function
         ship_id = ship.id
         biggest_halite, position = heappop(h)  # get biggest halite
+        removed.add((biggest_halite, position))
         destination = self.game_map.normalize(position)
-        not_first_dest = ship_id in self.ship_dest
+        self.dropoff_distribution = self.get_ship_distribution_over_dropoffs()
+        # create an inverted ship_dest hashmap 
+        # with a list of ships per destination
+        self.inv_ship_dest = {}
+        for ID, pos in self.ship_dest.items():
+            if pos in self.inv_ship_dest:
+                self.inv_ship_dest[pos].append(ID)
+            else:
+                self.inv_ship_dest[pos] = [ID]
         # repeat while not a viable destination, or enemies around the position or 
         # too many ships going to that dropoff area
         # or the same destination as before
         while self.bad_destination(ship, destination) or (self.NR_OF_PLAYERS == 4 and self.game_map[destination].enemy_neighbouring > 0):
             # if no more options, return
-            if len(h) == 0:
+            if not h:
                 GlobalFunctions(self.game).state_switch(ship.id, "returning")
                 return
             biggest_halite, position = heappop(h)
+            removed.add((biggest_halite, position))
             destination = self.game_map.normalize(position)
         self.ship_dest[ship_id] = destination  # set the destination
+        # This cell has a ship so doesn't need to be in heap
+        removed.remove((biggest_halite, position))
+        # Add add removed ones back to the heap except the cell were going to
+        for r in removed:
+            heappush(h, r)
         self.reassign_duplicate_dests(destination, ship_id) # deal with duplicate destinations
 
 
@@ -50,16 +71,16 @@ class DestinationProcessor():
         if self.game_map[destination].halite_amount == 0:
             return True
         if self.game.turn_number <= GC.SPAWN_TURN:
-            return not self.dest_viable(destination, ship) or self.game_map[destination].enemy_amount >= GC.UNSAFE_AREA\
-                or self.too_many_near_dropoff(ship, destination)
+            return self.game_map[destination].enemy_amount >= GC.UNSAFE_AREA\
+                or not self.dest_viable(destination, ship) or self.too_many_near_dropoff(ship, destination)
         else:
-            return not self.dest_viable(destination, ship) or self.game_map[destination].enemy_amount >= GC.UNSAFE_AREA
+            return self.game_map[destination].enemy_amount >= GC.UNSAFE_AREA or not self.dest_viable(destination, ship)
 
 
     def reassign_duplicate_dests(self, destination, this_id):
         # if another ship had the same destination
         s = self.get_ship_w_destination(destination, this_id)
-        if s:  # find a new destination for it
+        if s:  # find a new destination for the ships with same dest
             for other in s:
                 self.process_new_destination(other)
 
@@ -88,7 +109,6 @@ class DestinationProcessor():
             my_dist = self.game_map.calculate_distance(position, ship.position)
             their_dist = min([self.game_map.calculate_distance(
                 position, inspectable_ship.position) for inspectable_ship in inspectable_ships])
-
             return my_dist < their_dist # if im closer to destination, assign it to me.
         else:
             return True  # nobody has the best patch, all good
@@ -99,7 +119,7 @@ class DestinationProcessor():
         if GlobalFunctions(self.game).get_shipyard(ship.position) == GlobalFunctions(self.game).get_shipyard(destination):
             return False
         else:
-            return self.prcntg_ships_returning_to_doff(GlobalFunctions(self.game).get_shipyard(destination)) > (1 / len(GlobalFunctions(self.game).get_dropoff_positions()))
+            return self.dropoff_distribution[GlobalFunctions(self.game).get_shipyard(destination)] > (1 / len(GlobalFunctions(self.game).get_dropoff_positions()))
 
 
     def prcntg_ships_returning_to_doff(self, d_pos):
@@ -110,12 +130,23 @@ class DestinationProcessor():
                 amount += 1
         return amount / len(self.me.get_ships())
 
+    def get_ship_distribution_over_dropoffs(self):
+        distribution = {}
+        for s in self.me.get_ships(): # count ships per dropoff
+            d_pos = GlobalFunctions(self.game).get_shipyard(s.position)
+            if d_pos in distribution:
+                distribution[d_pos] += 1
+            else:
+                distribution[d_pos] = 1
+        for p, amount in distribution.items(): # turn into percentages
+            distribution[p] = amount/len(self.me.get_ships())
+        return distribution 
 
     def get_ship_w_destination(self, dest, this_id):
-        """ gets a ship with dest, s.t. that ship is not this_id """
+        """ gets ships with dest, s.t. that ship is not this_id """
         other_ships = []
-        if dest in self.ship_dest.values():
-            for s in self.ship_dest.keys():  # get ship with the same destination
-                if s != this_id and self.ship_dest[s] == dest and self.me.has_ship(s):
-                    other_ships.append(self.me.get_ship(s))
+        if dest in self.inv_ship_dest:
+            for s_id in self.inv_ship_dest[dest]:
+                if s_id != this_id:
+                    other_ships.append(self.me.get_ship(s_id))
         return other_ships

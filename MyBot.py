@@ -161,12 +161,10 @@ class main():
 
                 # transition
                 SM = StateMachine(self.game, self.return_percentage, self.prcntg_halite_left)
-                logging.info(GlobalFunctions(self.game).time_left())
                 SM.state_transition(ship)
-                logging.info(GlobalFunctions(self.game).time_left())
 
-                logging.info("SHIP {}, STATE {}, DESTINATION {}".format(
-                    ship.id, self.ship_state[ship.id], self.ship_dest[ship.id]))
+                # logging.info("SHIP {}, STATE {}, DESTINATION {}".format(
+                #     ship.id, self.ship_state[ship.id], self.ship_dest[ship.id]))
                 MP = MoveProcessor(self.game, self.has_moved, command_queue)
                 # if ship is dropoff builder
                 if self.is_builder(ship):
@@ -183,7 +181,6 @@ class main():
                 else:  # not associated with building a dropoff, so move regularly
                     move = MP.produce_move(ship)
                     if move is not None:
-                        logging.info(move)
                         command_queue.append(ship.move(move))
                         self.previous_position[ship.id] = ship.position
                         self.game_map[ship.position.directional_offset(move)].mark_unsafe(ship)
@@ -197,7 +194,7 @@ class main():
 
             surrounded_shipyard = self.game_map.is_surrounded(self.me.shipyard.position)
             logging.info(GlobalFunctions(self.game).time_left())
-            if not dropoff_built and 2.5 * (self.max_enemy_ships() + 1) > len(self.me.get_ships()) and self.game.turn_number <= GC.SPAWN_TURN \
+            if not dropoff_built and 2 * (self.max_enemy_ships() + 1) > len(self.me.get_ships()) and self.game.turn_number <= GC.SPAWN_TURN \
                     and self.me.halite_amount >= constants.SHIP_COST and self.prcntg_halite_left > (1 - 0.65) and \
                     not (self.game_map[self.me.shipyard].is_occupied or surrounded_shipyard or "waiting" in self.ship_state.values()):
                 if not ("build" in self.ship_state.values() and self.me.halite_amount <= (constants.SHIP_COST + constants.DROPOFF_COST)):
