@@ -103,10 +103,10 @@ class main():
             if self.game.turn_number == 1:
                 TOTAL_MAP_HALITE = self.game_map.total_halite
 
-            prcntg_halite_left = self.game_map.total_halite / TOTAL_MAP_HALITE
+            self.prcntg_halite_left = self.game_map.total_halite / TOTAL_MAP_HALITE
             # if clusters_determined and not cluster_centers:
             if self.game.turn_number >= GC.SPAWN_TURN:
-                self.game_map.HALITE_STOP = prcntg_halite_left * GC.INITIAL_HALITE_STOP
+                self.game_map.HALITE_STOP = self.prcntg_halite_left * GC.INITIAL_HALITE_STOP
 
             if self.crashed_ship_positions and self.game.turn_number < GC.CRASH_TURN and self.ENABLE_BACKUP:
                 self.process_backup_sending()
@@ -121,7 +121,7 @@ class main():
             if self.game.turn_number == GC.CRASH_SELECTION_TURN:
                 GC.CRASH_TURN = self.select_crash_turn()
 
-            if prcntg_halite_left > 0.2:
+            if self.prcntg_halite_left > 0.2:
                 self.return_percentage = GC.BIG_PERCENTAGE if self.game.turn_number < GC.PERCENTAGE_SWITCH else GC.SMALL_PERCENTAGE
             else:  # if low percentage in map, return when half full
                 self.return_percentage = 0.6
@@ -163,7 +163,7 @@ class main():
                 #     ship.id, self.ship_state[ship.id], self.ship_dest[ship.id]))
 
                 # transition
-                SM = StateMachine(self.game, self.return_percentage, prcntg_halite_left)
+                SM = StateMachine(self.game, self.return_percentage, self.prcntg_halite_left)
                 SM.state_transition(ship)
 
 
@@ -199,7 +199,7 @@ class main():
             surrounded_shipyard = self.game_map.is_surrounded(self.me.shipyard.position)
             logging.info(GlobalFunctions(self.game).time_left())
             if not dropoff_built and 2.5 * (self.max_enemy_ships() + 1) > len(self.me.get_ships()) and self.game.turn_number <= GC.SPAWN_TURN \
-                    and self.me.halite_amount >= constants.SHIP_COST and prcntg_halite_left > (1 - 0.65) and \
+                    and self.me.halite_amount >= constants.SHIP_COST and self.prcntg_halite_left > (1 - 0.65) and \
                     not (self.game_map[self.me.shipyard].is_occupied or surrounded_shipyard or "waiting" in self.ship_state.values()):
                 if not ("build" in self.ship_state.values() and self.me.halite_amount <= (constants.SHIP_COST + constants.DROPOFF_COST)):
                     command_queue.append(self.me.shipyard.spawn())
