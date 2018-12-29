@@ -9,6 +9,7 @@ from hlt import constants
 
 # This library contains direction metadata to better interface with the game.
 from hlt.positionals import Direction, Position
+from hlt.game_map import MapCell
 # heap
 from heapq import heappush, heappop, merge
 # This library allows you to generate random numbers.
@@ -26,17 +27,16 @@ from pyclustering.cluster.center_initializer import kmeans_plusplus_initializer
 from pyclustering.utils.metric import distance_metric, type_metric
 import numpy as np
 from math import ceil
+from copy import deepcopy
 
 #stderr = sys.stderr
 #sys.stderr = open(os.devnull, 'w')
 
-""" <<<Game Begin>>> """
 dropoff_clf = pickle.load(open('mlp.sav', 'rb'))
 # This game object contains the initial game state.
 game = hlt.Game()
 # At this point "game" variable is populated with initial map data.
 # This is a good place to do computationally expensive start-up pre-processing.
-
 import bot.GlobalConstants as GC
 
 from bot.ClusterProcessor import ClusterProcessor
@@ -278,7 +278,6 @@ class main():
             if len(self.me.get_ships()) < ratio * len(player.get_ships()):
                 return True
         return False
-
 
     def should_build(self):
         # if clusters determined, more than 13 ships, we have clusters and nobody
