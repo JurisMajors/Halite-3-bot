@@ -53,6 +53,10 @@ class GlobalFunctions():
         GV = GlobalVariablesSingleton.getInstance()
         self.ENABLE_BACKUP = GV.ENABLE_BACKUP
         self.ENABLE_COMBAT = GV.ENABLE_COMBAT
+        self.previous_state = GV.previous_state
+        self.ship_state = GV.ship_state
+        self.ship_path = GV.ship_path
+        self.ship_dest = GV.ship_dest
 
 
     def halite_priority_q(self, pos, area):
@@ -86,16 +90,24 @@ class GlobalFunctions():
         return min([self.game_map.euclidean_distance(pos, d) for d in self.get_enemy_dropoff_positions()])
 
 
-    def state_switch(self, ship_id, new_state, previous_state, ship_state, ship_path):
-        if ship_id not in previous_state:
-            previous_state[ship_id] = "exploring"
-        if ship_id not in ship_state:
-            ship_state[ship_id] = previous_state[ship_id]
-        if not new_state == "exploring":  # reset path to empty list
-            ship_path[ship_id] = []
+    def get_shipyard(self, position):
+        """ gives shipyard that the ship would return to """
+        # return game_map[position].dijkstra_dest
+        return min([(self.game_map.euclidean_distance(position, d), d) for d in self.get_dropoff_positions()], key=lambda x: x[0])[1]
 
-        previous_state[ship_id] = ship_state[ship_id]
-        ship_state[ship_id] = new_state
+
+    def state_switch(self, ship_id, new_state):
+        if ship_id not in self.previous_state:
+            self.previous_state[ship_id] = "exploring"
+        if ship_id not in self.ship_state:
+            self.ship_state[ship_id] = self.previous_state[ship_id]
+        if not new_state == "exploring":  # reset path to empty list
+            self.ship_path[ship_id] = []
+        if new_state == "returning":
+            self.ship_dest[ship_id] = self.game_map[self.me.get_ship(ship_id).position].dijkstra_dest
+
+        self.previous_state[ship_id] = self.ship_state[ship_id]
+        self.ship_state[ship_id] = new_state
 
 
     def get_enemy_dropoff_positions(self):
@@ -384,7 +396,7 @@ class DestinationProcessor():
         while self.bad_destination(ship, destination) or (NR_OF_PLAYERS == 4 and self.game_map[destination].enemy_neighbouring > 0):
             # if no more options, return
             if len(h) == 0:
-                GlobalFunctions(self.game).state_switch(ship.id, "returning", self.previous_state, self.ship_state, self.ship_path)
+                GlobalFunctions(self.game).state_switch(ship.id, "returning")
                 return
             biggest_halite, position = heappop(h)
             destination = self.game_map.normalize(position)
@@ -443,7 +455,7 @@ class DestinationProcessor():
 
     def too_many_near_dropoff(self, ship, destination):
         # if no more options, use the same destination
-        if self.game_map[ship.position].dijkstra_dest == self.game_map[destination].dijkstra_dest:
+        if GlobalFunctions(self.game).get_shipyard(ship.position)== GlobalFunctions(self.game).get_shipyard(destination):
             return False
         else:
             return self.prcntg_ships_returning_to_doff(self.game_map[destination].dijkstra_dest) > (1 / len(GlobalFunctions(self.game).get_dropoff_positions()))
@@ -521,7 +533,7 @@ class MoveProcessor():
 
     def harakiri(self, ship, destination):
         """ pre: next to or on shipyard """
-        shipyard = self.game_map[ship.position].dijkstra_dest
+        shipyard = GlobalFunctions(self.game).get_shipyard(ship.position)
         ship_pos = self.game_map.normalize(ship.position)
         if ship.position == shipyard:  # if at shipyard
             return Direction.Still  # let other ships crash in to you
@@ -542,7 +554,7 @@ class MoveProcessor():
 
 
     def assassinate(self, ship, destination):
-        GlobalFunctions(self.game).state_switch(ship.id, self.previous_state[ship.id], self.previous_state, self.ship_state, self.ship_path)
+        GlobalFunctions(self.game).state_switch(ship.id, self.previous_state[ship.id])
         if self.game_map.calculate_distance(ship.position, destination) == 1:
             target_direction = self.game_map.get_target_direction(
                 ship.position, destination)
@@ -748,59 +760,74 @@ class MoveProcessor():
 
 
 class StateMachine():
-    def __init__(self, game, ship, ship_path, ship_state, ship_dest, fleet_leader, return_percentage, previous_state, prcntg_halite_left):
+    def __init__(self, game, ship, return_percentage, prcntg_halite_left):
         self.game = game
         self.game_map = game.game_map
         self.me = game.me
         self.ship = ship
-        self.ship_path = ship_path
-        self.ship_state = ship_state
-        self.ship_dest = ship_dest
-        self.fleet_leader = fleet_leader
         self.return_percentage = return_percentage
-        self.previous_state = previous_state
+        
         self.prcntg_halite_left = prcntg_halite_left
         GV = GlobalVariablesSingleton.getInstance()
         self.ENABLE_BACKUP = GV.ENABLE_BACKUP
         self.ENABLE_COMBAT = GV.ENABLE_COMBAT
+        self.ship_path = GV.ship_path
+        self.ship_state = GV.ship_state
+        self.ship_dest = GV.ship_dest
+        self.fleet_leader = GV.fleet_leader
+        self.previous_state = GV.previous_state
 
 
     def state_transition(self):
         # transition
         new_state = None
         shipyard = self.game_map[self.ship.position].dijkstra_dest
-
-        new_state_switch = {
-            "exploring": self.exploring_transition(),
-            "collecting": self.collecting_transition(),
-            "returning": self.returning_transition(),
-            "fleet": self.fleet_transition(),
-            "builder": self.builder_transition(),
-            "waiting": self.waiting_transition(),
-            "backup": self.backup_transition(),
-        }
+        DP = DestinationProcessor(self.game, self.ship_dest, self.ship_state, self.ship_path, self.previous_state)
+        GF = GlobalFunctions(self.game)
 
         if self.game.turn_number >= GC.CRASH_TURN and self.game_map.calculate_distance(
                 self.ship.position, shipyard) < 2:
             # if next to shipyard after crash turn, suicide
-            self.ship_path[self.ship.id] = []
             new_state = "harakiri"
 
-        elif game.turn_number >= GC.CRASH_TURN:
+        elif self.game.turn_number >= GC.CRASH_TURN:
             # return if at crash turn
-            self.ship_path[self.ship.id] = []
             new_state = "returning"
 
-        elif self.ship.position in GlobalFunctions(self.game).get_dropoff_positions():
-            self.ship_path[self.ship.id] = []
-            DestinationProcessor(self.game, self.ship_dest, self.ship_state, self.ship_path, self.previous_state).find_new_destination(
-                self.game_map.halite_priority, self.ship)
+        elif self.ship.position in GF.get_dropoff_positions():
+            DP.process_new_destination(self.ship)
             new_state = "exploring"
 
-        else: new_state = new_state_switch.get(self.ship_state[self.ship.id], None)
+        # decent halite and close to enemy dropoff, return
+        elif self.ship.halite_amount >= 0.5 * constants.MAX_HALITE and GF.dist_to_enemy_doff(self.ship.position) < 0.1 * self.game_map.width:
+            new_state = "returning"
+
+        elif self.ship.halite_amount >= constants.MAX_HALITE * self.return_percentage and self.ship_state[self.ship.id] not in ["build", "waiting", "collecting", "returning"]:
+            new_state = "returning"
+
+        elif self.ship_state[self.ship.id] == "exploring":
+            new_state = self.exploring_transition()
+
+        elif self.ship_state[self.ship.id] == "collecting":
+            new_state = self.collecting_transition()
+
+        elif self.ship_state[self.ship.id] == "returning":
+            new_state = self.returning_transition()
+
+        elif self.ship_state[self.ship.id] == "fleet":
+            new_state = self.fleet_transition()
+
+        elif self.ship_state[self.ship.id] == "build":
+            new_state = self.builder_transition()
+
+        elif self.ship_state[self.ship.id] == "waiting":
+            new_state = self.waiting_transition()
+
+        elif self.ship_state[self.ship.id] == "backup":
+            new_state = self.backup_transition()
 
         if new_state is not None:
-            GlobalFunctions(self.game).state_switch(self.ship.id, new_state, self.previous_state, self.ship_state, self.ship_path)
+            GF.state_switch(self.ship.id, new_state)
 
 
     """Exploring_transition"""
@@ -1199,8 +1226,7 @@ class main():
                 #     ship.id, self.ship_state[ship.id], self.ship_dest[ship.id]))
 
                 # transition
-                SM = StateMachine(self.game, ship, self.ship_path, self.ship_state, 
-                    self.ship_dest, self.fleet_leader, self.return_percentage, self.previous_state, prcntg_halite_left)
+                SM = StateMachine(self.game, ship, self.return_percentage, prcntg_halite_left)
                 SM.state_transition()
 
 
@@ -1265,7 +1291,7 @@ class main():
         fleet = self.get_fleet(dropoff_pos, 1)
         if fleet:
             closest_ship = fleet.pop(0)  # remove and get closest ship
-            GlobalFunctions(self.game).state_switch(closest_ship.id, "build", self.previous_state, self.ship_state, self.ship_path)  # will build dropoff
+            GlobalFunctions(self.game).state_switch(closest_ship.id, "build")  # will build dropoff
             # if dropoffs position already has a structure (e.g. other dropoff) or
             # somebody is going there already
             if self.game_map[dropoff_pos].has_structure or dropoff_pos in self.ship_dest.values():
@@ -1296,7 +1322,7 @@ class main():
             if leader is not None:
                 self.fleet_leader[fleet_ship.id] = leader
 
-            GlobalFunctions(self.game).state_switch(fleet_ship.id, new_state, self.previous_state, self.ship_state, self.ship_path)
+            GlobalFunctions(self.game).state_switch(fleet_ship.id, new_state)
             DestinationProcessor(self.game, self.ship_dest, self.ship_state, self.ship_path, self.previous_state).find_new_destination(h, fleet_ship)
 
 
@@ -1392,7 +1418,7 @@ class main():
         '''selects turn when to crash'''
         distance = 0
         for ship in self.me.get_ships():
-            shipyard = self.game_map[ship.position].dijkstra_dest  # its shipyard position
+            shipyard = GlobalFunctions(self.game).get_shipyard(ship.position)  # its shipyard position
             d = self.game_map.calculate_distance(shipyard, ship.position)
             if d > distance:  # get maximum distance away of shipyard
                 distance = d
