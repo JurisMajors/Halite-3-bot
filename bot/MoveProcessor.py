@@ -49,7 +49,6 @@ class MoveProcessor():
             "backup": self.exploring,
         }
 
-        logging.info(state)
         return mover[state](ship, destination)
 
 
@@ -128,6 +127,17 @@ class MoveProcessor():
             return None
         elif self.game_map.is_surrounded(ship.position):
             return Direction.Still
+        elif ship.position in GlobalFunctions(self.game).get_dropoff_positions():
+            c_dist = None
+            c_n = None
+            for n in self.game_map.get_neighbours(self.game_map[ship.position]):
+                if not n.is_occupied:
+                    dist_to_dest = self.game_map.calculate_distance(n.position, destination)
+                    if c_dist is None or dist_to_dest < c_dist:
+                        c_dist = dist_to_dest
+                        c_n = n 
+            return self.dir_to_dest(ship.position, c_n.position)
+
 
         # next direction occupied, recalculate
         if ship.id not in self.ship_path or not self.ship_path[ship.id]:

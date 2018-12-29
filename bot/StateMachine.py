@@ -236,10 +236,10 @@ class StateMachine():
 
     def returning_transition(self):
         DP = DestinationProcessor(self.game)
-        if self.ship.position in GlobalFunctions(self.game).get_dropoff_positions():
-            # explore again when back in shipyard
-            DP.find_new_destination(self.game_map.halite_priority, self.ship)
-            return "exploring"
+        if self.game.turn_number >= GC.CRASH_TURN and self.game_map[self.ship.position].parent.is_occupied\
+        and not self.me.has_ship(self.game_map[self.ship.position].parent.ship.id):
+            self.ship_dest[self.ship.id] = self.game_map[self.ship.position].parent.position
+            return "assassinate"
 
         elif self.ship.position in GlobalFunctions(self.game).get_dropoff_positions():
             # explore again when back in shipyard

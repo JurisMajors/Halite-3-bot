@@ -36,15 +36,11 @@ class GlobalFunctions():
             for x in range(area):
                 p = Position((top_left.x + x) % self.game_map.width,
                              (top_left.y + y) % self.game_map.height)  # position of patch
-                if not (p == pos or p in self.get_dropoff_positions()):  # we dont consider the position of the centre or dropoffs
+                if p not in self.get_dropoff_positions():  # we dont consider the position of the centre or dropoffs
                     cell = self.game_map[p]
                     # we ignore cells who have 0 halite.
                     # if that cell has small amount of halite, just take a ratio with 2x distance to lesser the priority
-                    if 0 < cell.halite_amount <= self.game_map.HALITE_STOP:
-                        ratio = cell.halite_amount / \
-                                (2 * self.game_map.calculate_distance(p, pos))
-                        heappush(h, (-1 * ratio, p))
-                    elif cell.halite_amount > 0:
+                    if cell.halite_amount > 0:
                         factor = self.game_map.cell_factor(pos, cell, self.me, self.ENABLE_BACKUP)
                         # add negative halite amounts so that would act as maxheap
                         heappush(h, (factor, p))

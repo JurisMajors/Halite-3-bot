@@ -159,13 +159,13 @@ class main():
                     self.previous_state[ship.id] = "exploring"
                     self.ship_state[ship.id] = "exploring"  # explore
 
-                # logging.info("SHIP {}, STATE {}, DESTINATION {}".format(
-                #     ship.id, self.ship_state[ship.id], self.ship_dest[ship.id]))
 
                 # transition
                 SM = StateMachine(self.game, self.return_percentage, self.prcntg_halite_left)
                 SM.state_transition(ship)
 
+                logging.info("SHIP {}, STATE {}, DESTINATION {}".format(
+                    ship.id, self.ship_state[ship.id], self.ship_dest[ship.id]))
 
                 MP = MoveProcessor(self.game, self.has_moved, command_queue)
                 # if ship is dropoff builder
