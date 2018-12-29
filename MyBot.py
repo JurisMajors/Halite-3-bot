@@ -80,7 +80,6 @@ class main():
             self.game.update_frame()
             self.game_map = self.game.game_map
             self.me = self.game.me
-            swapped = set() # for swapping destinations
             self.clear_dictionaries()  # of crashed or transformed ships
             command_queue = []
 
@@ -162,11 +161,12 @@ class main():
 
                 # transition
                 SM = StateMachine(self.game, self.return_percentage, self.prcntg_halite_left)
+                logging.info(GlobalFunctions(self.game).time_left())
                 SM.state_transition(ship)
+                logging.info(GlobalFunctions(self.game).time_left())
 
                 logging.info("SHIP {}, STATE {}, DESTINATION {}".format(
                     ship.id, self.ship_state[ship.id], self.ship_dest[ship.id]))
-
                 MP = MoveProcessor(self.game, self.has_moved, command_queue)
                 # if ship is dropoff builder
                 if self.is_builder(ship):
@@ -191,7 +191,6 @@ class main():
                             self.game_map[ship.position].ship = None
 
                 self.clear_dictionaries()  # of crashed or transformed ships
-
 
                 # This ship has made a move
                 self.has_moved[ship.id] = True

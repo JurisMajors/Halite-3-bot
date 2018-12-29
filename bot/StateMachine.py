@@ -102,7 +102,7 @@ class StateMachine():
             self.ship_dest[self.ship.id] = self.get_best_neighbour(self.ship.position).position
             DP.reassign_duplicate_dests(self.ship_dest[self.ship.id], self.ship.id)
 
-        elif euclid_to_dest <= 2\
+        elif 0 < euclid_to_dest <= 2\
                 and self.exists_better_in_area(self.ship.position, self.ship_dest[self.ship.id], 4):
             DP.process_new_destination(self.ship)
 
@@ -160,7 +160,6 @@ class StateMachine():
 
 
     def collecting_transition(self):
-        new_state = None
         inspire_multiplier = self.game_map.get_inspire_multiplier(
             self.ship.position, self.game_map[self.ship.position], self.ENABLE_BACKUP)
         cell_halite = self.game_map[self.ship.position].halite_amount * inspire_multiplier
@@ -170,33 +169,33 @@ class StateMachine():
             return "returning"
 
         elif self.NR_OF_PLAYERS == 4 and self.game_map.percentage_occupied >= GC.BUSY_PERCENTAGE and self.ship.halite_amount >= GC.BUSY_RETURN_AMOUNT:
-            new_state = "returning"
+            return "returning"
 
         elif self.ship.halite_amount >= constants.MAX_HALITE * self.return_percentage and \
                 not (cell_halite > GC.MEDIUM_HALITE * inspire_multiplier and not self.ship.is_full):
             # return to shipyard if enough halite
-            new_state = "returning"
+            return "returning"
 
         elif self.ship.halite_amount < constants.MAX_HALITE * self.return_percentage * 0.9 and self.game_map[self.ship.position].halite_amount <= 100 and \
                 self.better_patch_neighbouring(self.game_map[self.ship.position].halite_amount):
             # explore to best neighbour if current cell has low halite, and there is a 2x patch next to it
             self.ship_dest[self.ship.id] = self.get_best_neighbour(self.ship.position).position
-            new_state = "exploring"
             DP.reassign_duplicate_dests(self.ship_dest[self.ship.id], self.ship.id)
+            return "exploring"
 
         elif (cell_halite < self.game_map.HALITE_STOP * inspire_multiplier and self.ship.halite_amount < constants.MAX_HALITE * self.return_percentage * .9):
             # Keep exploring if halite patch low on halite and ship doesnt have close to returning percentage
             DP.process_new_destination(self.ship)
-            new_state = "exploring"
+            return "exploring"
 
         elif cell_halite < self.game_map.HALITE_STOP * inspire_multiplier:
             # return if cell has low halite
-            new_state = "returning"
+            return "returning"
 
         elif self.ship.halite_amount <= constants.MAX_HALITE * 0.4 and self.ENABLE_COMBAT\
                 and GlobalFunctions(self.game).dist_to_enemy_doff(self.ship.position) >= GC.CLOSE_TO_SHIPYARD * self.game_map.width and self.game_map[self.ship.position].enemy_neighbouring:
             # if not that mch halite and not too close to assasinate and enemy is neighbouring, attempt to kill sm1 
-            new_state = self.attempt_switching_assasinate()
+            return self.attempt_switching_assasinate()
 
         elif self.game_map[self.ship.position].enemy_neighbouring > 0 and self.ship.halite_amount >= GC.MEDIUM_HALITE and self.game_map[self.ship.position].halite_amount <= GC.MEDIUM_HALITE:  # if enemy right next to it
             # move to neighbour that has minimal enemies, but more halite
@@ -209,11 +208,11 @@ class StateMachine():
                     ratio = n_ratio
                     next_dest = n.position
             self.ship_path[self.ship.id] = []
-            new_state = "exploring"
             self.ship_dest[self.ship.id] = n.position
             DP.reassign_duplicate_dests(self.ship_dest[self.ship.id], self.ship.id)
+            return "exploring"
 
-        return new_state
+        return None
 
 
     def better_patch_neighbouring(self, big_diff):
@@ -236,8 +235,9 @@ class StateMachine():
 
     def returning_transition(self):
         DP = DestinationProcessor(self.game)
+
         if self.game.turn_number >= GC.CRASH_TURN and self.game_map[self.ship.position].parent.is_occupied\
-        and not self.me.has_ship(self.game_map[self.ship.position].parent.ship.id):
+            and not self.me.has_ship(self.game_map[self.ship.position].parent.ship.id):
             self.ship_dest[self.ship.id] = self.game_map[self.ship.position].parent.position
             return "assassinate"
 
@@ -289,8 +289,8 @@ class StateMachine():
                 return "exploring"
 
         elif self.game_map[future_dropoff_cell.position].enemy_amount >= GC.UNSAFE_AREA:
-            new_state = "exploring"
             DP.process_new_destination(self.ship)
+            return "exploring"
 
         elif distance_to_dest <= 2:
             neighbours = self.game_map.get_neighbours(self.game_map[self.ship.position])
@@ -332,7 +332,7 @@ class StateMachine():
             return "collecting"
 
         elif self.ship.halite_amount >= constants.MAX_HALITE * self.return_percentage:
-            new_state = "returning"
+            return "returning"
         elif self.game_map.calculate_distance(self.ship.position, destination) == 1:
             if self.game_map[destination].is_occupied and self.me.has_ship(self.game_map[destination].ship.id):
                 self.ship_dest[self.ship.id] = self.get_best_neighbour(destination).position

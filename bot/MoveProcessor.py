@@ -34,7 +34,7 @@ class MoveProcessor():
         destination = self.ship_dest[ship.id]
         ''' produces move for ship '''
 
-        if ship.halite_amount < self.game_map[ship.position].halite_amount / 10:
+        if ship.halite_amount < self.game_map[ship.position].halite_amount / constants.MOVE_COST_RATIO:
             return Direction.Still
 
 
@@ -130,6 +130,7 @@ class MoveProcessor():
         elif ship.position in GlobalFunctions(self.game).get_dropoff_positions():
             c_dist = None
             c_n = None
+            logging.info("moving out of shipyard")
             for n in self.game_map.get_neighbours(self.game_map[ship.position]):
                 if not n.is_occupied:
                     dist_to_dest = self.game_map.calculate_distance(n.position, destination)
@@ -139,12 +140,12 @@ class MoveProcessor():
             return self.dir_to_dest(ship.position, c_n.position)
 
 
-        # next direction occupied, recalculate
         if ship.id not in self.ship_path or not self.ship_path[ship.id]:
             self.ship_path[ship.id] = self.game_map.explore(ship, destination)
         else:
             direction = self.ship_path[ship.id][0][0]
             next_pos = ship.position.directional_offset(direction)
+            # next direction occupied, recalculate
             if self.game_map[next_pos].is_occupied and not direction == Direction.Still:
                 other_ship = self.game_map[next_pos].ship
                 # move to intermediate destination, aka move around
