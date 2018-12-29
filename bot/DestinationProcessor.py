@@ -32,10 +32,8 @@ class DestinationProcessor():
     def find_new_destination(self, h, ship):
         ''' h: priority queue of halite factors,
                                         halite_pos: dictionary of halite factor -> patch position '''
-        removed = set()  # all elements removed from the heap during this function
         ship_id = ship.id
         biggest_halite, position = heappop(h)  # get biggest halite
-        removed.add((biggest_halite, position))
         destination = self.game_map.normalize(position)
         self.dropoff_distribution = self.get_ship_distribution_over_dropoffs()
         # create an inverted ship_dest hashmap 
@@ -55,14 +53,10 @@ class DestinationProcessor():
                 GlobalFunctions(self.game).state_switch(ship.id, "returning")
                 return
             biggest_halite, position = heappop(h)
-            removed.add((biggest_halite, position))
             destination = self.game_map.normalize(position)
         self.ship_dest[ship_id] = destination  # set the destination
         # This cell has a ship so doesn't need to be in heap
-        removed.remove((biggest_halite, position))
         # Add add removed ones back to the heap except the cell were going to
-        for r in removed:
-            heappush(h, r)
         self.reassign_duplicate_dests(destination, ship_id) # deal with duplicate destinations
 
 
@@ -133,7 +127,8 @@ class DestinationProcessor():
     def get_ship_distribution_over_dropoffs(self):
         distribution = {}
         for s in self.me.get_ships(): # count ships per dropoff
-            d_pos = GlobalFunctions(self.game).get_shipyard(s.position)
+            eval_pos = s.position if s.id not in self.ship_dest else self.ship_dest[s.id]
+            d_pos = GlobalFunctions(self.game).get_shipyard(eval_pos)
             if d_pos in distribution:
                 distribution[d_pos] += 1
             else:

@@ -102,7 +102,7 @@ class StateMachine():
             self.ship_dest[self.ship.id] = self.get_best_neighbour(self.ship.position).position
             DP.reassign_duplicate_dests(self.ship_dest[self.ship.id], self.ship.id)
 
-        elif 0 < euclid_to_dest <= 2\
+        elif euclid_to_dest <= 2\
                 and self.exists_better_in_area(self.ship.position, self.ship_dest[self.ship.id], 4):
             DP.process_new_destination(self.ship)
 
@@ -121,7 +121,7 @@ class StateMachine():
                         n.ship.halite_amount >= GC.MEDIUM_HALITE and\
                         self.enough_backup_nearby(n.position, int(0.15 * self.game_map.width), 2):
                     # assasinate that mofo
-                    logging.info("ASSASINATING")
+                    logging.info("ASSASSINATING")
                     self.ship_dest[self.ship.id] = n.position
                     return "assassinate"
         return None

@@ -30,4 +30,4 @@ def benchmark(bot1, bot2, iterations):
                 print(f"{bot2} scored {result2}")
 
 
-benchmark("MyBot", "Old", 3)
+benchmark("MyBot", "Old", 1)

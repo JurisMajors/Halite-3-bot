@@ -46,7 +46,7 @@ from bot.GlobalVariablesSingleton import GlobalVariablesSingleton
 from bot.MoveProcessor import MoveProcessor
 from bot.StateMachine import StateMachine
 
-game.ready("MLP")
+game.ready("v56")
 
 
 class main():

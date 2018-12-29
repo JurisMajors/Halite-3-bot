@@ -33,3 +33,4 @@ class GlobalVariablesSingleton():
             self.ship_obj = {} # ship.id to ship obj for processing crashed ship stuff
             self.turn_start = 0 # for timing
             self.NR_OF_PLAYERS = len(game.players.keys())
+            self.MIN_CLUSTER_VALUE = 6000 if game.game_map.width >= 64 else 8000

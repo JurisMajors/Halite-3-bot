@@ -4,7 +4,7 @@ sys.path.insert(1, os.path.join(sys.path[0], '..'))
 import hlt
 from hlt import constants
 
-VARIABLES = ["YEEHAW", 1285, 50, 0.4, 1, 0.95, 500, 50, 0.55,
+VARIABLES = ["YEEHAW", 1285, 50, 0.4, 0.9, 0.95, 500, 50, 0.55,
              0, 0.8, 0, 0.01, 0.98, 1.05, 0.9, 0.15, 0.15, 8, 8]
 VERSION = VARIABLES[1]
 # search area for halite relative to shipyard
@@ -37,7 +37,7 @@ MAX_CLUSTERS = int(VARIABLES[18])  # max amount of clusters
 FLEET_SIZE = int(VARIABLES[19])  # fleet size to send for new dropoff
 CLOSE_TO_SHIPYARD = 0.18 # definition of percentage of map size that we consider close to shipyard
 ENEMY_SHIPYARD_CLOSE = 0.15 # -//- close to enemy shipyard
-SHIP_SCAN_AREA = 20 # when ship changing destinations relative to its position, the area used to scan around him for halite
+SHIP_SCAN_AREA = 16 # when ship changing destinations relative to its position, the area used to scan around him for halite
 EXTRA_FLEET_MAP_SIZE = 32 # for maps >= we send an extra fleet together with the builder of a dropoff
 # % of patches that have a ship on them for ships to return earlier
 BUSY_PERCENTAGE = 0.15
