@@ -131,6 +131,22 @@ class GlobalFunctions():
         return 2 - (time.time() - GlobalVariablesSingleton.getInstance().turn_start)
 
 
+    def bfs_unoccupied(self, position):
+        # bfs for closest cell
+        Q = deque([])
+        visited = set()
+        Q.append(position)
+        while Q:
+            cur = Q.popleft()
+            visited.add(cur)
+            if not (self.game_map[cur].is_occupied and self.game_map[cur].has_structure):
+                return cur
+            for neighbour in self.game_map.get_neighbours(self.game_map[cur]):
+                if not neighbour.position in visited:
+                    Q.append(neighbour.position)
+                    visited.add(neighbour.position)
+
+
 class ClusterProcessor():
 
     def __init__(self, game):
@@ -875,7 +891,6 @@ class StateMachine():
 
 
     def is_savior(self, ship):
-        '''Duplicate function ATM'''
         return self.me.has_ship(ship.id) and ship.halite_amount <= self.return_percentage * 0.5 * constants.MAX_HALITE \
                 and (ship.id not in self.ship_state or not (self.ship_state[ship.id] in ["waiting", "returning", "build"]))
 
@@ -1019,7 +1034,7 @@ class StateMachine():
 
         if future_dropoff_cell.has_structure:
             if distance_to_dest <= GC.CLOSE_TO_SHIPYARD * self.game_map.width:
-                self.ship_dest[self.ship.id] = main(self.game).bfs_unoccupied(future_dropoff_cell.position)
+                self.ship_dest[self.ship.id] = GlobalFunctions(self.game).bfs_unoccupied(future_dropoff_cell.position)
                 DP.reassign_duplicate_dests(self.ship_dest[self.ship.id], self.ship.id)
             else:
                 DP.process_new_destination(self.ship)
@@ -1284,7 +1299,7 @@ class main():
             # somebody is going there already
             if self.game_map[dropoff_pos].has_structure or dropoff_pos in self.ship_dest.values():
                 # bfs for closer valid unoccupied position
-                dropoff_pos = self.bfs_unoccupied(dropoff_pos)
+                dropoff_pos = GlobalFunctions(self.game).bfs_unoccupied(dropoff_pos)
             self.ship_dest[closest_ship.id] = dropoff_pos  # go to the dropoff
             if self.game_map.width >= GC.EXTRA_FLEET_MAP_SIZE:
                 self.send_ships(dropoff_pos, int(GC.FLEET_SIZE / 2), "fleet", leader=closest_ship)
@@ -1326,22 +1341,6 @@ class main():
         distances.sort(key=lambda x: x[0])
         fleet_size = min(len(distances), fleet_size)
         return [t[1] for t in distances[:fleet_size]]
-
-
-    def bfs_unoccupied(self, position):
-        # bfs for closest cell
-        Q = deque([])
-        visited = set()
-        Q.append(position)
-        while Q:
-            cur = Q.popleft()
-            visited.add(cur)
-            if not (self.game_map[cur].is_occupied and self.game_map[cur].has_structure):
-                return cur
-            for neighbour in self.game_map.get_neighbours(self.game_map[cur]):
-                if not neighbour.position in visited:
-                    Q.append(neighbour.position)
-                    visited.add(neighbour.position)
 
 
     def have_less_ships(self, ratio):
@@ -1395,11 +1394,6 @@ class main():
     def is_builder(self, ship):
         ''' checks if this ship is a builder '''
         return self.ship_state[ship.id] == "waiting" or (self.ship_state[ship.id] == "build" and self.ship_dest[ship.id] == ship.position)
-
-
-    def is_savior(self, ship):
-        return self.me.has_ship(ship.id) and ship.halite_amount <= self.return_percentage * 0.5 * constants.MAX_HALITE \
-                and (ship.id not in self.ship_state or not (self.ship_state[ship.id] in ["waiting", "returning", "build"]))
 
 
     def select_crash_turn(self):
