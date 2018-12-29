@@ -69,7 +69,6 @@ class MapCell:
     def mark_unsafe(self, ship):
         """
         Mark this cell as unsafe (occupied) for navigation.
-
         Use in conjunction with GameMap.naive_navigate.
         """
         self.ship = ship
@@ -93,7 +92,6 @@ class MapCell:
 class GameMap:
     """
     The game map.
-
     Can be indexed by a position, or by a contained entity.
     Coordinates start at 0. Coordinates are normalized for you
     """
@@ -205,7 +203,6 @@ class GameMap:
     def naive_navigate(self, ship, destination):
         """
         Returns a singular safe move towards the destination.
-
         :param ship: The ship to move.
         :param destination: Ending position
         :return: A direction.

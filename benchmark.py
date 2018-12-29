@@ -29,5 +29,5 @@ def benchmark(bot1, bot2, iterations):
                 print(f"{bot1} scored {result1}")
                 print(f"{bot2} scored {result2}")
 
+benchmark("MyBot", "Old", 1)
 
-benchmark("MyBot", "53", 1)
