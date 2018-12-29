@@ -1007,9 +1007,11 @@ def should_build():
         if cluster_centers:  # there is already a dropoff position
             return True
         # there is no good dropoff position yet, make one
+        logging.info("determining extra cluster centers")
         game_map.set_close_friendly_ships(me)
         pos = game_map.get_most_dense_dropoff_position(get_dropoff_positions())
         cluster_centers.append((10000, pos))  # fake 10000 halite for new needed cluster
+        logging.info(cluster_centers)
         return True
 
     # Original dropoff code

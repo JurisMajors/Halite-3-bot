@@ -104,7 +104,7 @@ class GameMap:
         self._cells = cells
         self.HALITE_STOP = 50
         self.c = []
-        self.extra_dropoff_possibilities = []  # array of positions
+        self.extra_dropoff_possibilities = set()  # set of positions
 
     def __getitem__(self, location):
         """
@@ -539,7 +539,7 @@ class GameMap:
 
     def set_close_friendly_ships(self, me):
         """ Sets a number of close friendly ships for each cell """
-        self.extra_dropoff_possibilities = []
+        self.extra_dropoff_possibilities = set()
         for s in me.get_ships():
             self.set_area(self[s.position])
 
@@ -552,7 +552,7 @@ class GameMap:
                 pos = Position((top_left.x + x) % self.width,
                                (top_left.y + y) % self.height)
                 self[pos].close_friendly_ships += 1
-                self.extra_dropoff_possibilities.append(
+                self.extra_dropoff_possibilities.add(
                     pos)  # add the position
 
     def get_most_dense_dropoff_position(self, dropoff_positions, min_dist=10):
