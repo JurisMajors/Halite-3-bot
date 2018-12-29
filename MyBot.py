@@ -360,7 +360,7 @@ class ClusterProcessor():
 
 class DestinationProcessor():
 
-    def __init__(self, game, ship_dest, ship_state, ship_path, previous_state):
+    def __init__(self, game):
         self.game = game
         self.game_map = game.game_map
         self.me = game.me
@@ -770,7 +770,7 @@ class StateMachine():
         # transition
         new_state = None
         shipyard = GlobalFunctions(self.game).get_shipyard(self.ship.position)
-        DP = DestinationProcessor(self.game, self.ship_dest, self.ship_state, self.ship_path, self.previous_state)
+        DP = DestinationProcessor(self.game)
         GF = GlobalFunctions(self.game)
 
         if self.game.turn_number >= GC.CRASH_TURN and self.game_map.calculate_distance(
@@ -822,7 +822,7 @@ class StateMachine():
     def exploring_transition(self):
         distance_to_dest = self.game_map.calculate_distance(self.ship.position, self.ship_dest[self.ship.id])
         euclid_to_dest = self.game_map.euclidean_distance(self.ship.position, self.ship_dest[self.ship.id])
-        DP = DestinationProcessor(self.game, self.ship_dest, self.ship_state, self.ship_path, self.previous_state)
+        DP = DestinationProcessor(self.game)
         if self.ship.position == self.ship_dest[self.ship.id]:
             # collect if reached destination or on medium sized patch
             return "collecting"
@@ -901,7 +901,7 @@ class StateMachine():
         inspire_multiplier = self.game_map.get_inspire_multiplier(
             self.ship.position, self.game_map[self.ship.position], self.ENABLE_BACKUP)
         cell_halite = self.game_map[self.ship.position].halite_amount * inspire_multiplier
-        DP = DestinationProcessor(self.game, self.ship_dest, self.ship_state, self.ship_path, self.previous_state)
+        DP = DestinationProcessor(self.game)
 
         if self.ship.is_full:
             return "returning"
@@ -972,7 +972,7 @@ class StateMachine():
 
 
     def returning_transition(self):
-        DP = DestinationProcessor(self.game, self.ship_dest, self.ship_state, self.ship_path, self.previous_state)
+        DP = DestinationProcessor(self.game)
         if self.ship.position in GlobalFunctions(self.game).get_dropoff_positions():
             # explore again when back in shipyard
             return "exploring"
@@ -992,7 +992,7 @@ class StateMachine():
 
 
     def fleet_transition(self):
-        DP = DestinationProcessor(self.game, self.ship_dest, self.ship_state, self.ship_path, self.previous_state)
+        DP = DestinationProcessor(self.game)
         destination = self.ship_dest[self.ship.id]
         if self.ship.position == destination:  # if arrived
             self.ship_path[self.ship.id] = []
@@ -1013,7 +1013,7 @@ class StateMachine():
 
     def builder_transition(self):
         # if someone already built dropoff there before us
-        DP = DestinationProcessor(self.game, self.ship_dest, self.ship_state, self.ship_path, self.previous_state)
+        DP = DestinationProcessor(self.game)
         future_dropoff_cell = self.game_map[self.ship_dest[self.ship.id]]
         distance_to_dest = self.game_map.euclidean_distance(self.ship.position, self.ship_dest[self.ship.id])
 
@@ -1045,7 +1045,7 @@ class StateMachine():
 
 
     def waiting_transition(self):
-        DP = DestinationProcessor(self.game, self.ship_dest, self.ship_state, self.ship_path, self.previous_state)
+        DP = DestinationProcessor(self.game)
         neighbours = self.game_map.get_neighbours(self.game_map[self.ship.position])
         cell = self.game_map[self.ship.position]
         for n in neighbours:
@@ -1062,7 +1062,7 @@ class StateMachine():
 
 
     def backup_transition(self):
-        DP = DestinationProcessor(self.game, self.ship_dest, self.ship_state, self.ship_path, self.previous_state)
+        DP = DestinationProcessor(self.game)
         destination = self.ship_dest[self.ship.id]
         if self.ship.position == destination:  # if arrived
             self.ship_path[self.ship.id] = []
@@ -1205,7 +1205,7 @@ class main():
                 # setup state
                 # if ship hasnt received a destination yet
                 if ship.id not in self.ship_dest or not ship.id in self.ship_state:
-                    DestinationProcessor(self.game, self.ship_dest, self.ship_state, self.ship_path, self.previous_state).find_new_destination(
+                    DestinationProcessor(self.game).find_new_destination(
                         self.game_map.halite_priority, ship)
                     self.previous_state[ship.id] = "exploring"
                     self.ship_state[ship.id] = "exploring"  # explore
@@ -1311,7 +1311,7 @@ class main():
                 self.fleet_leader[fleet_ship.id] = leader
 
             GlobalFunctions(self.game).state_switch(fleet_ship.id, new_state)
-            DestinationProcessor(self.game, self.ship_dest, self.ship_state, self.ship_path, self.previous_state).find_new_destination(h, fleet_ship)
+            DestinationProcessor(self.game).find_new_destination(h, fleet_ship)
 
 
     def get_fleet(self, position, fleet_size, condition=None):
