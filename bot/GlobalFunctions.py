@@ -9,6 +9,7 @@ import logging
 from hlt.positionals import Direction, Position
 from heapq import heappush, heappop, merge
 from bot.GlobalVariablesSingleton import GlobalVariablesSingleton
+from collections import deque
 
 class GlobalFunctions():
 
