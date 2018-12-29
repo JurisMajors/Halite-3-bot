@@ -7,6 +7,7 @@ from hlt import constants
 import logging
 import bot.GlobalConstants as GC
 from bot.GlobalVariablesSingleton import GlobalVariablesSingleton
+from bot.GlobalFunctions import GlobalFunctions
 from hlt.positionals import Direction, Position
 from pyclustering.cluster.kmedians import kmedians
 from pyclustering.cluster.center_initializer import kmeans_plusplus_initializer
