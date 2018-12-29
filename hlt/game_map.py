@@ -104,6 +104,7 @@ class GameMap:
         self._cells = cells
         self.HALITE_STOP = 50
         self.c = []
+        self.extra_dropoff_possibilities = []  # array of positions
 
     def __getitem__(self, location):
         """
@@ -130,7 +131,7 @@ class GameMap:
         target = self.normalize(target)
         resulting_position = abs(source - target)
         return min(resulting_position.x, self.width - resulting_position.x) + \
-               min(resulting_position.y, self.height - resulting_position.y)
+            min(resulting_position.y, self.height - resulting_position.y)
 
     def euclidean_distance(self, source, target):
         ''' Computes euclidean distance on torus map '''
@@ -268,7 +269,7 @@ class GameMap:
                 continue
             for neighbour in self.get_neighbours(cell):
                 new_dist = dist + neighbour.halite_amount + \
-                           70 + neighbour.enemy_neighbouring
+                    70 + neighbour.enemy_neighbouring
                 if new_dist < neighbour.weight_to_shipyard:
                     neighbour.weight_to_shipyard = new_dist
                     neighbour.parent = cell
@@ -334,7 +335,7 @@ class GameMap:
                     neighbour.cost = new_cost
                     # distance is the heuristic
                     priority = new_cost + \
-                               self.calculate_distance(neighbour.position, target)
+                        self.calculate_distance(neighbour.position, target)
                     neighbour.a_star_parent = current
                     neighbour.visited = ship
                     visited.append(neighbour)
@@ -367,7 +368,7 @@ class GameMap:
             t_direction = self.get_target_direction(
                 next_cell.position, end.position)
             direction = t_direction[0] if t_direction[
-                                              0] is not None else t_direction[1]
+                0] is not None else t_direction[1]
             direction = direction if direction is not None else Direction.Still
 
             if path:  # if not length zero check last element
@@ -389,7 +390,8 @@ class GameMap:
         if end_cell.is_occupied and not end_cell.ship == ship:
             return False
         Q = []
-        heappush(Q, (self.calculate_distance(end_cell.position, start_cell.position), end_cell))
+        heappush(Q, (self.calculate_distance(
+            end_cell.position, start_cell.position), end_cell))
         visited = set()
         while Q:
             cur = heappop(Q)[1]
@@ -405,7 +407,8 @@ class GameMap:
                 if neighbour == start_cell:  # needed because start will be occupied by our ship
                     return True
                 if not neighbour.is_occupied and neighbour not in visited:
-                    heappush(Q, (self.calculate_distance(neighbour.position, start_cell.position), neighbour))
+                    heappush(Q, (self.calculate_distance(
+                        neighbour.position, start_cell.position), neighbour))
                     visited.add(neighbour)
         return False
 
@@ -440,7 +443,8 @@ class GameMap:
             if not p.id == me.id:
                 # bfs around the ships
                 for their in p.get_ships():
-                    self.bfs_around_enemy(their.position, constants.INSPIRATION_RADIUS)
+                    self.bfs_around_enemy(
+                        their.position, constants.INSPIRATION_RADIUS)
 
     def init_map(self, me, all_players, enable_inspire=True, backup=False):
         self.total_halite = 0
@@ -474,7 +478,7 @@ class GameMap:
 
     def cell_heuristic(self, halite, distance):
         return (self.c[0] * halite * halite + self.c[1] * halite + self.c[2]) / (
-                self.c[3] * distance * distance + self.c[4] * distance + self.c[5])
+            self.c[3] * distance * distance + self.c[4] * distance + self.c[5])
 
     def cell_factor(self, cntr, cell, me, backup):
         dropoff_positions = self.get_dropoff_positions(me)
@@ -535,15 +539,9 @@ class GameMap:
 
     def set_close_friendly_ships(self, me):
         """ Sets a number of close friendly ships for each cell """
-        # reset close friendly ships
-        for y in range(self.height):
-            for x in range(self.width):
-                self[Position(x, y)].close_friendly_ships = 0
-
-        for y in range(self.height):
-            for x in range(self.width):
-                if self[Position(x, y)].ship in me.get_ships():
-                    self.set_area(self[Position(x, y)])
+        self.extra_dropoff_possibilities = []
+        for s in me.get_ships():
+            self.set_area(self[s.position])
 
     def set_area(self, cell, area=4):
         top_left = Position(int(-1 * area / 2),
@@ -554,21 +552,28 @@ class GameMap:
                 pos = Position((top_left.x + x) % self.width,
                                (top_left.y + y) % self.height)
                 self[pos].close_friendly_ships += 1
+                self.extra_dropoff_possibilities.append(
+                    pos)  # add the position
 
     def get_most_dense_dropoff_position(self, dropoff_positions, min_dist=10):
         """ Returns the position of the cell with the most close friendly ships that is at least
         min_dist away from all other dropoffs """
         max_nearby = 0  # maximum nearby friendly ships
         best_pos = Position(0, 0)
-        for x in range(self.width):
-            for y in range(self.height):
-                if self[Position(x, y)].structure is not None:
-                    continue
-                if self[Position(x, y)].close_friendly_ships > max_nearby:
-                    for d in dropoff_positions:
-                        if self.euclidean_distance(Position(x, y), d) > min_dist:
-                            max_nearby = self[Position(x, y)].close_friendly_ships
-                            best_pos = Position(x, y)
+
+        for possible_pos in self.extra_dropoff_possibilities:  # for each possibility
+            if self[possible_pos].structure is not None:
+                continue
+            if self[possible_pos].close_friendly_ships > max_nearby:  # if more than the max
+                min_distance_to_dropoff = 9999
+
+                for d in dropoff_positions:  # check if its far enough from a current dropoffs
+                    min_distance_to_dropoff = min(
+                        min_distance_to_dropoff, self.euclidean_distance(possible_pos, d))
+
+                if min_distance_to_dropoff > min_dist:
+                    max_nearby = self[possible_pos].close_friendly_ships
+                    best_pos = possible_pos
 
         return best_pos
 
@@ -601,6 +606,7 @@ class GameMap:
                 self[Position(x, y)].inspired = None
                 self[Position(x, y)].enemy_amount = 0
                 self[Position(x, y)].enemy_neighbouring = 0
+                self[Position(x, y)].close_friendly_ships = 0
 
         for _ in range(int(read_input())):
             cell_x, cell_y, cell_energy = map(int, read_input().split())

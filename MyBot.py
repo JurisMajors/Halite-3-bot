@@ -430,7 +430,7 @@ def dir_to_dest(pos, dest):
         new_pos = game_map.normalize(pos.directional_offset(d))
         if new_pos == normalized_dest:
             return d
-    return None
+    return Direction.Still # should never happen
 
 def state_switch(ship_id, new_state):
     if ship_id not in previous_state:
@@ -520,9 +520,18 @@ def exploring(this_ship, destination):
             if closest_dist is None or dist < closest_dist: # set smallest dist and neighbour
                 closest_dist = dist
                 closest_n = n
-        # swap with the ship there
+
         if closest_n is None: # wait for exploring ships to go away
             return Direction.Still
+
+        # if enemy ship
+        if not me.has_ship(closest_n.ship.id):
+            # kill him
+            ship_state[this_ship.id] = "assassinate"
+            ship_dest[this_ship.id] = closest_n.position
+            return dir_to_dest(this_ship.position, ship_dest[this_ship.id]) 
+        # else its our ship
+        # so swap with it
         move_ship_to_position(closest_n.ship, this_ship.position)
         move_ship_to_position(this_ship, closest_n.position)
         game_map[this_ship.position].ship = closest_n.ship
