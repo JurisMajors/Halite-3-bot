@@ -1092,7 +1092,7 @@ class StateMachine():
             elif self.game_map[destination].is_occupied:  # not our ship
                 return self.attempt_switching_assasinate()
         elif self.game_map[destination].enemy_amount >= GC.UNSAFE_AREA:
-            DP.process_new_destination(ship)
+            DP.process_new_destination(self.ship)
             return "exploring"
         elif self.ENABLE_COMBAT and GlobalFunctions(self.game).dist_to_enemy_doff(self.ship.position) >= GC.CLOSE_TO_SHIPYARD * self.game_map.width:
             return self.attempt_switching_assasinate()
@@ -1484,7 +1484,11 @@ class main():
             # if there are little enemies in that area
             if self.game_map[crashed_pos].enemy_amount <= GC.UNSAFE_AREA and self.game_map[crashed_pos].halite_amount >= constants.MAX_HALITE:
                 # send a backup fleet there
-                self.send_ships(crashed_pos, 2, "backup", is_savior)
+                self.send_ships(crashed_pos, 2, "backup", self.is_savior)
+
+    def is_savior(self, ship):
+        return self.me.has_ship(ship.id) and ship.halite_amount <= self.return_percentage * 0.5 * constants.MAX_HALITE \
+                and (ship.id not in self.ship_state or not (self.ship_state[ship.id] in ["waiting", "returning", "build"]))
 
 
 class GlobalVariablesSingleton():
