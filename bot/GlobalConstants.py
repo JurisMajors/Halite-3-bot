@@ -27,7 +27,11 @@ def load_global_constants(json_file):
     ''' when switch collectable percentage of max halite '''
     PERCENTAGE_SWITCH = int(data["PERCENTAGE_SWITCH"] * constants.MAX_TURNS)
 
+
+    ''' '''
     SMALL_PERCENTAGE = float(data["SMALL_PERCENTAGE"])
+    
+    ''' '''
     BIG_PERCENTAGE = float(data["BIG_PERCENTAGE"])
 
     ''' definition of medium patch size for stopping and collecting patch if on the way '''
@@ -50,19 +54,40 @@ def load_global_constants(json_file):
 
     CRASH_SELECTION_TURN = int(float(data["CRASH_SELECTION_TURN"]) * constants.MAX_TURNS)
 
-    # Minimum halite needed to join a halite cluster
+    ''' Minimum halite needed to join a halite cluster '''
     DETERMINE_CLUSTER_TURN = int(float(data["DETERMINE_CLUSTER_TURN"]) * constants.MAX_TURNS)
-    CLUSTER_TOO_CLOSE = float(data["CLUSTER_TOO_CLOSE"])  # distance two clusters can be within
-    MAX_CLUSTERS = int(data["MAX_CLUSTERS"])  # max amount of clusters
-    FLEET_SIZE = int(data["FLEET_SIZE"])  # fleet size to send for new dropoff
-    CLOSE_TO_SHIPYARD = data["CLOSE_TO_SHIPYARD"] # definition of percentage of map size that we consider close to shipyard
-    ENEMY_SHIPYARD_CLOSE = data["ENEMY_SHIPYARD_CLOSE"] # -//- close to enemy shipyard
-    SHIP_SCAN_AREA = data["SHIP_SCAN_AREA"] # when ship changing destinations relative to its position, the area used to scan around him for halite
-    EXTRA_FLEET_MAP_SIZE = data["EXTRA_FLEET_MAP_SIZE"] # for maps >= we send an extra fleet together with the builder of a dropoff
-    # % of patches that have a ship on them for ships to return earlier
+
+    ''' minimal distance two clusters have to be from each other '''
+    CLUSTER_TOO_CLOSE = float(data["CLUSTER_TOO_CLOSE"]) 
+
+    ''' maximal amount of clusters ''' 
+    MAX_CLUSTERS = int(data["MAX_CLUSTERS"])
+
+    ''' fleet size to send for new dropoff '''
+    FLEET_SIZE = int(data["FLEET_SIZE"])
+
+    ''' definition of percentage of map size that we consider close to shipyard '''
+    CLOSE_TO_SHIPYARD = data["CLOSE_TO_SHIPYARD"]
+
+    ''' -//- close to enemy shipyard '''
+    ENEMY_SHIPYARD_CLOSE = data["ENEMY_SHIPYARD_CLOSE"] 
+
+    ''' when ship changing destinations relative to its position, the area used to scan around him for halite '''
+    SHIP_SCAN_AREA = data["SHIP_SCAN_AREA"] 
+
+
+    ''' for maps >= we send an extra fleet together with the builder of a dropoff '''
+    EXTRA_FLEET_MAP_SIZE = data["EXTRA_FLEET_MAP_SIZE"] 
+
+
+    ''' % of patches that have a ship on them for ships to return earlier '''
     BUSY_PERCENTAGE = data["BUSY_PERCENTAGE"]
+
+    ''' '''
     BUSY_RETURN_AMOUNT = data["BUSY_RETURN_AMOUNT"] * constants.MAX_TURNS
+    
+    ''' '''
     UNSAFE_AREA = data["UNSAFE_AREA"]
 
     ''' for each 40 ships there should be a dropoff '''
-    MAX_SHIP_DROPOFF_RATIO = data["MAX_SHIP_DROPOFF_RATIO"]  
+    MAX_SHIP_DROPOFF_RATIO = data["MAX_SHIP_DROPOFF_RATIO"]
