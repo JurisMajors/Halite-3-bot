@@ -182,7 +182,7 @@ class StateMachine():
             return "returning"
 
         elif self.ship.halite_amount < constants.MAX_HALITE * self.return_percentage * 0.9 and self.game_map[self.ship.position].halite_amount <= 100 and \
-                self.better_patch_neighbouring(self.game_map[self.ship.position].halite_amount):
+                self.better_patch_neighbouring(self.game_map[self.ship.position].halite_amount + 1):
             # explore to best neighbour if current cell has low halite, and
             # there is a 2x patch next to it
             self.ship_dest[self.ship.id] = self.get_best_neighbour(

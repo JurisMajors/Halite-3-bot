@@ -131,7 +131,7 @@ class main():
                 self.return_percentage = 0.6
 
             if self.should_build():
-                self.process_building(self.cluster_centers)
+                self.process_building()
 
             # has_moved ID->True/False, moved or not
             # ships priority queue of (importance, ship)
@@ -224,8 +224,8 @@ class main():
     def get_ship_amount(self, playerID):
         return len(self.game.players[playerID].get_ships())
 
-    def process_building(self, cluster_centers):
-        dropoff_val, dropoff_pos = cluster_centers.pop(0)  # remove from list
+    def process_building(self):
+        dropoff_val, dropoff_pos = self.cluster_centers.pop(0)  # remove from list
         # sends ships to position where closest will build dropoff
         dropoff_pos = self.game_map.normalize(dropoff_pos)
         fleet = self.get_fleet(dropoff_pos, 1)
@@ -243,7 +243,7 @@ class main():
                 self.send_ships(dropoff_pos, int(
                     GC.FLEET_SIZE / 2), "fleet", leader=closest_ship)
         else:  # if builder not available
-            cluster_centers.insert(0, (dropoff_val, dropoff_pos))
+            self.cluster_centers.insert(0, (dropoff_val, dropoff_pos))
 
     def send_ships(self, pos, ship_amount, new_state, condition=None, leader=None):
         '''sends a fleet of size ship_amount to explore around pos
@@ -288,6 +288,11 @@ class main():
         return False
 
     def should_build(self):
+        if self.prcntg_halite_left < 0.2\
+        or self.game.turn_number >= GC.CRASH_TURN * 0.8\
+        or len(self.me.get_dropoffs()) > GC.MAX_CLUSTERS:
+            return False
+
         # calculate amount of ships going to each dropoff
         dropoff_count = {}  # dropoff_pos -> ships going there
         for d in self.GF.get_dropoff_positions():
@@ -303,9 +308,7 @@ class main():
 
         # if clusters determined, more than 13 ships, we have clusters and nobody
         # is building at this turn (in order to not build too many)
-        if (len(self.me.get_ships()) / len(
-                self.GF.get_dropoff_positions()) >= GC.MAX_SHIP_DROPOFF_RATIO
-                or is_crowded_dropoff) and not self.any_builders():
+        if is_crowded_dropoff and not self.any_builders():
             # there are more than 40 ships per dropoff
             if self.cluster_centers:  # there is already a dropoff position
                 return True
@@ -316,8 +319,6 @@ class main():
             # fake 10000 halite for new needed cluster
             self.cluster_centers.append((10000, pos))
             return True
-
-        # Original dropoff code
 
         return self.clusters_determined and self.game.turn_number >= self.dropoff_last_built + 15 and self.cluster_centers \
                and len(self.me.get_ships()) > (len(self.GF.get_dropoff_positions()) + 1) * GC.FLEET_SIZE \
