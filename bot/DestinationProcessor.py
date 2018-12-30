@@ -32,7 +32,7 @@ class DestinationProcessor():
 
     def find_new_destination(self, h, ship):
         ''' h: priority queue of halite factors,
-                                        halite_pos: dictionary of halite factor -> patch position '''
+        halite_pos: dictionary of halite factor -> patch position '''
         ship_id = ship.id
         removed = set()
         biggest_halite, position = heappop(h)  # get biggest halite
@@ -78,6 +78,9 @@ class DestinationProcessor():
             return self.game_map[destination].enemy_amount >= GC.UNSAFE_AREA or not self.dest_viable(destination, ship)
 
     def reassign_duplicate_dests(self, destination, this_id):
+        """ Given a destination and a ship id that has that new destination assigned
+        looks for different ships that have the same destination and processes a new destination 
+        for them """ 
         # if another ship had the same destination
         s = self.get_ship_w_destination(destination, this_id)
         if s:  # find a new destination for the ships with same dest
@@ -85,6 +88,7 @@ class DestinationProcessor():
                 self.process_new_destination(other)
 
     def process_new_destination(self, ship):
+        """ Processes a new destination using find_new_destination for ship """
         self.ship_path[ship.id] = []
         if ship.position in self.GF.get_dropoff_positions() or ship.id not in self.ship_dest:
             self.find_new_destination(self.game_map.halite_priority, ship)
@@ -113,12 +117,15 @@ class DestinationProcessor():
             return True  # nobody has the best patch, all good
 
     def too_many_near_dropoff(self, ship, destination):
+        """ Returns whether too many ships have the destination at the 
+        shipyard of this ships destination """
         if self.GF.get_shipyard(ship.position) == self.GF.get_shipyard(destination):
             return False
         else:
             return self.dropoff_distribution[self.GF.get_shipyard(destination)] > (1 / len(self.GF.get_dropoff_positions()))
 
     def prcntg_ships_returning_to_doff(self, d_pos):
+        """ Percentage of ships returning to dropoff at d_pos """
         amount = 0
         for s in self.me.get_ships():
             eval_pos = s.position if s.id not in self.ship_dest else self.ship_dest[
@@ -128,6 +135,8 @@ class DestinationProcessor():
         return amount / len(self.me.get_ships())
 
     def get_ship_distribution_over_dropoffs(self):
+        """ Returns a dictionary of dropoff positions 
+        mapped to percentage of ships returning to that dropoff """
         distribution = {}
         for s in self.me.get_ships():  # count ships per dropoff
             eval_pos = s.position if s.id not in self.ship_dest else self.ship_dest[

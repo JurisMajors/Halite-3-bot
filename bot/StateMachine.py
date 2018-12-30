@@ -173,7 +173,9 @@ class StateMachine():
         if self.ship.is_full:
             return "returning"
 
-        elif self.NR_OF_PLAYERS == 4 and self.game_map.percentage_occupied >= GC.BUSY_PERCENTAGE and self.ship.halite_amount >= GC.BUSY_RETURN_AMOUNT:
+        elif self.NR_OF_PLAYERS == 4\
+        and self.game_map.percentage_occupied >= GC.BUSY_PERCENTAGE\
+        and self.ship.halite_amount >= GC.BUSY_RETURN_AMOUNT:
             return "returning"
 
         elif self.ship.halite_amount >= constants.MAX_HALITE * self.return_percentage and \
