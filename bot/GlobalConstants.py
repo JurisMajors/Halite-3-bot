@@ -27,7 +27,6 @@ def load_global_constants(json_file):
     ''' when switch collectable percentage of max halite '''
     PERCENTAGE_SWITCH = int(data["PERCENTAGE_SWITCH"] * constants.MAX_TURNS)
 
-
     ''' '''
     SMALL_PERCENTAGE = float(data["SMALL_PERCENTAGE"])
     
@@ -51,7 +50,6 @@ def load_global_constants(json_file):
     E = float(data["E"])
     F = float(data["F"])
 
-
     CRASH_SELECTION_TURN = int(float(data["CRASH_SELECTION_TURN"]) * constants.MAX_TURNS)
 
     ''' Minimum halite needed to join a halite cluster '''
@@ -73,20 +71,18 @@ def load_global_constants(json_file):
     ENEMY_SHIPYARD_CLOSE = data["ENEMY_SHIPYARD_CLOSE"] 
 
     ''' when ship changing destinations relative to its position, the area used to scan around him for halite '''
-    SHIP_SCAN_AREA = data["SHIP_SCAN_AREA"] 
-
+    SHIP_SCAN_AREA = data["SHIP_SCAN_AREA"]
 
     ''' for maps >= we send an extra fleet together with the builder of a dropoff '''
     EXTRA_FLEET_MAP_SIZE = data["EXTRA_FLEET_MAP_SIZE"] 
 
-
     ''' % of patches that have a ship on them for ships to return earlier '''
     BUSY_PERCENTAGE = data["BUSY_PERCENTAGE"]
 
-    ''' '''
+    ''' amount of halite a ship has to have to return when a BUSY_PERCENTAGE of cells are occupied'''
     BUSY_RETURN_AMOUNT = data["BUSY_RETURN_AMOUNT"] * constants.MAX_TURNS
     
-    ''' '''
+    ''' definition of amount of enemy ships that make an area of radius 4 (manhattan distance) unsafe '''
     UNSAFE_AREA = data["UNSAFE_AREA"]
 
     ''' for each 40 ships there should be a dropoff '''
