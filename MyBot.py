@@ -59,7 +59,7 @@ class main():
         self.game_map = game.game_map
         self.me = game.me
         GV = GlobalVariablesSingleton(game)
-
+        self.GF = GlobalFunctions(self.game)
         self.ENABLE_BACKUP = GV.ENABLE_BACKUP
         self.ENABLE_COMBAT = GV.ENABLE_COMBAT
         self.ship_state = GV.ship_state
@@ -70,7 +70,6 @@ class main():
         self.fleet_leader = GV.fleet_leader
         self.ship_obj = GV.ship_obj
         self.NR_OF_PLAYERS = GV.NR_OF_PLAYERS
-
         self.crashed_positions = []
         self.cluster_centers = []
         self.clusters_determined = False
@@ -114,7 +113,7 @@ class main():
                 self.process_backup_sending()
 
             # Dijkstra the graph based on all dropoffs
-            self.game_map.create_graph(GlobalFunctions(self.game).get_dropoff_positions())
+            self.game_map.create_graph(self.GF.get_dropoff_positions())
 
             if self.game.turn_number == GC.DETERMINE_CLUSTER_TURN:
                 self.clusters_determined = True
@@ -145,7 +144,7 @@ class main():
                 ship = heappop(ships)[1]
                 if self.has_moved[ship.id]:
                     continue
-                if GlobalFunctions(self.game).time_left() < 0.15:
+                if self.GF.time_left() < 0.15:
                     logging.info("STANDING STILL TOO SLOW")
                     command_queue.append(ship.stay_still())
                     self.ship_state[ship.id] = "collecting"
@@ -196,7 +195,7 @@ class main():
                 self.has_moved[ship.id] = True
 
             surrounded_shipyard = self.game_map.is_surrounded(self.me.shipyard.position)
-            logging.info(GlobalFunctions(self.game).time_left())
+            logging.info(self.GF.time_left())
             if not dropoff_built and 2 * (self.max_enemy_ships() + 1) > len(self.me.get_ships()) and self.game.turn_number <= GC.SPAWN_TURN \
                     and self.me.halite_amount >= constants.SHIP_COST and self.prcntg_halite_left > (1 - 0.65) and \
                     not (self.game_map[self.me.shipyard].is_occupied or surrounded_shipyard or "waiting" in self.ship_state.values()):
@@ -227,12 +226,12 @@ class main():
         fleet = self.get_fleet(dropoff_pos, 1)
         if fleet:
             closest_ship = fleet.pop(0)  # remove and get closest ship
-            GlobalFunctions(self.game).state_switch(closest_ship.id, "build")  # will build dropoff
+            self.GF.state_switch(closest_ship.id, "build")  # will build dropoff
             # if dropoffs position already has a structure (e.g. other dropoff) or
             # somebody is going there already
             if self.game_map[dropoff_pos].has_structure or dropoff_pos in self.ship_dest.values():
                 # bfs for closer valid unoccupied position
-                dropoff_pos = GlobalFunctions(self.game).bfs_unoccupied(dropoff_pos)
+                dropoff_pos = self.GF.bfs_unoccupied(dropoff_pos)
             self.ship_dest[closest_ship.id] = dropoff_pos  # go to the dropoff
             if self.game_map.width >= GC.EXTRA_FLEET_MAP_SIZE:
                 self.send_ships(dropoff_pos, int(GC.FLEET_SIZE / 2), "fleet", leader=closest_ship)
@@ -246,7 +245,7 @@ class main():
         condition : boolean function that qualifies a ship to send'''
         fleet = self.get_fleet(self.game_map.normalize(pos), ship_amount, condition)
         # for rest of the fleet to explore
-        h = GlobalFunctions(self.game).halite_priority_q(pos, GC.SHIP_SCAN_AREA)
+        h = self.GF.halite_priority_q(pos, GC.SHIP_SCAN_AREA)
 
         for fleet_ship in fleet:  # for other fleet members
             if len(h) == 0:
@@ -258,7 +257,7 @@ class main():
             if leader is not None:
                 self.fleet_leader[fleet_ship.id] = leader
 
-            GlobalFunctions(self.game).state_switch(fleet_ship.id, new_state)
+            self.GF.state_switch(fleet_ship.id, new_state)
             DestinationProcessor(self.game).find_new_destination(h, fleet_ship)
 
 
@@ -285,20 +284,20 @@ class main():
     def should_build(self):
         # if clusters determined, more than 13 ships, we have clusters and nobody
         # is building at this turn (in order to not build too many)
-        if len(self.me.get_ships()) / len(GlobalFunctions(self.game).get_dropoff_positions()) >= GC.MAX_SHIP_DROPOFF_RATIO and not self.any_builders():
+        if len(self.me.get_ships()) / len(self.GF.get_dropoff_positions()) >= GC.MAX_SHIP_DROPOFF_RATIO and not self.any_builders():
             # there are more than 40 ships per dropoff
             if self.cluster_centers:  # there is already a dropoff position
                 return True
             # there is no good dropoff position yet, make one
             self.game_map.set_close_friendly_ships(self.me)
-            pos = self.game_map.get_most_dense_dropoff_position(GlobalFunctions(self.game).get_dropoff_positions())
+            pos = self.game_map.get_most_dense_dropoff_position(self.GF.get_dropoff_positions())
             self.cluster_centers.append((10000, pos))  # fake 10000 halite for new needed cluster
             return True
 
         # Original dropoff code
 
         return self.clusters_determined and self.game.turn_number >= self.dropoff_last_built + 15 and self.cluster_centers \
-            and len(self.me.get_ships()) > (len(GlobalFunctions(self.game).get_dropoff_positions()) + 1) * GC.FLEET_SIZE\
+            and len(self.me.get_ships()) > (len(self.GF.get_dropoff_positions()) + 1) * GC.FLEET_SIZE\
             and self.fleet_availability() >= 1.5 * GC.FLEET_SIZE and not self.any_builders()
 
 
@@ -332,7 +331,7 @@ class main():
         '''selects turn when to crash'''
         distance = 0
         for ship in self.me.get_ships():
-            shipyard = GlobalFunctions(self.game).get_shipyard(ship.position)  # its shipyard position
+            shipyard = self.GF.get_shipyard(ship.position)  # its shipyard position
             d = self.game_map.calculate_distance(shipyard, ship.position)
             if d > distance:  # get maximum distance away of shipyard
                 distance = d
@@ -352,7 +351,7 @@ class main():
             has_moved[s.id] = False
             if s.id in self.ship_state:
                 # get ships shipyard
-                shipyard = GlobalFunctions(self.game).get_shipyard(s.position)
+                shipyard = self.GF.get_shipyard(s.position)
                 # importance, the lower the number, bigger importance
                 if s.position == shipyard:
                     importance = -10000
@@ -393,7 +392,7 @@ class main():
         """ adds a carshed position ot the crashed positions list '"""
         neighbours = self.game_map.get_neighbours(self.game_map[pos])
         h_amount = -1
-        distance_to_enemy_dropoff = GlobalFunctions(self.game).dist_to_enemy_doff(pos)
+        distance_to_enemy_dropoff = self.GF.dist_to_enemy_doff(pos)
         for n in neighbours:
             h_amount = max(h_amount, n.halite_amount)
         if h_amount > 800:
@@ -405,7 +404,7 @@ class main():
         where a ship crashed previously """
         to_remove = []
         for pos in self.crashed_ship_positions:
-            if GlobalFunctions(self.game).dist_to_enemy_doff(pos) > 4:
+            if self.GF.dist_to_enemy_doff(pos) > 4:
                 self.add_crashed_position(pos)
             to_remove.append(pos)
         for s in to_remove:  # remove the crashed positions
