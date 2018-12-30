@@ -39,7 +39,7 @@ game = hlt.Game()
 # This is a good place to do computationally expensive start-up pre-processing.
 import bot.GlobalConstants as GC
 
-constantFile = "2pl.json" if len(game.players.keys()) == 2 else "4pl.json"
+constantFile = "2P32.json" if len(game.players.keys()) == 2 else "4P32.json"
 GC.load_global_constants(constantFile)
 
 from bot.ClusterProcessor import ClusterProcessor
