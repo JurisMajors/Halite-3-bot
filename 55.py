@@ -178,11 +178,7 @@ def halite_priority_q(pos, area):
                 # we ignore cells who have 0 halite.
                 # if that cell has small amount of halite, just take a ratio
                 # with 2x distance to lesser the priority
-                if 0 < cell.halite_amount <= game_map.HALITE_STOP:
-                    ratio = cell.halite_amount / \
-                        (2 * game_map.calculate_distance(p, pos) + 1)
-                    heappush(h, (round(1 / ratio, 2), p))
-                elif cell.halite_amount > 0:
+                if cell.halite_amount > 0:
                     factor = game_map.cell_factor(pos, cell, me, enable_backup)
                     # add negative halite amounts so that would act as maxheap
                     heappush(h, (factor, p))

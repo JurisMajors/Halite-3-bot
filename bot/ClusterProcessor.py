@@ -179,7 +179,7 @@ class ClusterProcessor():
                 if not c2 == c1:
                     dist = self.game_map.euclidean_distance(c1[1], c2[1])
                     # if close enough for merging
-                    if dist <= area:
+                    if dist <= area and not dist <= 4:
                         X.append([c2[1].x, c2[1].y, c2[0] / normalizer])
 
             # get initialized centers for the algorithm
@@ -205,9 +205,9 @@ class ClusterProcessor():
         if len(p1) < 3:
             p1 = p1[0]
             p2 = p2[0]
-        manh_dist = self.game_map.calculate_distance(
+        euclid_dist = self.game_map.euclidean_distance(
             Position(p1[0], p1[1]), Position(p2[0], p2[1]))
-        return manh_dist + abs(p1[2] - p2[2])
+        return euclid_dist + abs(p1[2] - p2[2])
 
 
     def get_patch_data(self, x, y, center):

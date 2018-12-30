@@ -33,7 +33,9 @@ class DestinationProcessor():
         ''' h: priority queue of halite factors,
                                         halite_pos: dictionary of halite factor -> patch position '''
         ship_id = ship.id
+        removed = set()
         biggest_halite, position = heappop(h)  # get biggest halite
+        removed.add((biggest_halite, position))
         destination = self.game_map.normalize(position)
         self.dropoff_distribution = self.get_ship_distribution_over_dropoffs()
         # create an inverted ship_dest hashmap 
@@ -53,10 +55,14 @@ class DestinationProcessor():
                 GlobalFunctions(self.game).state_switch(ship.id, "returning")
                 return
             biggest_halite, position = heappop(h)
+            removed.add((biggest_halite, position))
             destination = self.game_map.normalize(position)
         self.ship_dest[ship_id] = destination  # set the destination
         # This cell has a ship so doesn't need to be in heap
+        removed.remove((biggest_halite, position))
         # Add add removed ones back to the heap except the cell were going to
+        for r in removed:
+            heappush(h, r)
         self.reassign_duplicate_dests(destination, ship_id) # deal with duplicate destinations
 
 
@@ -109,7 +115,6 @@ class DestinationProcessor():
 
 
     def too_many_near_dropoff(self, ship, destination):
-        # if no more options, use the same destination
         if GlobalFunctions(self.game).get_shipyard(ship.position) == GlobalFunctions(self.game).get_shipyard(destination):
             return False
         else:
@@ -140,8 +145,8 @@ class DestinationProcessor():
     def get_ship_w_destination(self, dest, this_id):
         """ gets ships with dest, s.t. that ship is not this_id """
         other_ships = []
-        if dest in self.inv_ship_dest:
-            for s_id in self.inv_ship_dest[dest]:
-                if s_id != this_id:
-                    other_ships.append(self.me.get_ship(s_id))
+        if dest in self.ship_dest.values():
+            for s in self.ship_dest.keys():
+                if s != this_id and self.ship_dest[s] == dest and self.me.has_ship(s):
+                    other_ships.append(self.me.get_ship(s))
         return other_ships
