@@ -316,9 +316,12 @@ class main():
             self.game_map.set_close_friendly_ships(self.me)
             pos = self.game_map.get_most_dense_dropoff_position(
                 self.GF.get_dropoff_positions())
-            # fake 10000 halite for new needed cluster
-            self.cluster_centers.append((10000, pos))
-            return True
+            if pos is not None:
+                # fake 10000 halite for new needed cluster
+                self.cluster_centers.append((10000, pos))
+                return True
+            else:
+                return False
 
         return self.clusters_determined and self.game.turn_number >= self.dropoff_last_built + 15 and self.cluster_centers \
                and len(self.me.get_ships()) > (len(self.GF.get_dropoff_positions()) + 1) * GC.FLEET_SIZE \
