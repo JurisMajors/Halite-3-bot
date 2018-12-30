@@ -27,15 +27,15 @@ class StateMachine():
         self.fleet_leader = GV.fleet_leader
         self.previous_state = GV.previous_state
         self.NR_OF_PLAYERS = GV.NR_OF_PLAYERS
+        self.GF = GlobalFunctions(self.game)
 
 
     def state_transition(self, ship):
         # transition
         self.ship = ship
         new_state = None
-        shipyard = GlobalFunctions(self.game).get_shipyard(self.ship.position)
+        shipyard = self.GF.get_shipyard(self.ship.position)
         DP = DestinationProcessor(self.game)
-        GF = GlobalFunctions(self.game)
 
         if self.game.turn_number >= GC.CRASH_TURN and self.game_map.calculate_distance(
                 self.ship.position, shipyard) < 2:
@@ -46,12 +46,12 @@ class StateMachine():
             # return if at crash turn
             new_state = "returning"
 
-        elif self.ship.position in GF.get_dropoff_positions():
+        elif self.ship.position in self.GF.get_dropoff_positions():
             DP.process_new_destination(self.ship)
             new_state = "exploring"
 
         # decent halite and close to enemy dropoff, return
-        elif self.ship.halite_amount >= 0.5 * constants.MAX_HALITE and GF.dist_to_enemy_doff(self.ship.position) < 0.1 * self.game_map.width:
+        elif self.ship.halite_amount >= 0.5 * constants.MAX_HALITE and self.GF.dist_to_enemy_doff(self.ship.position) < 0.1 * self.game_map.width:
             new_state = "returning"
 
         elif self.ship.halite_amount >= constants.MAX_HALITE * self.return_percentage and self.ship_state[self.ship.id] not in ["build", "waiting", "collecting", "returning"]:
@@ -79,7 +79,7 @@ class StateMachine():
             new_state = self.backup_transition()
 
         if new_state is not None:
-            GF.state_switch(self.ship.id, new_state)
+            self.GF.state_switch(self.ship.id, new_state)
 
 
     """Exploring_transition"""
@@ -107,7 +107,7 @@ class StateMachine():
             DP.process_new_destination(self.ship)
 
         elif self.ENABLE_COMBAT and (distance_to_dest > GC.CLOSE_TO_SHIPYARD * self.game_map.width or distance_to_dest == 1)\
-                and GlobalFunctions(self.game).dist_to_enemy_doff(self.ship.position) >= GC.ENEMY_SHIPYARD_CLOSE * self.game_map.width:
+                and self.GF.dist_to_enemy_doff(self.ship.position) >= GC.ENEMY_SHIPYARD_CLOSE * self.game_map.width:
             return self.attempt_switching_assasinate()
         return None
 
@@ -193,7 +193,7 @@ class StateMachine():
             return "returning"
 
         elif self.ship.halite_amount <= constants.MAX_HALITE * 0.4 and self.ENABLE_COMBAT\
-                and GlobalFunctions(self.game).dist_to_enemy_doff(self.ship.position) >= GC.CLOSE_TO_SHIPYARD * self.game_map.width and self.game_map[self.ship.position].enemy_neighbouring:
+                and self.GF.dist_to_enemy_doff(self.ship.position) >= GC.CLOSE_TO_SHIPYARD * self.game_map.width and self.game_map[self.ship.position].enemy_neighbouring:
             # if not that mch halite and not too close to assasinate and enemy is neighbouring, attempt to kill sm1 
             return self.attempt_switching_assasinate()
 
@@ -241,14 +241,14 @@ class StateMachine():
             self.ship_dest[self.ship.id] = self.game_map[self.ship.position].parent.position
             return "assassinate"
 
-        elif self.ship.position in GlobalFunctions(self.game).get_dropoff_positions():
+        elif self.ship.position in self.GF.get_dropoff_positions():
             # explore again when back in shipyard
             DP.process_new_destination(self.ship)
             return "exploring"
 
-        elif self.game_map.calculate_distance(self.ship.position, GlobalFunctions(self.game).get_shipyard(self.ship.position)) == 1:
+        elif self.game_map.calculate_distance(self.ship.position, self.GF.get_shipyard(self.ship.position)) == 1:
             # if next to a dropoff 
-            cell = self.game_map[GlobalFunctions(self.game).get_shipyard(self.ship.position)]
+            cell = self.game_map[self.GF.get_shipyard(self.ship.position)]
             if cell.is_occupied and not self.me.has_ship(cell.ship.id) and "harakiri" not in self.ship_state.values():
                 return "harakiri"
         return None
@@ -282,7 +282,7 @@ class StateMachine():
 
         if future_dropoff_cell.has_structure:
             if distance_to_dest <= GC.CLOSE_TO_SHIPYARD * self.game_map.width:
-                self.ship_dest[self.ship.id] = GlobalFunctions(self.game).bfs_unoccupied(future_dropoff_cell.position)
+                self.ship_dest[self.ship.id] = self.GF.bfs_unoccupied(future_dropoff_cell.position)
                 DP.reassign_duplicate_dests(self.ship_dest[self.ship.id], self.ship.id)
             else:
                 DP.process_new_destination(self.ship)
@@ -300,7 +300,7 @@ class StateMachine():
                     DP.reassign_duplicate_dests(self.ship_dest[self.ship.id], self.ship.id)
                     return "build"
         elif self.NR_OF_PLAYERS == 4 or self.game_map.width >= 56: # for 4 players and large maps 1v1
-            smallest_dist = GlobalFunctions(self.game).dist_to_enemy_doff(self.ship_dest[self.ship.id])
+            smallest_dist = self.GF.dist_to_enemy_doff(self.ship_dest[self.ship.id])
             if smallest_dist <= self.game_map.width * GC.ENEMY_SHIPYARD_CLOSE:
                 DP.process_new_destination(self.ship)
                 return "exploring"
@@ -342,7 +342,7 @@ class StateMachine():
         elif self.game_map[destination].enemy_amount >= GC.UNSAFE_AREA:
             DP.process_new_destination(self.ship)
             return "exploring"
-        elif self.ENABLE_COMBAT and GlobalFunctions(self.game).dist_to_enemy_doff(self.ship.position) >= GC.CLOSE_TO_SHIPYARD * self.game_map.width:
+        elif self.ENABLE_COMBAT and self.GF.dist_to_enemy_doff(self.ship.position) >= GC.CLOSE_TO_SHIPYARD * self.game_map.width:
             return self.attempt_switching_assasinate()
         return None
 
@@ -358,7 +358,7 @@ class StateMachine():
         for n in neighbours:
             n_halite = n.halite_amount * \
                 self.game_map.get_inspire_multiplier(position, n, self.ENABLE_BACKUP)
-            if n.enemy_amount < GC. UNSAFE_AREA and n_halite > max_halite:
+            if n.enemy_amount < GC.UNSAFE_AREA and n_halite > max_halite:
                 best = n
                 max_halite = n_halite
         return best

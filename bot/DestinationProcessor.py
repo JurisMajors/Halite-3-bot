@@ -25,6 +25,7 @@ class DestinationProcessor():
         self.ship_path = GV.ship_path
         self.previous_state = GV.previous_state
         self.NR_OF_PLAYERS = GV.NR_OF_PLAYERS
+        self.GF = GlobalFunctions(self.game)
         self.inv_ship_dest = {}
         self.dropoff_distribution = {}
 
@@ -52,7 +53,7 @@ class DestinationProcessor():
         while self.bad_destination(ship, destination) or (self.NR_OF_PLAYERS == 4 and self.game_map[destination].enemy_neighbouring > 0):
             # if no more options, return
             if not h:
-                GlobalFunctions(self.game).state_switch(ship.id, "returning")
+                self.GF.state_switch(ship.id, "returning")
                 return
             biggest_halite, position = heappop(h)
             removed.add((biggest_halite, position))
@@ -87,11 +88,11 @@ class DestinationProcessor():
 
     def process_new_destination(self, ship):
         self.ship_path[ship.id] = []
-        if ship.position in GlobalFunctions(self.game).get_dropoff_positions() or ship.id not in self.ship_dest:
+        if ship.position in self.GF.get_dropoff_positions() or ship.id not in self.ship_dest:
             self.find_new_destination(self.game_map.halite_priority, ship)
         else:
             source = ship.position
-            ship_h = GlobalFunctions(self.game).halite_priority_q(source, GC.SHIP_SCAN_AREA)
+            ship_h = self.GF.halite_priority_q(source, GC.SHIP_SCAN_AREA)
             self.find_new_destination(ship_h, ship)
 
 
@@ -115,17 +116,17 @@ class DestinationProcessor():
 
 
     def too_many_near_dropoff(self, ship, destination):
-        if GlobalFunctions(self.game).get_shipyard(ship.position) == GlobalFunctions(self.game).get_shipyard(destination):
+        if self.GF.get_shipyard(ship.position) == self.GF.get_shipyard(destination):
             return False
         else:
-            return self.dropoff_distribution[GlobalFunctions(self.game).get_shipyard(destination)] > (1 / len(GlobalFunctions(self.game).get_dropoff_positions()))
+            return self.dropoff_distribution[self.GF.get_shipyard(destination)] > (1 / len(self.GF.get_dropoff_positions()))
 
 
     def prcntg_ships_returning_to_doff(self, d_pos):
         amount = 0
         for s in self.me.get_ships():
             eval_pos = s.position if s.id not in self.ship_dest else self.ship_dest[s.id]
-            if GlobalFunctions(self.game).get_shipyard(eval_pos) == d_pos:
+            if self.GF.get_shipyard(eval_pos) == d_pos:
                 amount += 1
         return amount / len(self.me.get_ships())
 
@@ -133,7 +134,7 @@ class DestinationProcessor():
         distribution = {}
         for s in self.me.get_ships(): # count ships per dropoff
             eval_pos = s.position if s.id not in self.ship_dest else self.ship_dest[s.id]
-            d_pos = GlobalFunctions(self.game).get_shipyard(eval_pos)
+            d_pos = self.GF.get_shipyard(eval_pos)
             if d_pos in distribution:
                 distribution[d_pos] += 1
             else:

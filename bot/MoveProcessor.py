@@ -24,6 +24,7 @@ class MoveProcessor():
         self.has_moved = has_moved
         self.command_queue = command_queue
         self.NR_OF_PLAYERS = GV.NR_OF_PLAYERS
+        self.GF = GlobalFunctions(self.game)
 
 
 
@@ -62,7 +63,7 @@ class MoveProcessor():
 
     def harakiri(self, ship, destination):
         """ pre: next to or on shipyard """
-        shipyard = GlobalFunctions(self.game).get_shipyard(ship.position)
+        shipyard = self.GF.get_shipyard(ship.position)
         ship_pos = self.game_map.normalize(ship.position)
         if ship.position == shipyard:  # if at shipyard
             return Direction.Still  # let other ships crash in to you
@@ -83,7 +84,7 @@ class MoveProcessor():
 
 
     def assassinate(self, ship, destination):
-        GlobalFunctions(self.game).state_switch(ship.id, self.previous_state[ship.id])
+        self.GF.state_switch(ship.id, self.previous_state[ship.id])
         if self.game_map.calculate_distance(ship.position, destination) == 1:
             target_direction = self.game_map.get_target_direction(
                 ship.position, destination)
@@ -96,10 +97,10 @@ class MoveProcessor():
         if ship.position == destination:
             self.ship_path[ship.id] = []
             return Direction.Still
-        elif GlobalFunctions(self.game).time_left() < 0.1:
-            logging.info(f"Exploring ship standing still, {GlobalFunctions(self.game).time_left()} left")
+        elif self.GF.time_left() < 0.1:
+            logging.info(f"Exploring ship standing still, {self.GF.time_left()} left")
             return Direction.Still
-        elif ship.position in GlobalFunctions(self.game).get_dropoff_positions() and self.game_map.is_surrounded(ship.position): # if in a dropoff and surrounded
+        elif ship.position in self.GF.get_dropoff_positions() and self.game_map.is_surrounded(ship.position): # if in a dropoff and surrounded
             # find closest neighbour
             closest_n = None
             closest_dist = None
@@ -152,7 +153,7 @@ class MoveProcessor():
         to_go = self.get_step(path)
         next_pos = self.game_map.normalize(position.directional_offset(to_go))
         while self.game_map[next_pos].is_occupied:
-            if GlobalFunctions(self.game).time_left() < 0.3:
+            if self.GF.time_left() < 0.3:
                 logging.info("INTERIM EXPLORING STANDING STILL")
                 return position
             if not path:
@@ -198,7 +199,7 @@ class MoveProcessor():
                     # if other ship has enough halite to move, hasnt made a move
                     # yet, and if it would move in the ship
                     if not self.has_moved[other_ship.id] and \
-                            (can_move or other_ship.position in GlobalFunctions(self.game).get_dropoff_positions()):
+                            (can_move or other_ship.position in self.GF.get_dropoff_positions()):
                         if (other_ship.id not in self.ship_path or (not self.ship_path[other_ship.id] or
                                                                     other_ship.position.directional_offset(self.ship_path[other_ship.id][0][0]) == ship.position)):
                             # move stays the same target move
@@ -212,7 +213,7 @@ class MoveProcessor():
                         move = Direction.Still
 
                 elif self.ship_state[other_ship.id] in ["returning", "harakiri"]:  # suiciding or queue
-                    if self.has_moved[other_ship.id] or (self.game.turn_number <= GC.CRASH_TURN and other_ship.position in GlobalFunctions(self.game).get_dropoff_positions()):
+                    if self.has_moved[other_ship.id] or (self.game.turn_number <= GC.CRASH_TURN and other_ship.position in self.GF.get_dropoff_positions()):
                         move = Direction.Still
                     elif Direction.Still == self.simulate_make_returning_move(other_ship, command_queue): # should never happen but just in case :D
                         move = Direction.Still
@@ -268,7 +269,7 @@ class MoveProcessor():
         cell = source_cell.parent
         while cell.is_occupied:
             cell = cell.parent
-            if GlobalFunctions(self.game).time_left() < 0.5:
+            if self.GF.time_left() < 0.5:
                 logging.info("INTERIM DIJKSTRA DESTINATION STANDING STILL TOO SLOW")
                 return source_cell
         return cell

@@ -25,6 +25,7 @@ class ClusterProcessor():
         self.me = game.me
         self.GV = GlobalVariablesSingleton.getInstance()
         self.NR_OF_PLAYERS = self.GV.NR_OF_PLAYERS
+        self.GF = GlobalFunctions(self.game)
 
 
     def clusters_with_classifier(self):
@@ -130,7 +131,7 @@ class ClusterProcessor():
             halite, pos = d
             diff = self.game_map.euclidean_distance(pos, self.me.shipyard.position)
             if diff < GC.CLOSE_TO_SHIPYARD * self.game_map.width\
-             or GlobalFunctions(self.game).dist_to_enemy_doff(pos) < GC.CLOSE_TO_SHIPYARD * self.game_map.width\
+             or self.GF.dist_to_enemy_doff(pos) < GC.CLOSE_TO_SHIPYARD * self.game_map.width\
              or halite < 0.7 * self.GV.MIN_CLUSTER_VALUE:
                 if d in centers:
                     centers.remove(d)
