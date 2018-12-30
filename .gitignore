@@ -13,6 +13,8 @@ run_game.sh
 replays
 bad.py
 .idea/*
+workspace.xml
+.idea/workspace.xml
 *.pyc
 hlt/__pycache__/
 hlt/__pycache__/*.pyc
