@@ -292,7 +292,7 @@ class main():
             self.cluster_centers.append((10000, pos))  # fake 10000 halite for new needed cluster
             return True
 
-    # Original dropoff code
+        # Original dropoff code
 
         return self.clusters_determined and self.game.turn_number >= self.dropoff_last_built + 15 and self.cluster_centers \
             and len(self.me.get_ships()) > (len(GlobalFunctions(self.game).get_dropoff_positions()) + 1) * GC.FLEET_SIZE\
