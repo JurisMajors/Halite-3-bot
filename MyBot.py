@@ -288,10 +288,28 @@ class main():
         return False
 
     def should_build(self):
+        # calculate amount of ships going to each dropoff
+        dropoff_count = {}  # dropoff_pos -> ships going there
+        for d in self.GF.get_dropoff_positions():
+            dropoff_count[d] = 0
+        for ship_id in self.me.get_ships():
+            if GlobalVariablesSingleton.getInstance().ship_state[ship_id] == "returning" and \
+                    GlobalVariablesSingleton.getInstance().ship_dest[ship_id] in self.GF.get_dropoff_positions():
+                dropoff_count[GlobalVariablesSingleton.getInstance().ship_dest[ship_id]] += 1
+            elif GlobalVariablesSingleton.getInstance().ship_state[ship_id] == "collecting":
+                dropoff_count[self.game_map[self.me.get_ship(ship_id).position].dijkstra_dest] += 1
+
+        is_crowded_dropoff = False  # if there is a dropoff with many ships assigned to it this is true
+        for dropoff in dropoff_count:
+            if dropoff_count[dropoff] >= 25:
+                is_crowded_dropoff = True
+
+
         # if clusters determined, more than 13 ships, we have clusters and nobody
         # is building at this turn (in order to not build too many)
-        if len(self.me.get_ships()) / len(
-                self.GF.get_dropoff_positions()) >= GC.MAX_SHIP_DROPOFF_RATIO and not self.any_builders():
+        if (len(self.me.get_ships()) / len(
+                self.GF.get_dropoff_positions()) >= GC.MAX_SHIP_DROPOFF_RATIO
+                or is_crowded_dropoff) and not self.any_builders():
             # there are more than 40 ships per dropoff
             if self.cluster_centers:  # there is already a dropoff position
                 return True
