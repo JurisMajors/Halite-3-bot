@@ -257,15 +257,15 @@ class MoveProcessor():
             cell = self.game_map[ship.position]
             d_to_dijkstra_dest = self.game_map.calculate_distance(
                 cell.position, cell.dijkstra_dest)
-            dest = self.interim_djikstra_dest(cell).position
+            dest = self.interim_dijkstra_dest(cell).position
         return self.exploring(ship, dest)
 
-    def interim_djikstra_dest(self, source_cell):
-        ''' finds the intermediate djikstra destination that is not occupied '''
+    def interim_dijkstra_dest(self, source_cell):
+        ''' finds the intermediate dijkstra destination that is not occupied '''
         cell = source_cell.parent
-        while cell.is_occupied:
+        while cell.is_occupied and cell.position not in self.GF.get_dropoff_positions():
             cell = cell.parent
-            if self.GF.time_left() < 0.5:
+            if self.GF.time_left() < 0.3:
                 logging.info(
                     "INTERIM DIJKSTRA DESTINATION STANDING STILL TOO SLOW")
                 return source_cell

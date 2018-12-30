@@ -29,8 +29,8 @@ import numpy as np
 from math import ceil
 from copy import deepcopy
 
-#stderr = sys.stderr
-#sys.stderr = open(os.devnull, 'w')
+stderr = sys.stderr
+sys.stderr = open(os.devnull, 'w')
 
 dropoff_clf = pickle.load(open('mlp.sav', 'rb'))
 # This game object contains the initial game state.
@@ -201,10 +201,13 @@ class main():
             surrounded_shipyard = self.game_map.is_surrounded(
                 self.me.shipyard.position)
             logging.info(self.GF.time_left())
-            if not dropoff_built and 2 * (self.max_enemy_ships() + 1) > len(self.me.get_ships()) and self.game.turn_number <= GC.SPAWN_TURN \
+            if not dropoff_built and 2 * (self.max_enemy_ships() + 1) > len(
+                    self.me.get_ships()) and self.game.turn_number <= GC.SPAWN_TURN \
                     and self.me.halite_amount >= constants.SHIP_COST and self.prcntg_halite_left > (1 - 0.65) and \
-                    not (self.game_map[self.me.shipyard].is_occupied or surrounded_shipyard or "waiting" in self.ship_state.values()):
-                if not ("build" in self.ship_state.values() and self.me.halite_amount <= (constants.SHIP_COST + constants.DROPOFF_COST)):
+                    not (self.game_map[
+                             self.me.shipyard].is_occupied or surrounded_shipyard or "waiting" in self.ship_state.values()):
+                if not ("build" in self.ship_state.values() and self.me.halite_amount <= (
+                        constants.SHIP_COST + constants.DROPOFF_COST)):
                     command_queue.append(self.me.shipyard.spawn())
             # Send your moves back to the game environment, ending this turn.
             self.game.end_turn(command_queue)
@@ -287,7 +290,8 @@ class main():
     def should_build(self):
         # if clusters determined, more than 13 ships, we have clusters and nobody
         # is building at this turn (in order to not build too many)
-        if len(self.me.get_ships()) / len(self.GF.get_dropoff_positions()) >= GC.MAX_SHIP_DROPOFF_RATIO and not self.any_builders():
+        if len(self.me.get_ships()) / len(
+                self.GF.get_dropoff_positions()) >= GC.MAX_SHIP_DROPOFF_RATIO and not self.any_builders():
             # there are more than 40 ships per dropoff
             if self.cluster_centers:  # there is already a dropoff position
                 return True
@@ -302,8 +306,8 @@ class main():
         # Original dropoff code
 
         return self.clusters_determined and self.game.turn_number >= self.dropoff_last_built + 15 and self.cluster_centers \
-            and len(self.me.get_ships()) > (len(self.GF.get_dropoff_positions()) + 1) * GC.FLEET_SIZE\
-            and self.fleet_availability() >= 1.5 * GC.FLEET_SIZE and not self.any_builders()
+               and len(self.me.get_ships()) > (len(self.GF.get_dropoff_positions()) + 1) * GC.FLEET_SIZE \
+               and self.fleet_availability() >= 1.5 * GC.FLEET_SIZE and not self.any_builders()
 
     def any_builders(self):
         return "waiting" in self.ship_state.values() or "build" in self.ship_state.values()
@@ -321,11 +325,13 @@ class main():
     def is_fleet(self, ship):
         ''' returns if a ship is good for adding it to a fleet '''
         return self.me.has_ship(ship.id) and (
-            ship.id not in self.ship_state or not (self.ship_state[ship.id] in ["fleet", "waiting", "returning", "build"]))
+                ship.id not in self.ship_state or not (
+                    self.ship_state[ship.id] in ["fleet", "waiting", "returning", "build"]))
 
     def is_builder(self, ship):
         ''' checks if this ship is a builder '''
-        return self.ship_state[ship.id] == "waiting" or (self.ship_state[ship.id] == "build" and self.ship_dest[ship.id] == ship.position)
+        return self.ship_state[ship.id] == "waiting" or (
+                    self.ship_state[ship.id] == "build" and self.ship_dest[ship.id] == ship.position)
 
     def select_crash_turn(self):
         '''selects turn when to crash'''
@@ -410,14 +416,16 @@ class main():
         if self.crashed_positions:  # if there are any crashed positions to process
             hal, crashed_pos = heappop(self.crashed_positions)  # get pos info
             # if there are little enemies in that area
-            if self.game_map[crashed_pos].enemy_amount <= GC.UNSAFE_AREA and self.game_map[crashed_pos].halite_amount >= constants.MAX_HALITE:
+            if self.game_map[crashed_pos].enemy_amount <= GC.UNSAFE_AREA and self.game_map[
+                crashed_pos].halite_amount >= constants.MAX_HALITE:
                 # send a backup fleet there
                 self.send_ships(crashed_pos, 2, "backup", StateMachine(
                     self.game, self.return_percentage, self.prcntg_halite_left).is_savior)
 
     def is_savior(self, ship):
         return self.me.has_ship(ship.id) and ship.halite_amount <= self.return_percentage * 0.5 * constants.MAX_HALITE \
-            and (ship.id not in self.ship_state or not (self.ship_state[ship.id] in ["waiting", "returning", "build"]))
+               and (ship.id not in self.ship_state or not (
+                    self.ship_state[ship.id] in ["waiting", "returning", "build"]))
 
 
 backuped_dropoffs = []
