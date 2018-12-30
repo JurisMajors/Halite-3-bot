@@ -66,3 +66,5 @@ illegalBot.py
 *.iml
 .idea/*
 *.html
+DropoffClassifier/all_data.json
+benchmark.json
