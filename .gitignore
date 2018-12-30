@@ -4,7 +4,6 @@ Makefile
 *.log
 fluorine-master/
 *~
-*.pyc
 *.pyo
 __pycache__/
 *.class
@@ -15,18 +14,10 @@ replays
 bad.py
 .idea/*
 *.pyc
+hlt/__pycache__/
 hlt/__pycache__/*.pyc
-hlt/__pycache__/game_map.cpython-36.pyc
-hlt/__pycache__/entity.cpython-36.pyc
-hlt/__pycache__/entity.cpython-36.pyc
-hlt/__pycache__/game_map.cpython-36.pyc
-*.pyc
-hlt/__pycache__/game_map.cpython-36.pyc
-hlt/__pycache__/game_map.cpython-36.pyc
-*.pyc
 *.xml
 halite-bot.zip
-*.pyc
 DropoffClassifier/hlt_client/bin/hlt
 DropoffClassifier/hlt_client/build/lib/hlt_client/__init__.py
 DropoffClassifier/hlt_client/build/lib/hlt_client/__main__.py
@@ -58,7 +49,6 @@ DropoffClassifier/hlt_client/README.md
 DropoffClassifier/hlt_client/requirements.txt
 DropoffClassifier/hlt_client/setup.py
 *.xml
-*.pyc
 HeuristicVisualization/Data/GameMap1.npy
 *.npy
 HeuristicVisualization/Visualizer.py
@@ -68,3 +58,4 @@ illegalBot.py
 *.html
 DropoffClassifier/all_data.json
 benchmark.json
+run_game.bat
