@@ -58,7 +58,6 @@ DropoffClassifier/hlt_client/README.md
 DropoffClassifier/hlt_client/requirements.txt
 DropoffClassifier/hlt_client/setup.py
 *.xml
-*.json
 *.pyc
 HeuristicVisualization/Data/GameMap1.npy
 *.npy
