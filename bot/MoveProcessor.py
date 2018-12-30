@@ -56,7 +56,7 @@ class MoveProcessor():
         return Direction.Still
 
     def returning(self, ship, destination):
-        return self.make_returning_move(ship, self.has_moved)
+        return self.make_returning_move(ship)
 
     def harakiri(self, ship, destination):
         """ pre: next to or on shipyard """
@@ -166,7 +166,7 @@ class MoveProcessor():
             del path[0]
         return direction
 
-    def make_returning_move(self, ship, command_queue):
+    def make_returning_move(self, ship):
         """
         Makes a returning move based on Dijkstras and other ship positions.
         """
@@ -213,7 +213,7 @@ class MoveProcessor():
                     if self.has_moved[other_ship.id] or (self.game.turn_number <= GC.CRASH_TURN and other_ship.position in self.GF.get_dropoff_positions()):
                         move = Direction.Still
                     # should never happen but just in case :D
-                    elif Direction.Still == self.simulate_make_returning_move(other_ship, command_queue):
+                    elif Direction.Still == self.simulate_make_returning_move(other_ship):
                         move = Direction.Still
                 # move around these ships
                 elif self.ship_state[other_ship.id] in ["collecting", "waiting"]:
@@ -227,9 +227,9 @@ class MoveProcessor():
                 move = self.a_star_move(ship)
         return move
 
-    def simulate_make_returning_move(self, other_ship, command_queue):
+    def simulate_make_returning_move(self, other_ship):
         other_move = self.produce_move(other_ship)
-        command_queue.append(other_ship.move(other_move))
+        self.command_queue.append(other_ship.move(other_move))
         self.previous_position[other_ship.id] = other_ship.position
         self.game_map[other_ship.position.directional_offset(
             other_move)].mark_unsafe(other_ship)
