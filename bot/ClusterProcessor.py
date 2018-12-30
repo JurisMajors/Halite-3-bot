@@ -44,7 +44,7 @@ class ClusterProcessor():
         x_size = int(self.game_map.width /
                      2) if self.NR_OF_PLAYERS in [2, 4] else self.game_map.width
         y_size = self.game_map.height if self.NR_OF_PLAYERS in [2, 1] else int(
-            game_map.height / 2)
+            self.game_map.height / 2)
         diff1, diff2, diff3, diff4 = (0, 0, 0, 0)
 
         # in 4 player maps limit the scanning area so that we dont classify centers of map
