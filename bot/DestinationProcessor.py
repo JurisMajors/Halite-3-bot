@@ -13,6 +13,7 @@ from bot.GlobalVariablesSingleton import GlobalVariablesSingleton
 from hlt.positionals import Direction, Position
 import time
 
+
 class DestinationProcessor():
 
     def __init__(self, game):
@@ -29,7 +30,6 @@ class DestinationProcessor():
         self.inv_ship_dest = {}
         self.dropoff_distribution = {}
 
-
     def find_new_destination(self, h, ship):
         ''' h: priority queue of halite factors,
                                         halite_pos: dictionary of halite factor -> patch position '''
@@ -39,7 +39,7 @@ class DestinationProcessor():
         removed.add((biggest_halite, position))
         destination = self.game_map.normalize(position)
         self.dropoff_distribution = self.get_ship_distribution_over_dropoffs()
-        # create an inverted ship_dest hashmap 
+        # create an inverted ship_dest hashmap
         # with a list of ships per destination
         self.inv_ship_dest = {}
         for ID, pos in self.ship_dest.items():
@@ -47,7 +47,7 @@ class DestinationProcessor():
                 self.inv_ship_dest[pos].append(ID)
             else:
                 self.inv_ship_dest[pos] = [ID]
-        # repeat while not a viable destination, or enemies around the position or 
+        # repeat while not a viable destination, or enemies around the position or
         # too many ships going to that dropoff area
         # or the same destination as before
         while self.bad_destination(ship, destination) or (self.NR_OF_PLAYERS == 4 and self.game_map[destination].enemy_neighbouring > 0):
@@ -64,8 +64,8 @@ class DestinationProcessor():
         # Add add removed ones back to the heap except the cell were going to
         for r in removed:
             heappush(h, r)
-        self.reassign_duplicate_dests(destination, ship_id) # deal with duplicate destinations
-
+        # deal with duplicate destinations
+        self.reassign_duplicate_dests(destination, ship_id)
 
     def bad_destination(self, ship, destination):
         """ definition of unviable destination for ship """
@@ -77,14 +77,12 @@ class DestinationProcessor():
         else:
             return self.game_map[destination].enemy_amount >= GC.UNSAFE_AREA or not self.dest_viable(destination, ship)
 
-
     def reassign_duplicate_dests(self, destination, this_id):
         # if another ship had the same destination
         s = self.get_ship_w_destination(destination, this_id)
         if s:  # find a new destination for the ships with same dest
             for other in s:
                 self.process_new_destination(other)
-
 
     def process_new_destination(self, ship):
         self.ship_path[ship.id] = []
@@ -95,7 +93,6 @@ class DestinationProcessor():
             ship_h = self.GF.halite_priority_q(source, GC.SHIP_SCAN_AREA)
             self.find_new_destination(ship_h, ship)
 
-
     def dest_viable(self, position, ship):
         """ is a destination viable for ship, i.e. 
             if any other ship is going there, if thats the case
@@ -103,17 +100,17 @@ class DestinationProcessor():
         if position in self.ship_dest.values():
             # get another ship with same destination
             inspectable_ships = self.get_ship_w_destination(position, ship.id)
-            if not inspectable_ships: # shouldnt happen but for safety
+            if not inspectable_ships:  # shouldnt happen but for safety
                 # if this ship doesnt exist for some reason
                 return True
 
             my_dist = self.game_map.calculate_distance(position, ship.position)
             their_dist = min([self.game_map.calculate_distance(
                 position, inspectable_ship.position) for inspectable_ship in inspectable_ships])
-            return my_dist < their_dist # if im closer to destination, assign it to me.
+            # if im closer to destination, assign it to me.
+            return my_dist < their_dist
         else:
             return True  # nobody has the best patch, all good
-
 
     def too_many_near_dropoff(self, ship, destination):
         if self.GF.get_shipyard(ship.position) == self.GF.get_shipyard(destination):
@@ -121,27 +118,28 @@ class DestinationProcessor():
         else:
             return self.dropoff_distribution[self.GF.get_shipyard(destination)] > (1 / len(self.GF.get_dropoff_positions()))
 
-
     def prcntg_ships_returning_to_doff(self, d_pos):
         amount = 0
         for s in self.me.get_ships():
-            eval_pos = s.position if s.id not in self.ship_dest else self.ship_dest[s.id]
+            eval_pos = s.position if s.id not in self.ship_dest else self.ship_dest[
+                s.id]
             if self.GF.get_shipyard(eval_pos) == d_pos:
                 amount += 1
         return amount / len(self.me.get_ships())
 
     def get_ship_distribution_over_dropoffs(self):
         distribution = {}
-        for s in self.me.get_ships(): # count ships per dropoff
-            eval_pos = s.position if s.id not in self.ship_dest else self.ship_dest[s.id]
+        for s in self.me.get_ships():  # count ships per dropoff
+            eval_pos = s.position if s.id not in self.ship_dest else self.ship_dest[
+                s.id]
             d_pos = self.GF.get_shipyard(eval_pos)
             if d_pos in distribution:
                 distribution[d_pos] += 1
             else:
                 distribution[d_pos] = 1
-        for p, amount in distribution.items(): # turn into percentages
-            distribution[p] = amount/len(self.me.get_ships())
-        return distribution 
+        for p, amount in distribution.items():  # turn into percentages
+            distribution[p] = amount / len(self.me.get_ships())
+        return distribution
 
     def get_ship_w_destination(self, dest, this_id):
         """ gets ships with dest, s.t. that ship is not this_id """

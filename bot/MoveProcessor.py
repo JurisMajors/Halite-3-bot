@@ -1,4 +1,6 @@
-import os,sys,inspect
+import os
+import sys
+import inspect
 sys.path.insert(1, os.path.join(sys.path[0], '..'))
 
 import hlt
@@ -8,6 +10,7 @@ import logging
 from hlt.positionals import Direction, Position
 from bot.GlobalFunctions import GlobalFunctions
 from bot.GlobalVariablesSingleton import GlobalVariablesSingleton
+
 
 class MoveProcessor():
 
@@ -26,8 +29,6 @@ class MoveProcessor():
         self.NR_OF_PLAYERS = GV.NR_OF_PLAYERS
         self.GF = GlobalFunctions(self.game)
 
-
-
     def produce_move(self, ship):
         if ship.id not in self.ship_obj:
             self.ship_obj[ship.id] = ship
@@ -38,10 +39,9 @@ class MoveProcessor():
         if ship.halite_amount < self.game_map[ship.position].halite_amount / constants.MOVE_COST_RATIO:
             return Direction.Still
 
-
         mover = {
             "collecting": self.collecting,
-            "returning": self.returning, 
+            "returning": self.returning,
             "harakiri": self.harakiri,
             "assassinate": self.assassinate,
             "exploring": self.exploring,
@@ -52,14 +52,11 @@ class MoveProcessor():
 
         return mover[state](ship, destination)
 
-
     def collecting(self, ship, destination):
         return Direction.Still
 
-
     def returning(self, ship, destination):
         return self.make_returning_move(ship, self.has_moved)
-
 
     def harakiri(self, ship, destination):
         """ pre: next to or on shipyard """
@@ -71,7 +68,6 @@ class MoveProcessor():
             target_dir = self.dir_to_dest(ship.position, shipyard)
             return target_dir
 
-
     def dir_to_dest(self, pos, dest):
         """ Precondition: 
             position one move away """
@@ -80,8 +76,7 @@ class MoveProcessor():
             new_pos = self.game_map.normalize(pos.directional_offset(d))
             if new_pos == normalized_dest:
                 return d
-        return Direction.Still # should never happen
-
+        return Direction.Still  # should never happen
 
     def assassinate(self, ship, destination):
         self.GF.state_switch(ship.id, self.previous_state[ship.id])
@@ -92,7 +87,6 @@ class MoveProcessor():
         else:
             return self.exploring(ship, destination)
 
-
     def exploring(self, ship, destination):
         if ship.position == destination:
             self.ship_path[ship.id] = []
@@ -100,25 +94,27 @@ class MoveProcessor():
         elif self.GF.time_left() < 0.1:
             logging.info(f"Exploring ship standing still, {self.GF.time_left()} left")
             return Direction.Still
-        elif ship.position in self.GF.get_dropoff_positions() and self.game_map.is_surrounded(ship.position): # if in a dropoff and surrounded
+        elif ship.position in self.GF.get_dropoff_positions() and self.game_map.is_surrounded(ship.position):  # if in a dropoff and surrounded
             # find closest neighbour
             closest_n = None
             closest_dist = None
             for n in self.game_map.get_neighbours(self.game_map[ship.position]):
-                if n.ship.id in self.ship_state and self.ship_state[n.ship.id] != "returning": # only swap with returning baybes 
+                # only swap with returning baybes
+                if n.ship.id in self.ship_state and self.ship_state[n.ship.id] != "returning":
                     continue
-                dist = self.game_map.calculate_distance(n.position, destination)
-                if closest_dist is None or dist < closest_dist: # set smallest dist and neighbour
+                dist = self.game_map.calculate_distance(
+                    n.position, destination)
+                if closest_dist is None or dist < closest_dist:  # set smallest dist and neighbour
                     closest_dist = dist
                     closest_n = n
             # swap with the ship there
-            if closest_n is None: # wait for exploring ships to go away
+            if closest_n is None:  # wait for exploring ships to go away
                 return Direction.Still
             if not self.me.has_ship(closest_n.ship.id):
                 # kill him
                 self.ship_state[ship.id] = "assassinate"
                 self.ship_dest[ship.id] = closest_n.position
-                return self.dir_to_dest(ship.position, self.ship_dest[ship.id]) 
+                return self.dir_to_dest(ship.position, self.ship_dest[ship.id])
             # else its our ship
             # so swap with it
             self.move_ship_to_position(closest_n.ship, ship.position)
@@ -143,10 +139,9 @@ class MoveProcessor():
                 # use intermediate unoccpied position instead of actual dest
                 self.ship_path[ship.id] = self.game_map.explore(
                     ship, new_dest) + self.ship_path[ship.id]
-                    # add rest of the path, interim path + rest of path
+                # add rest of the path, interim path + rest of path
         # move in calculated direction
         return self.get_step(self.ship_path[ship.id])
-
 
     def interim_exploring_dest(self, position, path):
         ''' finds intermediate destination from a direction path that is not occupied '''
@@ -159,9 +154,9 @@ class MoveProcessor():
             if not path:
                 return next_pos
             to_go = self.get_step(path)
-            next_pos = self.game_map.normalize(next_pos.directional_offset(to_go))
+            next_pos = self.game_map.normalize(
+                next_pos.directional_offset(to_go))
         return next_pos
-
 
     @staticmethod
     def get_step(path):
@@ -170,7 +165,6 @@ class MoveProcessor():
         if path[0][1] == 0:  # if no more left that direction remove it
             del path[0]
         return direction
-
 
     def make_returning_move(self, ship, command_queue):
         """
@@ -190,12 +184,13 @@ class MoveProcessor():
             # target position occupied by own ship
             if self.me.has_ship(other_ship.id):
 
-                if other_ship.id not in self.ship_state or self.ship_state[other_ship.id] in ["exploring", "build", "fleet","backup"]:
+                if other_ship.id not in self.ship_state or self.ship_state[other_ship.id] in ["exploring", "build", "fleet", "backup"]:
                     can_move = other_ship.halite_amount >= self.game_map[
-                               other_ship.position].halite_amount / constants.MOVE_COST_RATIO
+                        other_ship.position].halite_amount / constants.MOVE_COST_RATIO
 
                     if other_ship.id in self.ship_dest:
-                        can_move = can_move and self.ship_dest[other_ship.id] != other_ship.position
+                        can_move = can_move and self.ship_dest[
+                            other_ship.id] != other_ship.position
                     # if other ship has enough halite to move, hasnt made a move
                     # yet, and if it would move in the ship
                     if not self.has_moved[other_ship.id] and \
@@ -206,20 +201,24 @@ class MoveProcessor():
                             # move other_ship to ship.position
                             # hence swapping ships
                             logging.info(f"SWAPPING {ship.id} with {other_ship.id}")
-                            self.move_ship_to_position(other_ship, ship.position)
+                            self.move_ship_to_position(
+                                other_ship, ship.position)
                         elif other_ship.id in self.ship_path and self.ship_path[other_ship.id] and self.ship_path[other_ship.id][0][0] == Direction.Still:
                             move = self.a_star_move(ship)
-                    else: # wait until can move
+                    else:  # wait until can move
                         move = Direction.Still
 
-                elif self.ship_state[other_ship.id] in ["returning", "harakiri"]:  # suiciding or queue
+                # suiciding or queue
+                elif self.ship_state[other_ship.id] in ["returning", "harakiri"]:
                     if self.has_moved[other_ship.id] or (self.game.turn_number <= GC.CRASH_TURN and other_ship.position in self.GF.get_dropoff_positions()):
                         move = Direction.Still
-                    elif Direction.Still == self.simulate_make_returning_move(other_ship, command_queue): # should never happen but just in case :D
+                    # should never happen but just in case :D
+                    elif Direction.Still == self.simulate_make_returning_move(other_ship, command_queue):
                         move = Direction.Still
-                elif self.ship_state[other_ship.id] in ["collecting", "waiting"]:  # move around these ships
+                # move around these ships
+                elif self.ship_state[other_ship.id] in ["collecting", "waiting"]:
                     if self.ship_state[other_ship.id] == "collecting" and \
-                    self.game_map[other_ship.position].halite_amount - self.game_map[other_ship.position].halite_amount / constants.EXTRACT_RATIO <= self.game_map.HALITE_STOP:
+                            self.game_map[other_ship.position].halite_amount - self.game_map[other_ship.position].halite_amount / constants.EXTRACT_RATIO <= self.game_map.HALITE_STOP:
                         move = Direction.Still
                     else:
                         move = self.a_star_move(ship)
@@ -228,17 +227,16 @@ class MoveProcessor():
                 move = self.a_star_move(ship)
         return move
 
-
     def simulate_make_returning_move(self, other_ship, command_queue):
         other_move = self.produce_move(other_ship)
         command_queue.append(other_ship.move(other_move))
         self.previous_position[other_ship.id] = other_ship.position
-        self.game_map[other_ship.position.directional_offset(other_move)].mark_unsafe(other_ship)
+        self.game_map[other_ship.position.directional_offset(
+            other_move)].mark_unsafe(other_ship)
         if other_move != Direction.Still and self.game_map[other_ship.position].ship == other_ship:
             self.game_map[other_ship.position].ship = None
         self.has_moved[other_ship.id] = True
         return other_move
-
 
     def get_dijkstra_move(self, ship):
         """
@@ -254,7 +252,6 @@ class MoveProcessor():
 
         return new_pos, new_dir
 
-
     def a_star_move(self, ship, dest=None):
         if dest is None:
             cell = self.game_map[ship.position]
@@ -263,17 +260,16 @@ class MoveProcessor():
             dest = self.interim_djikstra_dest(cell).position
         return self.exploring(ship, dest)
 
-
     def interim_djikstra_dest(self, source_cell):
         ''' finds the intermediate djikstra destination that is not occupied '''
         cell = source_cell.parent
         while cell.is_occupied:
             cell = cell.parent
             if self.GF.time_left() < 0.5:
-                logging.info("INTERIM DIJKSTRA DESTINATION STANDING STILL TOO SLOW")
+                logging.info(
+                    "INTERIM DIJKSTRA DESTINATION STANDING STILL TOO SLOW")
                 return source_cell
         return cell
-
 
     def move_ship_to_position(self, ship, destination):
         ''' moves ship to destination
