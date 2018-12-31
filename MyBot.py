@@ -298,9 +298,9 @@ class main():
         for d in self.GF.get_dropoff_positions():
             dropoff_count[d] = 0
         for s in self.me.get_ships():
-            if self.ship_state[s.id] == "returning":
+            if self.ship_state[s.id] == "returning" and self.ship_dest[s.id] in self.GF.get_dropoff_positions():
                 dropoff_count[self.ship_dest[s.id]] += 1
-            elif self.ship_state[s.id] == "collecting":
+            elif self.ship_state[s.id] == "collecting" and self.game_map[s.position].dijkstra_dest in self.GF.get_dropoff_positions():
                 dropoff_count[self.game_map[s.position].dijkstra_dest] += 1
 
          # if there is a dropoff with many ships assigned to it this is true
