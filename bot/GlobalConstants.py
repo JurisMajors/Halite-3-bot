@@ -17,7 +17,8 @@ def load_global_constants(json_file):
     global FLEET_SIZE, CLOSE_TO_SHIPYARD, ENEMY_SHIPYARD_CLOSE, SHIP_SCAN_AREA, EXTRA_FLEET_MAP_SIZE, BUSY_PERCENTAGE
     global BUSY_RETURN_AMOUNT, UNSAFE_AREA, MAX_SHIP_DROPOFF_RATIO
 
-    adress = r'{}\{}\{}'.format('bot', 'constantsprofiles', json_file)
+    # adress = r'./{}/{}/{}'.format('bot', 'constantsprofiles', json_file)
+    adress = os.path.join(os.path.dirname(__file__), f'constantsprofiles/{json_file}')
     with open(adress) as f:
         data = json.load(f)
 
