@@ -292,37 +292,40 @@ class main():
         or self.game.turn_number >= GC.CRASH_TURN * 0.75\
         or len(self.me.get_dropoffs()) > GC.MAX_CLUSTERS:
             return False
-        if not self.cluster_centers:
-            # calculate amount of ships going to each dropoff
-            dropoff_count = {}  # dropoff_pos -> ships going there
-            for d in self.GF.get_dropoff_positions():
-                dropoff_count[d] = 0
-            for s in self.me.get_ships():
-                if self.ship_state[s.id] == "returning":
-                    dropoff_count[self.ship_dest[s.id]] += 1
-                elif self.ship_state[s.id] == "collecting":
-                    dropoff_count[self.game_map[s.position].dijkstra_dest] += 1
 
-             # if there is a dropoff with many ships assigned to it this is true
-            is_crowded_dropoff = max(dropoff_count.values()) >= 30
+        # calculate amount of ships going to each dropoff
+        dropoff_count = {}  # dropoff_pos -> ships going there
+        for d in self.GF.get_dropoff_positions():
+            dropoff_count[d] = 0
+        for s in self.me.get_ships():
+            if self.ship_state[s.id] == "returning" and self.ship_dest[s.id] in self.GF.get_dropoff_positions():
+                dropoff_count[self.ship_dest[s.id]] += 1
+            elif self.ship_state[s.id] == "collecting" and self.game_map[s.position].dijkstra_dest in self.GF.get_dropoff_positions():
+                dropoff_count[self.game_map[s.position].dijkstra_dest] += 1
 
-            # if clusters determined, more than 13 ships, we have clusters and nobody
-            # is building at this turn (in order to not build too many)
-            if is_crowded_dropoff and not self.any_builders():
-                # there is no good dropoff position yet, make one
-                self.game_map.set_close_friendly_ships(self.me)
-                pos = self.game_map.get_most_dense_dropoff_position(
-                    self.GF.get_dropoff_positions(), int(self.game_map.width * 0.2))
-                if pos is not None:
-                    # fake 10000 halite for new needed cluster
-                    self.cluster_centers.append((10000, pos))
-                    return True
-                else:
-                    return False
-        else:
-            return self.clusters_determined and self.game.turn_number >= self.dropoff_last_built + 10 and self.cluster_centers \
-                   and len(self.me.get_ships()) > (len(self.GF.get_dropoff_positions()) + 1) * GC.FLEET_SIZE \
-                   and self.fleet_availability() >= 1.5 * GC.FLEET_SIZE and not self.any_builders()
+         # if there is a dropoff with many ships assigned to it this is true
+        is_crowded_dropoff = max(dropoff_count.values()) >= 25
+
+        # if clusters determined, more than 13 ships, we have clusters and nobody
+        # is building at this turn (in order to not build too many)
+        if is_crowded_dropoff and not self.any_builders():
+            # there are more than 40 ships per dropoff
+            if self.cluster_centers:  # there is already a dropoff position
+                return True
+            # there is no good dropoff position yet, make one
+            self.game_map.set_close_friendly_ships(self.me)
+            pos = self.game_map.get_most_dense_dropoff_position(
+                self.GF.get_dropoff_positions())
+            if pos is not None:
+                # fake 10000 halite for new needed cluster
+                self.cluster_centers.append((10000, pos))
+                return True
+            else:
+                return False
+
+        return self.clusters_determined and self.game.turn_number >= self.dropoff_last_built + 15 and self.cluster_centers \
+               and len(self.me.get_ships()) > (len(self.GF.get_dropoff_positions()) + 1) * GC.FLEET_SIZE \
+               and self.fleet_availability() >= 1.5 * GC.FLEET_SIZE and not self.any_builders()
 
     def any_builders(self):
         return "waiting" in self.ship_state.values() or "build" in self.ship_state.values()
