@@ -64,6 +64,7 @@ class Game:
                 if not ship.owner == self.me.id:
                     for n in self.game_map.get_neighbours(self.game_map[ship.position]):
                         n.enemy_neighbouring += 1
+                    self.game_map.bfs_around_enemy(ship.position, constants.INSPIRATION_RADIUS)
 
             self.game_map[player.shipyard.position].structure = player.shipyard
             for dropoff in player.get_dropoffs():

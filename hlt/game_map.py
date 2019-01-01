@@ -103,6 +103,7 @@ class GameMap:
         self.HALITE_STOP = 50
         self.c = []
         self.extra_dropoff_possibilities = set()  # set of positions
+        self.prcntg_halite_left = 1
 
     def __getitem__(self, location):
         """
@@ -340,6 +341,7 @@ class GameMap:
         return (visited, target) if reachable else (visited, closest_pos)
 
     def explore(self, ship, destination):
+        """ Returns a path from a_star and resets map for next a star"""
         if self.is_surrounded(ship.position):
             return [[Direction.Still, 1]]
 
@@ -433,23 +435,9 @@ class GameMap:
                     Q.append(neighbour.position)
                     visited.add(neighbour.position)
 
-    def mark_inspired_cells(self, me, players):
-        """ Using enemy ship position, BFS s in a diamond shape around them
-        to determine the enemy_amount in INSPIRATION_RADIUS distance """
-        for p in players:
-            if not p.id == me.id:
-                # bfs around the ships
-                for their in p.get_ships():
-                    self.bfs_around_enemy(
-                        their.position, constants.INSPIRATION_RADIUS)
-
-    def init_map(self, me, all_players, enable_inspire=True, backup=False):
+    def init_map(self, me, all_players, backup=False):
         self.total_halite = 0
         my_dropoff_pos = self.get_dropoff_positions(me)
-        if enable_inspire:
-            t = time.time()
-            self.mark_inspired_cells(me, all_players)
-            logging.info(f"Marked inspired cells in {time.time() - t}")
         self.halite_priority = []
         num_occupied = 0
         for y in range(self.height):

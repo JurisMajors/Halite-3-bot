@@ -39,7 +39,8 @@ game = hlt.Game()
 # This is a good place to do computationally expensive start-up pre-processing.
 import bot.GlobalConstants as GC
 
-constantFile = f"{len(game.players.keys())}P{game.game_map.width}.json"
+#constantFile = f"{len(game.players.keys())}P{game.game_map.width}.json"
+constantFile = "4P64.json" # just default for now.
 GC.load_global_constants(constantFile)
 logging.info(f"Constants {constantFile} loaded!")
 
@@ -50,7 +51,7 @@ from bot.GlobalVariablesSingleton import GlobalVariablesSingleton
 from bot.MoveProcessor import MoveProcessor
 from bot.StateMachine import StateMachine
 
-game.ready("v59")
+game.ready("v65")
 
 class main():
 
@@ -97,19 +98,19 @@ class main():
                 0.8) and self.NR_OF_PLAYERS == 2
             self.ENABLE_COMBAT = GlobalVariablesSingleton.getInstance().ENABLE_COMBAT
 
-            enable_inspire = not self.have_less_ships(0.8)
             GlobalVariablesSingleton.getInstance().ENABLE_BACKUP = self.ENABLE_COMBAT
             self.ENABLE_BACKUP = GlobalVariablesSingleton.getInstance().ENABLE_BACKUP
             # initialize shipyard halite, inspiring stuff and other
             self.game_map.init_map(self.me, list(
-                self.game.players.values()), enable_inspire, self.ENABLE_BACKUP)
+                self.game.players.values()), self.ENABLE_BACKUP)
+            logging.info(f"Map initialized.{self.GF.time_left()} left")
             if self.game.turn_number == 1:
                 TOTAL_MAP_HALITE = self.game_map.total_halite
 
-            self.prcntg_halite_left = self.game_map.total_halite / TOTAL_MAP_HALITE
+            self.game_map.prcntg_halite_left = self.game_map.total_halite / TOTAL_MAP_HALITE
             # if clusters_determined and not cluster_centers:
             if self.game.turn_number >= GC.SPAWN_TURN:
-                self.game_map.HALITE_STOP = self.prcntg_halite_left * GC.INITIAL_HALITE_STOP
+                self.game_map.HALITE_STOP = self.game_map.prcntg_halite_left * GC.INITIAL_HALITE_STOP
 
             if self.crashed_ship_positions and self.game.turn_number < GC.CRASH_TURN and self.ENABLE_BACKUP:
                 self.process_backup_sending()
@@ -125,10 +126,8 @@ class main():
             if self.game.turn_number == GC.CRASH_SELECTION_TURN:
                 GC.CRASH_TURN = self.select_crash_turn()
 
-            if self.prcntg_halite_left > 0.2:
+            if self.game_map.prcntg_halite_left > 0.2:
                 self.return_percentage = GC.BIG_PERCENTAGE if self.game.turn_number < GC.PERCENTAGE_SWITCH else GC.SMALL_PERCENTAGE
-            else:  # if low percentage in map, return when half full
-                self.return_percentage = 0.6
 
             if self.should_build():
                 self.process_building()
@@ -142,8 +141,8 @@ class main():
             # halite
             dropoff_built = False
             SM = StateMachine(
-                self.game, self.return_percentage, self.prcntg_halite_left)
-            MP = MoveProcessor(self.game, self.has_moved, command_queue)
+                self.game, self.return_percentage)
+            MP = MoveProcessor(self.game, self.has_moved, command_queue, SM)
 
             while ships:  # go through all ships
                 ship = heappop(ships)[1]
@@ -170,6 +169,7 @@ class main():
 
                 # logging.info("SHIP {}, STATE {}, DESTINATION {}".format(
                 # ship.id, self.ship_state[ship.id], self.ship_dest[ship.id]))
+
                 # if ship is dropoff builder
                 if self.is_builder(ship):
                     # if enough halite and havent built a dropoff this turn
@@ -196,7 +196,7 @@ class main():
                 self.me.shipyard.position)
             if not dropoff_built and 2 * (self.max_enemy_ships() + 1) > len(
                     self.me.get_ships()) and self.game.turn_number <= GC.SPAWN_TURN \
-                    and self.me.halite_amount >= constants.SHIP_COST and self.prcntg_halite_left > (1 - 0.65) and \
+                    and self.me.halite_amount >= constants.SHIP_COST and self.game_map.prcntg_halite_left > (1 - 0.65) and \
                     not (self.game_map[
                              self.me.shipyard].is_occupied or surrounded_shipyard or "waiting" in self.ship_state.values()):
                 if not ("build" in self.ship_state.values() and self.me.halite_amount <= (
@@ -204,8 +204,6 @@ class main():
                     command_queue.append(self.me.shipyard.spawn())
 
             logging.info(self.GF.time_left())
-            # Send your moves back to the game environment, ending this turn.
-            logging.info(command_queue)
             self.game.end_turn(command_queue)
 
     def max_enemy_ships(self):
@@ -284,7 +282,7 @@ class main():
         return False
 
     def should_build(self):
-        if self.prcntg_halite_left <= 0.2\
+        if self.game_map.prcntg_halite_left <= 0.2\
         or self.game.turn_number >= GC.CRASH_TURN * 0.75\
         or len(self.me.get_dropoffs()) > GC.MAX_CLUSTERS:
             return False
@@ -311,7 +309,7 @@ class main():
             # there is no good dropoff position yet, make one
             self.game_map.set_close_friendly_ships(self.me)
             pos = self.game_map.get_most_dense_dropoff_position(
-                self.GF.get_dropoff_positions())
+                self.GF.get_dropoff_positions(), int(0.2 * self.game_map.width))
             if pos is not None:
                 # fake 10000 halite for new needed cluster
                 self.cluster_centers.append((10000, pos))
@@ -434,7 +432,7 @@ class main():
                 crashed_pos].halite_amount >= constants.MAX_HALITE:
                 # send a backup fleet there
                 self.send_ships(crashed_pos, 2, "backup", StateMachine(
-                    self.game, self.return_percentage, self.prcntg_halite_left).is_savior)
+                    self.game, self.return_percentage, self.game_map.prcntg_halite_left).is_savior)
 
     def is_savior(self, ship):
         return self.me.has_ship(ship.id) and ship.halite_amount <= self.return_percentage * 0.5 * constants.MAX_HALITE \

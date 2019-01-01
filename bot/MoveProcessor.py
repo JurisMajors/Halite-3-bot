@@ -14,7 +14,7 @@ from bot.GlobalVariablesSingleton import GlobalVariablesSingleton
 
 class MoveProcessor():
 
-    def __init__(self, game, has_moved, command_queue):
+    def __init__(self, game, has_moved, command_queue, statemachine):
         self.game = game
         self.game_map = game.game_map
         self.me = game.me
@@ -29,6 +29,7 @@ class MoveProcessor():
         self.command_queue = command_queue
         self.NR_OF_PLAYERS = GV.NR_OF_PLAYERS
         self.GF = GlobalFunctions(self.game)
+        self.SM = statemachine
 
     def produce_move(self, ship):
         if ship.id not in self.ship_obj:
@@ -206,6 +207,12 @@ class MoveProcessor():
                                 other_ship, ship.position)
                         elif other_ship.id in self.ship_path and self.ship_path[other_ship.id] and self.ship_path[other_ship.id][0][0] == Direction.Still:
                             move = self.a_star_move(ship)
+                        else:
+                            self.SM.state_transition(other_ship) # state transition the ship
+                            # if will be standing still
+                            if self.SM.ship_state[other_ship.id] == "collecting" or other_ship.position == self.SM.ship_dest[other_ship.id]:
+                                move = self.a_star_move(ship) # move around
+                            # else its regular ship move, standard flow.
                     else:  # wait until can move
                         move = Direction.Still
 

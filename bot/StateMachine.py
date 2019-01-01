@@ -15,13 +15,13 @@ from bot.GlobalVariablesSingleton import GlobalVariablesSingleton
 
 class StateMachine():
 
-    def __init__(self, game, return_percentage, prcntg_halite_left):
+    def __init__(self, game, return_percentage):
         self.game = game
         self.game_map = game.game_map
         self.me = game.me
         self.return_percentage = return_percentage
 
-        self.prcntg_halite_left = prcntg_halite_left
+        self.prcntg_halite_left = game.game_map.prcntg_halite_left
         GV = GlobalVariablesSingleton.getInstance()
         self.ENABLE_BACKUP = GV.ENABLE_BACKUP
         self.ENABLE_COMBAT = GV.ENABLE_COMBAT
@@ -84,13 +84,13 @@ class StateMachine():
         if new_state is not None:
             self.GF.state_switch(self.ship.id, new_state)
 
-    """Exploring_transition"""
-
     def exploring_transition(self):
+        """Exploring_transition"""
         distance_to_dest = self.game_map.calculate_distance(
             self.ship.position, self.ship_dest[self.ship.id])
         euclid_to_dest = self.game_map.euclidean_distance(
             self.ship.position, self.ship_dest[self.ship.id])
+
         if self.ship.position == self.ship_dest[self.ship.id]:
             # collect if reached destination or on medium sized patch
             return "collecting"
@@ -104,7 +104,8 @@ class StateMachine():
 
         elif self.game_map[self.ship.position].inspired\
         and self.game_map[self.ship.position].enemy_amount <= GC.UNSAFE_AREA\
-        and ((self.NR_OF_PLAYERS == 4 and self.game_map[self.ship.position].halite_amount * constants.INSPIRED_BONUS_MULTIPLIER > 20)
+        and (((self.NR_OF_PLAYERS == 4 and self.game_map[self.ship.position].halite_amount * constants.INSPIRED_BONUS_MULTIPLIER > 20
+            or self.game_map.width == 32))
         or self.game_map[self.ship.position].halite_amount * constants.INSPIRED_BONUS_MULTIPLIER\
         > 0.5 * self.game_map[self.ship_dest[self.ship.id]].halite_amount\
          * self.game_map.get_inspire_multiplier(self.ship.position, self.game_map[self.ship_dest[self.ship.id]], self.ENABLE_BACKUP)):
@@ -121,6 +122,7 @@ class StateMachine():
         elif self.ENABLE_COMBAT and (distance_to_dest > GC.CLOSE_TO_SHIPYARD * self.game_map.width or distance_to_dest == 1)\
                 and self.GF.dist_to_enemy_doff(self.ship.position) >= GC.ENEMY_SHIPYARD_CLOSE * self.game_map.width:
             return self.attempt_switching_assasinate()
+
         return None
 
     def attempt_switching_assasinate(self):
@@ -178,8 +180,7 @@ class StateMachine():
         if self.ship.is_full:
             return "returning"
 
-        elif self.NR_OF_PLAYERS == 4\
-        and self.game_map.percentage_occupied >= GC.BUSY_PERCENTAGE\
+        elif self.game_map.percentage_occupied >= GC.BUSY_PERCENTAGE\
         and self.ship.halite_amount >= GC.BUSY_RETURN_AMOUNT:
             return "returning"
 
@@ -251,7 +252,6 @@ class StateMachine():
         return False
 
     def returning_transition(self):
-
         if self.game.turn_number >= GC.CRASH_TURN and self.game_map[self.ship.position].parent.is_occupied\
                 and not self.me.has_ship(self.game_map[self.ship.position].parent.ship.id):
             self.ship_dest[self.ship.id] = self.game_map[
@@ -268,6 +268,8 @@ class StateMachine():
             cell = self.game_map[self.GF.get_shipyard(self.ship.position)]
             if cell.is_occupied and not self.me.has_ship(cell.ship.id) and "harakiri" not in self.ship_state.values():
                 return "harakiri"
+        elif self.ship.halite_amount <= constants.MAX_HALITE * self.return_percentage and self.game_map[self.ship.position].halite_amount > 50:
+            return "collecting"
         return None
 
     def fleet_transition(self):
