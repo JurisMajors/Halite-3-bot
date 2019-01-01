@@ -1,4 +1,6 @@
-import os,sys,inspect
+import os
+import sys
+import inspect
 sys.path.insert(1, os.path.join(sys.path[0], '..'))
 
 import hlt
@@ -10,6 +12,7 @@ from hlt.positionals import Direction, Position
 from heapq import heappush, heappop, merge
 from bot.GlobalVariablesSingleton import GlobalVariablesSingleton
 from collections import deque
+
 
 class GlobalFunctions():
 
@@ -26,7 +29,6 @@ class GlobalFunctions():
         self.ship_dest = GV.ship_dest
         self.NR_OF_PLAYERS = GV.NR_OF_PLAYERS
 
-
     def halite_priority_q(self, pos, area):
         # h_amount <= 0 to run minheap as maxheap
         h = []  # stores halite amount * -1 with its position in a minheap
@@ -39,13 +41,15 @@ class GlobalFunctions():
                 if p not in self.get_dropoff_positions():  # we dont consider the position of the centre or dropoffs
                     cell = self.game_map[p]
                     # we ignore cells who have 0 halite.
-                    # if that cell has small amount of halite, just take a ratio with 2x distance to lesser the priority
+                    # if that cell has small amount of halite, just take a
+                    # ratio with 2x distance to lesser the priority
                     if cell.halite_amount > 0:
-                        factor = self.game_map.cell_factor(pos, cell, self.me, self.ENABLE_BACKUP)
-                        # add negative halite amounts so that would act as maxheap
+                        factor = self.game_map.cell_factor(
+                            pos, cell, self.me, self.ENABLE_BACKUP)
+                        # add negative halite amounts so that would act as
+                        # maxheap
                         heappush(h, (factor, p))
         return h
-
 
     def dist_to_enemy_doff(self, pos):
         ''' determines how close to an enemy dropoff is the position'''
@@ -53,12 +57,10 @@ class GlobalFunctions():
             return 1000
         return min([self.game_map.euclidean_distance(pos, d) for d in self.get_enemy_dropoff_positions()])
 
-
     def get_shipyard(self, position):
         """ gives shipyard that the ship would return to """
         # return game_map[position].dijkstra_dest
         return min([(self.game_map.euclidean_distance(position, d), d) for d in self.get_dropoff_positions()], key=lambda x: x[0])[1]
-
 
     def state_switch(self, ship_id, new_state):
         if ship_id not in self.previous_state:
@@ -68,11 +70,11 @@ class GlobalFunctions():
         if not new_state == "exploring":  # reset path to empty list
             self.ship_path[ship_id] = []
         if new_state == "returning":
-            self.ship_dest[ship_id] = self.game_map[self.me.get_ship(ship_id).position].dijkstra_dest
+            self.ship_dest[ship_id] = self.game_map[
+                self.me.get_ship(ship_id).position].dijkstra_dest
 
         self.previous_state[ship_id] = self.ship_state[ship_id]
         self.ship_state[ship_id] = new_state
-
 
     def get_enemy_dropoff_positions(self):
         ''' returns a list of enemy dropoffs, including shipyards '''
@@ -84,16 +86,13 @@ class GlobalFunctions():
                     positions.append(d_off.position)
         return positions
 
-
     def get_dropoff_positions(self):
         """ Returns a list of all positions of dropoffs and the shipyard """
         return [dropoff.position for dropoff in self.me.get_dropoffs()] + [self.me.shipyard.position]
 
-
     @staticmethod
     def time_left():
         return 2 - (time.time() - GlobalVariablesSingleton.getInstance().turn_start)
-
 
     def bfs_unoccupied(self, position):
         # bfs for closest cell

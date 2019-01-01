@@ -1,4 +1,6 @@
-import os,sys,inspect
+import os
+import sys
+import inspect
 sys.path.insert(1, os.path.join(sys.path[0], '..'))
 
 import hlt
@@ -17,6 +19,7 @@ from math import ceil
 
 dropoff_clf = pickle.load(open('mlp.sav', 'rb'))
 
+
 class ClusterProcessor():
 
     def __init__(self, game):
@@ -25,17 +28,17 @@ class ClusterProcessor():
         self.me = game.me
         self.GV = GlobalVariablesSingleton.getInstance()
         self.NR_OF_PLAYERS = self.GV.NR_OF_PLAYERS
-
+        self.GF = GlobalFunctions(self.game)
 
     def clusters_with_classifier(self):
         ''' uses classifier to determine clusters for dropoff '''
         cluster_centers = self.predict_centers()
         # do filtering
-        cluster_centers = self.filter_clusters(cluster_centers, GC.MAX_CLUSTERS)
+        cluster_centers = self.filter_clusters(
+            cluster_centers, GC.MAX_CLUSTERS)
         logging.info("Finally")
         logging.info(cluster_centers)
         return cluster_centers
-
 
     def predict_centers(self):
         cntr = self.find_center()
@@ -78,7 +81,6 @@ class ClusterProcessor():
                         cluster_centers.append((total_halite, p_center))
         return cluster_centers
 
-
     def find_center(self):
         ''' finds center of our part of the map '''
         travel = int(self.game_map.width / self.NR_OF_PLAYERS)
@@ -95,12 +97,12 @@ class ClusterProcessor():
         min_dist = 1000
         # find the center thats the closes to the shipyard
         for pos in cntrs:
-            dist = self.game_map.calculate_distance(pos, self.me.shipyard.position)
+            dist = self.game_map.calculate_distance(
+                pos, self.me.shipyard.position)
             if dist < min_dist:
                 cntr = pos
                 min_dist = dist
         return cntr
-
 
     def filter_clusters(self, centers, max_centers):
         '''filters cluster centres on some human logic '''
@@ -125,13 +127,15 @@ class ClusterProcessor():
 
         centers_copy = centers[:]
         # remove points that are too close to each other or the shipyard
-        # in priority of points that are have the largest amount of points in area
+        # in priority of points that are have the largest amount of points in
+        # area
         for i, d in enumerate(centers_copy, start=0):
             halite, pos = d
-            diff = self.game_map.euclidean_distance(pos, self.me.shipyard.position)
+            diff = self.game_map.euclidean_distance(
+                pos, self.me.shipyard.position)
             if diff < GC.CLOSE_TO_SHIPYARD * self.game_map.width\
-             or GlobalFunctions(self.game).dist_to_enemy_doff(pos) < GC.CLOSE_TO_SHIPYARD * self.game_map.width\
-             or halite < 0.7 * self.GV.MIN_CLUSTER_VALUE:
+                    or self.GF.dist_to_enemy_doff(pos) < GC.CLOSE_TO_SHIPYARD * self.game_map.width\
+                    or halite < 0.7 * self.GV.MIN_CLUSTER_VALUE:
                 if d in centers:
                     centers.remove(d)
                 continue
@@ -145,7 +149,6 @@ class ClusterProcessor():
 
         return centers
 
-
     def too_close(self, centers, position):
         ''' removes clusters that are too close to each other '''
         to_remove = []
@@ -156,7 +159,6 @@ class ClusterProcessor():
                 to_remove.append(d)
         return to_remove
 
-
     def merge_clusters(self, centers):
         ''' merges clusters using clustering in 3D where
         x: x
@@ -166,7 +168,8 @@ class ClusterProcessor():
         logging.info("Merging clusters")
         normalizer = 1
         area = GC.CLUSTER_TOO_CLOSE * self.game_map.width
-        metric = distance_metric(type_metric.USER_DEFINED, func=self.custom_dist)
+        metric = distance_metric(
+            type_metric.USER_DEFINED, func=self.custom_dist)
         X = []  # center coordinates that are merged in an iteration
         tmp_centers = []  # to not modify the list looping through
         history = []  # contains all already merged centers
@@ -198,7 +201,6 @@ class ClusterProcessor():
         centers.sort(key=lambda x: x[0], reverse=True)  # sort by best patches
         return centers
 
-
     def custom_dist(self, p1, p2):
         ''' distance function for a clustering algorithm,
         manh dist + the absolute difference in halite amount '''
@@ -208,7 +210,6 @@ class ClusterProcessor():
         euclid_dist = self.game_map.euclidean_distance(
             Position(p1[0], p1[1]), Position(p2[0], p2[1]))
         return euclid_dist + abs(p1[2] - p2[2])
-
 
     def get_patch_data(self, x, y, center):
         # pool + 1 x pool + 1 size square inspected for data (classifier trained
@@ -226,19 +227,19 @@ class ClusterProcessor():
             for diff_y in range(-1 * int(pool / 2), int(pool / 2) + 1):
 
                 new_coord_x, new_coord_y = x - diff_x, y - \
-                                           diff_y  # get patch coordinates from centr
+                    diff_y  # get patch coordinates from centr
                 total_halite += self.game_map[Position(new_coord_x,
-                                                  new_coord_y)].halite_amount  # add to total halite
+                                                       new_coord_y)].halite_amount  # add to total halite
                 c_data = self.get_cell_data(new_coord_x, new_coord_y, center)
 
-                if biggest_halite < c_data[0]:  # determine cell with most halite
+                # determine cell with most halite
+                if biggest_halite < c_data[0]:
                     biggest_halite = c_data[0]
                     biggest_cell = Position(new_coord_x, new_coord_y)
 
                 area_d += c_data
 
         return [area_d], total_halite, biggest_cell
-
 
     def get_cell_data(self, x, y, center):
         cell = self.game_map[Position(x, y)]
