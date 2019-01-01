@@ -80,12 +80,13 @@ class DestinationProcessor():
     def reassign_duplicate_dests(self, destination, this_id):
         """ Given a destination and a ship id that has that new destination assigned
         looks for different ships that have the same destination and processes a new destination 
-        for them """ 
+        for them. Except if a ship is in state backup """ 
         # if another ship had the same destination
         s = self.get_ship_w_destination(destination, this_id)
         if s:  # find a new destination for the ships with same dest
             for other in s:
-                self.process_new_destination(other)
+                if self.ship_state[other.id] != "backup":
+                    self.process_new_destination(other)
 
     def process_new_destination(self, ship):
         """ Processes a new destination using find_new_destination for ship """

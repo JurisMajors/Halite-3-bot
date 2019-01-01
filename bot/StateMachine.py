@@ -102,7 +102,12 @@ class StateMachine():
                 self.ship_dest[self.ship.id], self.ship.id)
             return "collecting"
 
-        elif self.game_map[self.ship.position].inspired and self.game_map[self.ship.position].enemy_amount <= GC.UNSAFE_AREA:
+        elif self.game_map[self.ship.position].inspired\
+        and self.game_map[self.ship.position].enemy_amount <= GC.UNSAFE_AREA\
+        and ((self.NR_OF_PLAYERS == 4 and self.game_map[self.ship.position].halite_amount * constants.INSPIRED_BONUS_MULTIPLIER > 20)
+        or self.game_map[self.ship.position].halite_amount * constants.INSPIRED_BONUS_MULTIPLIER\
+        > 0.5 * self.game_map[self.ship_dest[self.ship.id]].halite_amount\
+         * self.game_map.get_inspire_multiplier(self.ship.position, self.game_map[self.ship_dest[self.ship.id]], self.ENABLE_BACKUP)):
             # for inspiring
             self.ship_dest[self.ship.id] = self.get_best_neighbour(
                 self.ship.position).position

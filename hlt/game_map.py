@@ -552,7 +552,7 @@ class GameMap:
                 self.extra_dropoff_possibilities.add(
                     pos)  # add the position
 
-    def get_most_dense_dropoff_position(self, dropoff_positions, min_dist=15):
+    def get_most_dense_dropoff_position(self, dropoff_positions, min_dist=12):
         """ Returns the position of the cell with the most close friendly ships that is at least
         min_dist away from all other dropoffs """
         max_nearby = 3  # maximum nearby friendly ships

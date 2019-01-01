@@ -18,7 +18,7 @@ def load_global_constants(json_file):
     global BUSY_RETURN_AMOUNT, UNSAFE_AREA, MAX_SHIP_DROPOFF_RATIO
 
     # adress = r'./{}/{}/{}'.format('bot', 'constantsprofiles', json_file)
-    adress = os.path.join(os.path.dirname(__file__), f'constantsprofiles/{json_file}')
+    adress = os.path.join(os.path.dirname(__file__), 'constantsprofiles', json_file)
     with open(adress) as f:
         data = json.load(f)
 
