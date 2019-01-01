@@ -24,6 +24,7 @@ class MoveProcessor():
         self.previous_state = GV.previous_state
         self.ship_path = GV.ship_path
         self.ship_state = GV.ship_state
+        self.previous_position = GV.previous_position
         self.has_moved = has_moved
         self.command_queue = command_queue
         self.NR_OF_PLAYERS = GV.NR_OF_PLAYERS
@@ -229,13 +230,7 @@ class MoveProcessor():
 
     def simulate_make_returning_move(self, other_ship):
         other_move = self.produce_move(other_ship)
-        self.command_queue.append(other_ship.move(other_move))
-        self.previous_position[other_ship.id] = other_ship.position
-        self.game_map[other_ship.position.directional_offset(
-            other_move)].mark_unsafe(other_ship)
-        if other_move != Direction.Still and self.game_map[other_ship.position].ship == other_ship:
-            self.game_map[other_ship.position].ship = None
-        self.has_moved[other_ship.id] = True
+        self.move_ship(other_ship, other_move)
         return other_move
 
     def get_dijkstra_move(self, ship):
@@ -278,8 +273,15 @@ class MoveProcessor():
             move = self.get_step(self.ship_path[ship.id])
         else:
             move = self.dir_to_dest(ship.position, destination)
+        self.move_ship(ship, move)
 
-        self.has_moved[ship.id] = True
-        self.command_queue.append(ship.move(move))
-        self.game_map[destination].mark_unsafe(ship)
-        self.game_map[ship.position].ship = None
+    def move_ship(self, ship, direction):
+        """ Updates the command_queue
+        and all necessary data structures about a ship moving """ 
+        self.has_moved[ship.id] = True # ship has moved
+        self.previous_position[ship.id] = ship.position # previous position is the current position
+        self.command_queue.append(ship.move(direction)) # add the move to cmnd queue
+        self.game_map[ship.position.directional_offset(direction)].mark_unsafe(ship) # mark next position unsafe
+        # update cell occupation
+        if direction != Direction.Still and self.game_map[ship.position].ship == ship:
+            self.game_map[ship.position].ship = None

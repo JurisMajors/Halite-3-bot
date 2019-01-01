@@ -39,9 +39,9 @@ game = hlt.Game()
 # This is a good place to do computationally expensive start-up pre-processing.
 import bot.GlobalConstants as GC
 
-constantFile = "2P32.json" if len(game.players.keys()) == 2 else "4P32.json"
+constantFile = f"{len(game.players.keys())}P{game.game_map.width}.json"
 GC.load_global_constants(constantFile)
-#logging.info("Loaded constants")
+logging.info(f"Constants {constantFile} loaded!")
 
 from bot.ClusterProcessor import ClusterProcessor
 from bot.DestinationProcessor import DestinationProcessor
@@ -81,6 +81,7 @@ class main():
             self.game.update_frame()
             self.game_map = self.game.game_map
             self.me = self.game.me
+            GlobalVariablesSingleton.getInstance().turn_start = time.time()
             self.clear_dictionaries()  # of crashed or transformed ships
             command_queue = []
 
@@ -94,7 +95,6 @@ class main():
 
             GlobalVariablesSingleton.getInstance().ENABLE_COMBAT = not self.have_less_ships(
                 0.8) and self.NR_OF_PLAYERS == 2
-            GlobalVariablesSingleton.getInstance().turn_start = time.time()
             self.ENABLE_COMBAT = GlobalVariablesSingleton.getInstance().ENABLE_COMBAT
 
             enable_inspire = not self.have_less_ships(0.8)
@@ -141,6 +141,9 @@ class main():
             # whether a dropoff has been built this turn so that wouldnt use too much
             # halite
             dropoff_built = False
+            SM = StateMachine(
+                self.game, self.return_percentage, self.prcntg_halite_left)
+            MP = MoveProcessor(self.game, self.has_moved, command_queue)
 
             while ships:  # go through all ships
                 ship = heappop(ships)[1]
@@ -163,13 +166,10 @@ class main():
                     self.ship_state[ship.id] = "exploring"  # explore
 
                 # transition
-                SM = StateMachine(
-                    self.game, self.return_percentage, self.prcntg_halite_left)
                 SM.state_transition(ship)
 
                 # logging.info("SHIP {}, STATE {}, DESTINATION {}".format(
                 # ship.id, self.ship_state[ship.id], self.ship_dest[ship.id]))
-                MP = MoveProcessor(self.game, self.has_moved, command_queue)
                 # if ship is dropoff builder
                 if self.is_builder(ship):
                     # if enough halite and havent built a dropoff this turn
@@ -186,21 +186,14 @@ class main():
                 else:  # not associated with building a dropoff, so move regularly
                     move = MP.produce_move(ship)
                     if move is not None:
-                        command_queue.append(ship.move(move))
-                        self.previous_position[ship.id] = ship.position
-                        self.game_map[ship.position.directional_offset(
-                            move)].mark_unsafe(ship)
-                        if move != Direction.Still and self.game_map[ship.position].ship == ship:
-                            self.game_map[ship.position].ship = None
+                        MP.move_ship(ship, move)
 
                 self.clear_dictionaries()  # of crashed or transformed ships
-
                 # This ship has made a move
                 self.has_moved[ship.id] = True
 
             surrounded_shipyard = self.game_map.is_surrounded(
                 self.me.shipyard.position)
-            logging.info(self.GF.time_left())
             if not dropoff_built and 2 * (self.max_enemy_ships() + 1) > len(
                     self.me.get_ships()) and self.game.turn_number <= GC.SPAWN_TURN \
                     and self.me.halite_amount >= constants.SHIP_COST and self.prcntg_halite_left > (1 - 0.65) and \
@@ -209,7 +202,10 @@ class main():
                 if not ("build" in self.ship_state.values() and self.me.halite_amount <= (
                         constants.SHIP_COST + constants.DROPOFF_COST)):
                     command_queue.append(self.me.shipyard.spawn())
+
+            logging.info(self.GF.time_left())
             # Send your moves back to the game environment, ending this turn.
+            logging.info(command_queue)
             self.game.end_turn(command_queue)
 
     def max_enemy_ships(self):
