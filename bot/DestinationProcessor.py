@@ -139,6 +139,9 @@ class DestinationProcessor():
         """ Returns a dictionary of dropoff positions 
         mapped to percentage of ships returning to that dropoff """
         distribution = {}
+        for d_pos in self.GF.get_dropoff_positions(): # init to 0
+            distribution[d_pos] = 0
+            
         for s in self.me.get_ships():  # count ships per dropoff
             eval_pos = s.position if s.id not in self.ship_dest else self.ship_dest[
                 s.id]
@@ -147,6 +150,7 @@ class DestinationProcessor():
                 distribution[d_pos] += 1
             else:
                 distribution[d_pos] = 1
+
         for p, amount in distribution.items():  # turn into percentages
             distribution[p] = amount / len(self.me.get_ships())
         return distribution
