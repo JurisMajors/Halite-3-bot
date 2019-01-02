@@ -95,6 +95,7 @@ class StateMachine():
             # collect if reached destination or on medium sized patch
             return "collecting"
 
+
         elif self.game_map[self.ship.position].halite_amount >= GC.MEDIUM_HALITE:
             self.ship_dest[self.ship.id] = self.ship.position
             self.ship_path[self.ship.id] = []
@@ -176,10 +177,6 @@ class StateMachine():
             self.ship.position].halite_amount * inspire_multiplier
 
         if self.ship.is_full:
-            return "returning"
-
-        elif self.game_map.percentage_occupied >= GC.BUSY_PERCENTAGE\
-        and self.ship.halite_amount >= GC.BUSY_RETURN_AMOUNT:
             return "returning"
 
         elif self.ship.halite_amount >= constants.MAX_HALITE * self.return_percentage and \
@@ -362,6 +359,7 @@ class StateMachine():
                     self.ship_dest[self.ship.id], self.ship.id)
             elif self.game_map[destination].is_occupied:  # not our ship
                 return self.attempt_switching_assasinate()
+                
         elif self.game_map[destination].enemy_amount >= GC.UNSAFE_AREA:
             self.DP.process_new_destination(self.ship)
             return "exploring"

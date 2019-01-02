@@ -63,6 +63,7 @@ class main():
         self.GF = GlobalFunctions(self.game)
         self.ENABLE_BACKUP = GV.ENABLE_BACKUP
         self.ENABLE_COMBAT = GV.ENABLE_COMBAT
+        self.ENABLE_INSPIRE = GV.ENABLE_INSPIRE
         self.ship_state = GV.ship_state
         self.ship_path = GV.ship_path
         self.ship_dest = GV.ship_dest
@@ -79,7 +80,7 @@ class main():
 
     def mainloop(self):
         while True:
-            self.game.update_frame()
+            self.game.update_frame(self.ENABLE_INSPIRE)
             self.game_map = self.game.game_map
             self.me = self.game.me
             GlobalVariablesSingleton.getInstance().turn_start = time.time()
@@ -97,9 +98,11 @@ class main():
             GlobalVariablesSingleton.getInstance().ENABLE_COMBAT = not self.have_less_ships(
                 0.8) and self.NR_OF_PLAYERS == 2
             self.ENABLE_COMBAT = GlobalVariablesSingleton.getInstance().ENABLE_COMBAT
-
             GlobalVariablesSingleton.getInstance().ENABLE_BACKUP = self.ENABLE_COMBAT
             self.ENABLE_BACKUP = GlobalVariablesSingleton.getInstance().ENABLE_BACKUP
+            GlobalVariablesSingleton.getInstance().ENABLE_INSPIRE = not self.have_less_ships(0.9)
+            self.ENABLE_INSPIRE = GlobalVariablesSingleton.getInstance().ENABLE_INSPIRE
+
             # initialize shipyard halite, inspiring stuff and other
             self.game_map.init_map(self.me, list(
                 self.game.players.values()), self.ENABLE_BACKUP)
@@ -126,8 +129,9 @@ class main():
             if self.game.turn_number == GC.CRASH_SELECTION_TURN:
                 GC.CRASH_TURN = self.select_crash_turn()
 
-            if self.game_map.prcntg_halite_left > 0.2:
-                self.return_percentage = GC.BIG_PERCENTAGE if self.game.turn_number < GC.PERCENTAGE_SWITCH else GC.SMALL_PERCENTAGE
+            self.return_percentage = GC.BIG_PERCENTAGE if self.game.turn_number < GC.PERCENTAGE_SWITCH else GC.SMALL_PERCENTAGE
+            if self.game_map.prcntg_halite_left < 0.15 and self.game_map.percentage_occupied >= GC.BUSY_PERCENTAGE:
+                self.return_percentage = GC.BUSY_RETURN_AMOUNT / constants.MAX_HALITE
 
             if self.should_build():
                 self.process_building()
@@ -282,9 +286,10 @@ class main():
         return False
 
     def should_build(self):
-        if self.game_map.prcntg_halite_left <= 0.2\
+        if self.game_map.prcntg_halite_left <= 0.25\
         or self.game.turn_number >= GC.CRASH_TURN * 0.75\
-        or len(self.me.get_dropoffs()) > GC.MAX_CLUSTERS:
+        or len(self.me.get_dropoffs()) > GC.MAX_CLUSTERS\
+        or self.any_builders():
             return False
 
         # calculate amount of ships going to each dropoff
@@ -357,8 +362,6 @@ class main():
         crash_turn = constants.MAX_TURNS - distance - 5
         # set the crash turn to be turn s.t. all ships make it
         crash_turn = max(crash_turn, GC.CRASH_SELECTION_TURN)
-        if self.game_map.width == 64:
-            crash_turn -= 5
         return crash_turn
 
     def ship_priority_q(self):

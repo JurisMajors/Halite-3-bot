@@ -43,7 +43,7 @@ class Game:
         """
         send_commands([name])
 
-    def update_frame(self):
+    def update_frame(self, inspire):
         """
         Updates the game object's state.
         :returns: nothing.
@@ -64,7 +64,8 @@ class Game:
                 if not ship.owner == self.me.id:
                     for n in self.game_map.get_neighbours(self.game_map[ship.position]):
                         n.enemy_neighbouring += 1
-                    self.game_map.bfs_around_enemy(ship.position, constants.INSPIRATION_RADIUS)
+                    if inspire:
+                        self.game_map.bfs_around_enemy(ship.position, constants.INSPIRATION_RADIUS)
 
             self.game_map[player.shipyard.position].structure = player.shipyard
             for dropoff in player.get_dropoffs():

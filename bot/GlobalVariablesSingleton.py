@@ -27,6 +27,7 @@ class GlobalVariablesSingleton():
             GlobalVariablesSingleton.__instance = self
             self.ENABLE_BACKUP = True
             self.ENABLE_COMBAT = True
+            self.ENABLE_INSPIRE = True
             self.ship_state = {}  # ship.id -> ship state
             # ship.id -> directional path to ship_dest[ship.id]
             self.ship_path = {}

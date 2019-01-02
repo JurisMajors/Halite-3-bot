@@ -81,7 +81,7 @@ def load_global_constants(json_file):
     BUSY_PERCENTAGE = data["BUSY_PERCENTAGE"]
 
     ''' amount of halite a ship has to have to return when a BUSY_PERCENTAGE of cells are occupied'''
-    BUSY_RETURN_AMOUNT = data["BUSY_RETURN_AMOUNT"] * constants.MAX_TURNS
+    BUSY_RETURN_AMOUNT = data["BUSY_RETURN_AMOUNT"] * constants.MAX_HALITE
     
     ''' definition of amount of enemy ships that make an area of radius 4 (manhattan distance) unsafe '''
     UNSAFE_AREA = data["UNSAFE_AREA"]
