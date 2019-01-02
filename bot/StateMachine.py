@@ -104,11 +104,9 @@ class StateMachine():
 
         elif self.game_map[self.ship.position].inspired\
         and self.game_map[self.ship.position].enemy_amount <= GC.UNSAFE_AREA\
-        and (((self.NR_OF_PLAYERS == 4 and self.game_map[self.ship.position].halite_amount * constants.INSPIRED_BONUS_MULTIPLIER > 20
-            or self.game_map.width == 32))
-        or self.game_map[self.ship.position].halite_amount * constants.INSPIRED_BONUS_MULTIPLIER\
+        and self.game_map[self.ship.position].halite_amount * constants.INSPIRED_BONUS_MULTIPLIER\
         > 0.5 * self.game_map[self.ship_dest[self.ship.id]].halite_amount\
-         * self.game_map.get_inspire_multiplier(self.ship.position, self.game_map[self.ship_dest[self.ship.id]], self.ENABLE_BACKUP)):
+         * self.game_map.get_inspire_multiplier(self.ship.position, self.game_map[self.ship_dest[self.ship.id]], self.ENABLE_BACKUP):
             # for inspiring
             self.ship_dest[self.ship.id] = self.get_best_neighbour(
                 self.ship.position).position
@@ -268,8 +266,6 @@ class StateMachine():
             cell = self.game_map[self.GF.get_shipyard(self.ship.position)]
             if cell.is_occupied and not self.me.has_ship(cell.ship.id) and "harakiri" not in self.ship_state.values():
                 return "harakiri"
-        elif self.ship.halite_amount <= constants.MAX_HALITE * self.return_percentage and self.game_map[self.ship.position].halite_amount > 50:
-            return "collecting"
         return None
 
     def fleet_transition(self):

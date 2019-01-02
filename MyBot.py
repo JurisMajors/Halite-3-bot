@@ -432,7 +432,7 @@ class main():
                 crashed_pos].halite_amount >= constants.MAX_HALITE:
                 # send a backup fleet there
                 self.send_ships(crashed_pos, 2, "backup", StateMachine(
-                    self.game, self.return_percentage, self.game_map.prcntg_halite_left).is_savior)
+                    self.game, self.return_percentage).is_savior)
 
     def is_savior(self, ship):
         return self.me.has_ship(ship.id) and ship.halite_amount <= self.return_percentage * 0.5 * constants.MAX_HALITE \
