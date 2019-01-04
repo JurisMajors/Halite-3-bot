@@ -14,7 +14,7 @@ from bot.GlobalVariablesSingleton import GlobalVariablesSingleton
 
 class MoveProcessor():
 
-    def __init__(self, game, has_moved, command_queue):
+    def __init__(self, game, has_moved, command_queue, statemachine):
         self.game = game
         self.game_map = game.game_map
         self.me = game.me
@@ -24,10 +24,12 @@ class MoveProcessor():
         self.previous_state = GV.previous_state
         self.ship_path = GV.ship_path
         self.ship_state = GV.ship_state
+        self.previous_position = GV.previous_position
         self.has_moved = has_moved
         self.command_queue = command_queue
         self.NR_OF_PLAYERS = GV.NR_OF_PLAYERS
         self.GF = GlobalFunctions(self.game)
+        self.SM = statemachine
 
     def produce_move(self, ship):
         if ship.id not in self.ship_obj:
@@ -205,6 +207,12 @@ class MoveProcessor():
                                 other_ship, ship.position)
                         elif other_ship.id in self.ship_path and self.ship_path[other_ship.id] and self.ship_path[other_ship.id][0][0] == Direction.Still:
                             move = self.a_star_move(ship)
+                        else:
+                            self.SM.state_transition(other_ship) # state transition the ship
+                            # if will be standing still
+                            if self.SM.ship_state[other_ship.id] == "collecting" or other_ship.position == self.SM.ship_dest[other_ship.id]:
+                                move = self.a_star_move(ship) # move around
+                            # else its regular ship move, standard flow.
                     else:  # wait until can move
                         move = Direction.Still
 
@@ -229,13 +237,7 @@ class MoveProcessor():
 
     def simulate_make_returning_move(self, other_ship):
         other_move = self.produce_move(other_ship)
-        self.command_queue.append(other_ship.move(other_move))
-        self.previous_position[other_ship.id] = other_ship.position
-        self.game_map[other_ship.position.directional_offset(
-            other_move)].mark_unsafe(other_ship)
-        if other_move != Direction.Still and self.game_map[other_ship.position].ship == other_ship:
-            self.game_map[other_ship.position].ship = None
-        self.has_moved[other_ship.id] = True
+        self.move_ship(other_ship, other_move)
         return other_move
 
     def get_dijkstra_move(self, ship):
@@ -278,8 +280,15 @@ class MoveProcessor():
             move = self.get_step(self.ship_path[ship.id])
         else:
             move = self.dir_to_dest(ship.position, destination)
+        self.move_ship(ship, move)
 
-        self.has_moved[ship.id] = True
-        self.command_queue.append(ship.move(move))
-        self.game_map[destination].mark_unsafe(ship)
-        self.game_map[ship.position].ship = None
+    def move_ship(self, ship, direction):
+        """ Updates the command_queue
+        and all necessary data structures about a ship moving """ 
+        self.has_moved[ship.id] = True # ship has moved
+        self.previous_position[ship.id] = ship.position # previous position is the current position
+        self.command_queue.append(ship.move(direction)) # add the move to cmnd queue
+        self.game_map[ship.position.directional_offset(direction)].mark_unsafe(ship) # mark next position unsafe
+        # update cell occupation
+        if direction != Direction.Still and self.game_map[ship.position].ship == ship:
+            self.game_map[ship.position].ship = None

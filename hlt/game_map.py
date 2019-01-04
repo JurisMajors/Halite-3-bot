@@ -495,9 +495,9 @@ class GameMap:
     def get_inspire_multiplier(self, cntr, cell, backup):
         if cell.inspired is None:
             cell.inspired = cell.enemy_amount >= constants.INSPIRATION_SHIP_COUNT
-        if cell.inspired and self.calculate_distance(cntr, cell.position) <= constants.INSPIRATION_RADIUS \
-                and (not backup or cell.halite_amount <= constants.MAX_HALITE):
-            return constants.INSPIRED_BONUS_MULTIPLIER
+        if cell.inspired and (self.prcntg_halite_left < 0.3 or self.calculate_distance(cntr, cell.position) <= constants.INSPIRATION_RADIUS)\
+                and (not backup or cell.halite_amount <= constants.MAX_HALITE) and not cell.enemy_neighbouring:
+            return (constants.INSPIRED_BONUS_MULTIPLIER + 1)
         else:
             return 1
 

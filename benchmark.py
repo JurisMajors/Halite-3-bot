@@ -2,7 +2,7 @@ import os
 from random import randint, choice, seed
 import json
 
-seed(3)
+seed(908)
 map_sizes = [32, 40, 48, 56, 64]  # possible map sizes
 # run iteration of bots with variables
 def run_iteration(bot_name, map_size, seed):

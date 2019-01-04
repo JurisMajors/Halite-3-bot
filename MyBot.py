@@ -51,7 +51,7 @@ from bot.GlobalVariablesSingleton import GlobalVariablesSingleton
 from bot.MoveProcessor import MoveProcessor
 from bot.StateMachine import StateMachine
 
-game.ready("v65")
+game.ready("v72")
 
 class main():
 
@@ -198,9 +198,19 @@ class main():
 
             surrounded_shipyard = self.game_map.is_surrounded(
                 self.me.shipyard.position)
-            if not dropoff_built and 2 * (self.max_enemy_ships() + 1) > len(
-                    self.me.get_ships()) and self.game.turn_number <= GC.SPAWN_TURN \
-                    and self.me.halite_amount >= constants.SHIP_COST and self.game_map.prcntg_halite_left > (1 - 0.65) and \
+            total_ships = max(1, sum([self.get_ship_amount(pID) for pID in self.game.players.keys()]))
+            halite_per_ship = self.game_map.total_halite / total_ships
+            if self.NR_OF_PLAYERS == 4:
+                if self.game_map.width <= 40:
+                    VALUE_PER_SHIP = 1
+                else:
+                    VALUE_PER_SHIP = 1.5
+            else:
+                VALUE_PER_SHIP = 0.8
+                
+            if not dropoff_built and self.me.halite_amount >= constants.SHIP_COST and self.max_enemy_ships() + 6 > len(
+                    self.me.get_ships()) and self.game.turn_number <= GC.SPAWN_TURN\
+                    and halite_per_ship >= VALUE_PER_SHIP * constants.SHIP_COST and self.game_map.prcntg_halite_left > (1 - 0.65) and \
                     not (self.game_map[
                              self.me.shipyard].is_occupied or surrounded_shipyard or "waiting" in self.ship_state.values()):
                 if not ("build" in self.ship_state.values() and self.me.halite_amount <= (
@@ -287,9 +297,10 @@ class main():
 
     def should_build(self):
         if self.game_map.prcntg_halite_left <= 0.25\
-        or self.game.turn_number >= GC.CRASH_TURN * 0.75\
         or len(self.me.get_dropoffs()) > GC.MAX_CLUSTERS\
-        or self.any_builders():
+        or self.any_builders()\
+        or self.game.turn_number <= self.dropoff_last_built + 10\
+        or not self.clusters_determined:
             return False
 
         # calculate amount of ships going to each dropoff

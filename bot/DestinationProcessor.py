@@ -50,7 +50,8 @@ class DestinationProcessor():
         # repeat while not a viable destination, or enemies around the position or
         # too many ships going to that dropoff area
         # or the same destination as before
-        while self.bad_destination(ship, destination) or (self.NR_OF_PLAYERS == 4 and self.game_map[destination].enemy_neighbouring > 0):
+        while self.bad_destination(ship, destination) or (self.NR_OF_PLAYERS == 4\
+        and self.game_map[destination].enemy_neighbouring > 0):
             # if no more options, return
             if not h:
                 self.GF.state_switch(ship.id, "returning")

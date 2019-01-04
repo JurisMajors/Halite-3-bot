@@ -27,6 +27,7 @@ class GlobalVariablesSingleton():
             GlobalVariablesSingleton.__instance = self
             self.ENABLE_BACKUP = True
             self.ENABLE_COMBAT = True
+            self.ENABLE_INSPIRE = True
             self.ship_state = {}  # ship.id -> ship state
             # ship.id -> directional path to ship_dest[ship.id]
             self.ship_path = {}
@@ -38,6 +39,6 @@ class GlobalVariablesSingleton():
             self.turn_start = 0  # for timing
             self.NR_OF_PLAYERS = len(game.players.keys())
             if self.NR_OF_PLAYERS == 2:
-                self.MIN_CLUSTER_VALUE = 7000 if game.game_map.width >= 48 else 8000
+                self.MIN_CLUSTER_VALUE = 7000 if game.game_map.width > 48 else 8000
             else:
                 self.MIN_CLUSTER_VALUE = 8000 if game.game_map.width >= 64 else 8000

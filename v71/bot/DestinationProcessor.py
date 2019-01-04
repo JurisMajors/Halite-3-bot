@@ -50,7 +50,8 @@ class DestinationProcessor():
         # repeat while not a viable destination, or enemies around the position or
         # too many ships going to that dropoff area
         # or the same destination as before
-        while self.bad_destination(ship, destination) or (self.NR_OF_PLAYERS == 4 and self.game_map[destination].enemy_neighbouring > 0):
+        while self.bad_destination(ship, destination) or (self.NR_OF_PLAYERS == 4\
+        and self.game_map[destination].enemy_neighbouring > 0 and self.game_map.prcntg_halite_left > 0.2):
             # if no more options, return
             if not h:
                 self.GF.state_switch(ship.id, "returning")
@@ -139,6 +140,9 @@ class DestinationProcessor():
         """ Returns a dictionary of dropoff positions 
         mapped to percentage of ships returning to that dropoff """
         distribution = {}
+        for d_pos in self.GF.get_dropoff_positions(): # init to 0
+            distribution[d_pos] = 0
+            
         for s in self.me.get_ships():  # count ships per dropoff
             eval_pos = s.position if s.id not in self.ship_dest else self.ship_dest[
                 s.id]
@@ -147,6 +151,7 @@ class DestinationProcessor():
                 distribution[d_pos] += 1
             else:
                 distribution[d_pos] = 1
+
         for p, amount in distribution.items():  # turn into percentages
             distribution[p] = amount / len(self.me.get_ships())
         return distribution

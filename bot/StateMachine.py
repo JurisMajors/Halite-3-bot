@@ -95,7 +95,6 @@ class StateMachine():
             # collect if reached destination or on medium sized patch
             return "collecting"
 
-
         elif self.game_map[self.ship.position].halite_amount >= GC.MEDIUM_HALITE:
             self.ship_dest[self.ship.id] = self.ship.position
             self.ship_path[self.ship.id] = []
@@ -104,10 +103,10 @@ class StateMachine():
             return "collecting"
 
         elif self.game_map[self.ship.position].inspired\
-        and self.game_map[self.ship.position].enemy_amount <= GC.UNSAFE_AREA\
-        and self.game_map[self.ship.position].halite_amount * constants.INSPIRED_BONUS_MULTIPLIER\
-        > 0.5 * self.game_map[self.ship_dest[self.ship.id]].halite_amount\
-         * self.game_map.get_inspire_multiplier(self.ship.position, self.game_map[self.ship_dest[self.ship.id]], self.ENABLE_BACKUP):
+                and self.game_map[self.ship.position].enemy_amount <= GC.UNSAFE_AREA\
+                and self.game_map[self.ship.position].halite_amount * constants.INSPIRED_BONUS_MULTIPLIER\
+                > 0.5 * self.game_map[self.ship_dest[self.ship.id]].halite_amount\
+                * self.game_map.get_inspire_multiplier(self.ship.position, self.game_map[self.ship_dest[self.ship.id]], self.ENABLE_BACKUP):
             # for inspiring
             self.ship_dest[self.ship.id] = self.get_best_neighbour(
                 self.ship.position).position
@@ -210,7 +209,7 @@ class StateMachine():
             # is neighbouring, attempt to kill sm1
             return self.attempt_switching_assasinate()
 
-        elif self.game_map[self.ship.position].enemy_neighbouring > 0 and self.ship.halite_amount >= GC.MEDIUM_HALITE and self.game_map[self.ship.position].halite_amount <= GC.MEDIUM_HALITE:  # if enemy right next to it
+        elif self.game_map[self.ship.position].enemy_neighbouring > 0 and self.ship.halite_amount >= GC.MEDIUM_HALITE:  # if enemy right next to it
             # move to neighbour that has minimal enemies, but more halite
             ratio = cell_halite / \
                 (self.game_map[self.ship.position].enemy_neighbouring + 1)
@@ -241,7 +240,7 @@ class StateMachine():
             neighbour_h = n.halite_amount * \
                 self.game_map.get_inspire_multiplier(
                     self.ship.position, self.game_map[n.position], self.ENABLE_BACKUP)
-            if n.enemy_amount < GC.UNSAFE_AREA and neighbour_h >= current_h + big_diff and neighbour_h != 0:
+            if n.enemy_amount < GC.UNSAFE_AREA and neighbour_h >= current_h + big_diff and neighbour_h != 0 and not n.enemy_neighbouring:
                 return True
 
         return False
@@ -263,6 +262,7 @@ class StateMachine():
             cell = self.game_map[self.GF.get_shipyard(self.ship.position)]
             if cell.is_occupied and not self.me.has_ship(cell.ship.id) and "harakiri" not in self.ship_state.values():
                 return "harakiri"
+
         return None
 
     def fleet_transition(self):
@@ -327,15 +327,18 @@ class StateMachine():
         neighbours = self.game_map.get_neighbours(
             self.game_map[self.ship.position])
         cell = self.game_map[self.ship.position]
-        for n in neighbours:
+        for n in neighbours:  # for each neighbouring cell
+            # if enemy next to it
             if n.is_occupied and not self.me.has_ship(n.ship.id):
                 self.ship_dest[self.ship.id] = self.get_best_neighbour(
                     self.ship.position).position
                 self.DP.reassign_duplicate_dests(
                     self.ship_dest[self.ship.id], self.ship.id)
-                return "build"
+                return "build"  # build at best neighbour
         else:
-            if cell.halite_amount <= 500 or (self.ship.is_full and cell.halite_amount <= 800):
+            # if cell has low halite or ship is full and there is a better
+            # patch neighbouring, go to best neighbour
+            if cell.halite_amount <= 100 or (self.ship.is_full and self.better_patch_neighbouring(cell.halite_amount)):
                 self.ship_dest[self.ship.id] = self.get_best_neighbour(
                     self.ship.position).position
                 self.DP.reassign_duplicate_dests(
@@ -345,25 +348,25 @@ class StateMachine():
 
     def backup_transition(self):
         destination = self.ship_dest[self.ship.id]
+
         if self.ship.position == destination:  # if arrived
             self.ship_path[self.ship.id] = []
             return "collecting"
-
-        elif self.ship.halite_amount >= constants.MAX_HALITE * self.return_percentage:
-            return "returning"
         elif self.game_map.calculate_distance(self.ship.position, destination) == 1:
+            # our ship at dest
             if self.game_map[destination].is_occupied and self.me.has_ship(self.game_map[destination].ship.id):
+                # collect at neighoburing cell
                 self.ship_dest[self.ship.id] = self.get_best_neighbour(
                     destination).position
                 self.DP.reassign_duplicate_dests(
                     self.ship_dest[self.ship.id], self.ship.id)
             elif self.game_map[destination].is_occupied:  # not our ship
-                return self.attempt_switching_assasinate()
-                
-        elif self.game_map[destination].enemy_amount >= GC.UNSAFE_AREA:
+                return self.attempt_switching_assasinate()  # mby kill it
+
+        elif self.game_map[destination].enemy_amount >= GC.UNSAFE_AREA: # if very unsafe
             self.DP.process_new_destination(self.ship)
-            return "exploring"
-        elif self.ENABLE_COMBAT and self.GF.dist_to_enemy_doff(self.ship.position) >= GC.CLOSE_TO_SHIPYARD * self.game_map.width:
+            return "exploring" # abort
+        elif self.ENABLE_COMBAT and self.GF.dist_to_enemy_doff(self.ship.position) >= GC.CLOSE_TO_SHIPYARD * self.game_map.width: # check if can kill
             return self.attempt_switching_assasinate()
         return None
 
@@ -380,7 +383,7 @@ class StateMachine():
             n_halite = n.halite_amount * \
                 self.game_map.get_inspire_multiplier(
                     position, n, self.ENABLE_BACKUP)
-            if n.enemy_amount < GC.UNSAFE_AREA and n_halite > max_halite:
+            if n.enemy_amount < GC.UNSAFE_AREA and n_halite > max_halite and not n.enemy_neighbouring:
                 best = n
                 max_halite = n_halite
         return best
